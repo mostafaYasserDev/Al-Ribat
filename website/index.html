@@ -299,7 +299,7 @@
         <h1>Al-Ribat (الرباط)</h1>
         <p>تطبيق هادئ وبسيط يساعدك توازن يومك بين العبادة والتركيز والإنجاز، بدون تعقيد.</p>
 
-        <a href="../app-release.apk" class="btn-download" download>
+        <a href="https://github.com/mostafaYasserDev/Al-Ribat/releases/latest" id="downloadBtn" class="btn-download" download>
           <span class="material-symbols-outlined">download</span>
           تحميل التطبيق (APK)
         </a>
@@ -399,6 +399,27 @@
       setMode(!isDark);
       localStorage.setItem("alribat-theme", !isDark ? "dark" : "light");
     });
+
+    // Fetch latest release APK dynamically from GitHub
+    async function fetchLatestRelease() {
+      const downloadBtn = document.getElementById('downloadBtn');
+      if (!downloadBtn) return;
+      
+      try {
+        const response = await fetch('https://api.github.com/repos/mostafaYasserDev/Al-Ribat/releases/latest');
+        if (response.ok) {
+          const data = await response.json();
+          const apkAsset = data.assets.find(asset => asset.name.endsWith('.apk'));
+          if (apkAsset) {
+            downloadBtn.href = apkAsset.browser_download_url;
+            downloadBtn.removeAttribute('download'); // Let the browser handle the direct download link
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching latest release:', error);
+      }
+    }
+    fetchLatestRelease();
   </script>
 </body>
 
