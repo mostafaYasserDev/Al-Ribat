@@ -11,6 +11,19 @@ class MotivationQuotes {
     'بارك الله في وقتك؛ ابدأ الآن.',
     'العادة الحسنة صدقة على نفسك كل يوم.',
     'ما خاب من استعان بالله ثم بسعيه.',
+    'قليل دائم خير من كثير منقطع.',
+    'الاستمرارية تصنع المعجزات.',
+    'بادر قبل أن تغادر.',
+  ];
+
+  static const _emptyLines = <String>[
+    'وقتك الآن ثمين، استثمره في إضافة نشاط ينفعك.',
+    'لحظات الفراغ فرصة لزرع عادة جديدة مفيدة.',
+    'لا تترك يومك يمر دون إنجاز، أضف نشاطاً الآن!',
+    'ما رأيك في إضافة عادة صغيرة تغير مسار يومك؟',
+    'استثمر هدوء هذه اللحظة في تحديد هدف بسيط.',
+    'الصفحة بيضاء، أنت من يقرر ما سيكتب فيها اليوم.',
+    'لا بأس بوقت مستقطع، لكن اجعل ما بعده إضافة مثمرة.',
   ];
 
   static String pickFor(String seed) {
@@ -20,5 +33,9 @@ class MotivationQuotes {
 
   static String randomLine() {
     return _lines[Random().nextInt(_lines.length)];
+  }
+
+  static String randomEmptyLine() {
+    return _emptyLines[Random().nextInt(_emptyLines.length)];
   }
 }

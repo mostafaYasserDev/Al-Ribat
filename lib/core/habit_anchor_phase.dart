@@ -29,7 +29,7 @@ PrayerPhase anchorPrayerPhaseForPointInDay(PrayerSchedule schedule, DateTime poi
   final i = _byPhase(prayers, PrayerPhase.isha).time;
   final fNext = schedule.tomorrowFajr.time;
 
-  if (point.isBefore(f)) return PrayerPhase.isha;
+  if (point.isBefore(f)) return PrayerPhase.fajr;
   if (point.isBefore(d)) return PrayerPhase.fajr;
   if (point.isBefore(a)) return PrayerPhase.dhuhr;
   if (point.isBefore(m)) return PrayerPhase.asr;

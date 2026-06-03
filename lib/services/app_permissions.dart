@@ -19,4 +19,13 @@ class AppPermissions {
       await Permission.scheduleExactAlarm.request();
     } catch (_) {}
   }
+
+  static Future<void> requestIgnoreBatteryOptimizationsIfNeeded() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final status = await Permission.ignoreBatteryOptimizations.status;
+      if (status.isGranted) return;
+      await Permission.ignoreBatteryOptimizations.request();
+    } catch (_) {}
+  }
 }

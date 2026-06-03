@@ -1,426 +1,59 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>الرباط | Al-Ribat</title>
-
-  <!-- Fonts & Icons -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0"
-    rel="stylesheet" />
-
-  <style>
-    :root {
-      /* Fajr Theme (Light) */
-      --primary: #6B9AC4;
-      --bg: #F4F9FF;
-      --surface: #FFFFFF;
-      --surface-container: #EAF2F9;
-      --text: #1C1B1F;
-      --text-secondary: #49454F;
-      --outline: #E0E0E0;
-      --shadow: 0 4px 12px rgba(107, 154, 196, 0.08);
-      --radius: 16px;
-    }
-
-    body.dark {
-      /* Isha Theme (Dark) */
-      --primary: #6B9AC4;
-      --bg: #141935;
-      --surface: #1F264A;
-      --surface-container: #2A335E;
-      --text: #E6E1E5;
-      --text-secondary: #CAC4D0;
-      --outline: #3B447A;
-      --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body,
-    html {
-      margin: 0;
-      padding: 0;
-      font-family: 'Tajawal', sans-serif;
-      background-color: #E5E5E5;
-      color: var(--text);
-    }
-
-    body.dark {
-      background-color: #0A0D1C;
-    }
-
-    /* App Screen Simulation */
-    .app-container {
-      max-width: 480px;
-      margin: 0 auto;
-      min-height: 100vh;
-      background-color: var(--bg);
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 0 40px rgba(0, 0, 0, 0.1);
-      position: relative;
-      transition: background-color 0.3s ease;
-    }
-
-    /* App Bar */
-    .app-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 16px 20px;
-      background-color: var(--bg);
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      transition: background-color 0.3s ease;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    }
-
-    .app-bar-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--text);
-      margin: 0;
-    }
-
-    .theme-toggle {
-      background: none;
-      border: none;
-      color: var(--text);
-      cursor: pointer;
-      padding: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 50%;
-      transition: background-color 0.2s;
-    }
-
-    .theme-toggle:hover {
-      background-color: var(--surface-container);
-    }
-
-    /* Content */
-    .content {
-      padding: 20px;
-      flex: 1;
-    }
-
-    /* Hero / Icon */
-    .hero {
-      text-align: center;
-      margin-bottom: 32px;
-      animation: fadeUp 0.6s ease-out;
-    }
-
-    .app-icon {
-      width: 120px;
-      height: 120px;
-      border-radius: 28px;
-      box-shadow: var(--shadow);
-      margin-bottom: 16px;
-      object-fit: cover;
-      background-color: var(--surface);
-    }
-
-    .hero h1 {
-      margin: 0 0 8px;
-      font-size: 28px;
-      font-weight: 800;
-    }
-
-    .hero p {
-      margin: 0;
-      color: var(--text-secondary);
-      font-size: 16px;
-      line-height: 1.5;
-    }
-
-    /* Download Button */
-    .btn-download {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      background-color: var(--primary);
-      color: white;
-      text-decoration: none;
-      padding: 16px 24px;
-      border-radius: 99px;
-      font-size: 18px;
-      font-weight: 700;
-      box-shadow: var(--shadow);
-      margin-top: 24px;
-      transition: transform 0.2s, opacity 0.2s;
-    }
-
-    .btn-download:hover {
-      transform: translateY(-2px);
-      opacity: 0.95;
-    }
-
-    .btn-download:active {
-      transform: translateY(0);
-    }
-
-    /* Cards */
-    .section-title {
-      font-size: 16px;
-      font-weight: 700;
-      margin: 24px 16px 12px;
-      color: var(--text);
-    }
-
-    .card {
-      background-color: var(--surface);
-      border-radius: var(--radius);
-      margin-bottom: 16px;
-      box-shadow: var(--shadow);
-      overflow: hidden;
-      transition: background-color 0.3s ease;
-    }
-
-    /* Bio Profile */
-    .profile-card {
-      padding: 20px 16px;
-      text-align: center;
-    }
-
-    .profile-avatar {
-      width: 80px;
-      height: 80px;
-      border-radius: 50%;
-      background-color: var(--surface-container);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 16px;
-      color: var(--primary);
-    }
-
-    .profile-avatar .material-symbols-outlined {
-      font-size: 40px;
-    }
-
-    .profile-name {
-      font-weight: 700;
-      font-size: 18px;
-      margin: 0 0 8px;
-    }
-
-    .profile-bio {
-      color: var(--text-secondary);
-      font-size: 14px;
-      line-height: 1.6;
-      margin: 0;
-    }
-
-    /* List Tiles */
-    .list-tile {
-      display: flex;
-      align-items: center;
-      padding: 16px;
-      text-decoration: none;
-      color: var(--text);
-      transition: background-color 0.2s;
-    }
-
-    .list-tile:active {
-      background-color: var(--surface-container);
-    }
-
-    .list-divider {
-      height: 1px;
-      background-color: var(--outline);
-      margin: 0 16px;
-    }
-
-    .list-icon {
-      color: var(--text-secondary);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-left: 16px;
-    }
-
-    .list-content {
-      flex: 1;
-    }
-
-    .list-title {
-      font-weight: 500;
-      font-size: 16px;
-      margin: 0 0 4px;
-    }
-
-    .list-subtitle {
-      color: var(--text-secondary);
-      font-size: 13px;
-      margin: 0;
-    }
-
-    .list-trailing {
-      color: var(--text-secondary);
-    }
-
-    @keyframes fadeUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق الرباط - Al-Ribat</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-  <div class="app-container">
-    <div class="app-bar">
-      <h1 class="app-bar-title">دعم المطوّر</h1>
-      <button class="theme-toggle" id="modeToggle" aria-label="تبديل الوضع">
-        <span class="material-symbols-outlined" id="themeIcon">light_mode</span>
-      </button>
-    </div>
 
-    <div class="content">
-      <div class="hero">
-        <img src="icon.png" alt="أيقونة تطبيق الرباط" class="app-icon" onerror="this.style.display='none'">
-        <h1>Al-Ribat (الرباط)</h1>
-        <p>تطبيق هادئ وبسيط يساعدك توازن يومك بين العبادة والتركيز والإنجاز، بدون تعقيد.</p>
+    <main class="container content-wrapper">
+        
+        <header class="header">
+            <h1 class="logo"><i class="fa-solid fa-mosque"></i> الرِّبَـاط</h1>
+            <p class="description">تطبيق إنتاجي متكامل يتمحور حول الصلاة لمتابعة عاداتك اليومية وتنظيم وقتك بكل بساطة.</p>
+        </header>
+        
+        <section class="downloads">
+            <a href="https://github.com/mostafaYasserDev/Al-Ribat/releases/download/V02.00/al_ribat_release_arm64.apk" class="btn btn-primary" download>
+                <i class="fa-brands fa-android"></i> تحميل للهواتف الحديثة (ARM64)
+            </a>
+            <a href="https://github.com/mostafaYasserDev/Al-Ribat/releases/download/V02.01/al_ribat_release_arm32.apk" class="btn btn-secondary" download>
+                <i class="fa-solid fa-download"></i> تحميل للهواتف الأقدم (ARM32)
+            </a>
+        </section>
 
-        <a href="https://github.com/mostafaYasserDev/Al-Ribat/releases/latest" id="downloadBtn" class="btn-download" download>
-          <span class="material-symbols-outlined">download</span>
-          تحميل التطبيق (APK)
-        </a>
-      </div>
+        <section class="support">
+            <p>ادعم تطوير التطبيق لاستمراره:</p>
+            <div class="support-links">
+                <a href="https://ipn.eg/S/mostafayasserdev/instapay/0TMgfK" target="_blank" class="btn btn-instapay">
+                    <i class="fa-solid fa-money-bill-transfer"></i> إنستاباي
+                </a>
+                <a href="http://vf.eg/vfcash?id=mt&qrId=DBsLLW" target="_blank" class="btn btn-vodafone">
+                    <i class="fa-solid fa-mobile-screen"></i> فودافون كاش
+                </a>
+            </div>
+        </section>
 
-      <h2 class="section-title">الدعم المالي</h2>
-      <div class="card">
-        <a href="http://vf.eg/vfcash?id=mt&qrId=DBsLLW" target="_blank" rel="noopener" class="list-tile">
-          <div class="list-icon"><span class="material-symbols-outlined">smartphone</span></div>
-          <div class="list-content">
-            <h4 class="list-title">رابط الدعم عبر فودافون كاش</h4>
-            <p class="list-subtitle">http://vf.eg/vfcash?id=mt&qrId=DBsLLW</p>
-          </div>
-          <span class="material-symbols-outlined list-trailing">open_in_new</span>
-        </a>
-        <div class="list-divider"></div>
-        <a href="https://ipn.eg/S/mostafayasserdev/instapay/0TMgfK" target="_blank" rel="noopener" class="list-tile">
-          <div class="list-icon"><span class="material-symbols-outlined">payment</span></div>
-          <div class="list-content">
-            <h4 class="list-title">رابط أو معرف إنستا باي</h4>
-            <p class="list-subtitle">يفتح الرابط في المتصفح</p>
-          </div>
-          <span class="material-symbols-outlined list-trailing">open_in_new</span>
-        </a>
-        <div class="list-divider"></div>
-        <a href="https://paypal.me/mostafayasserdev" target="_blank" rel="noopener" class="list-tile">
-          <div class="list-icon"><span class="material-symbols-outlined">account_balance_wallet</span></div>
-          <div class="list-content">
-            <h4 class="list-title">رابط الدعم عبر PayPal</h4>
-          </div>
-          <span class="material-symbols-outlined list-trailing">open_in_new</span>
-        </a>
-      </div>
+    </main>
 
-      <h2 class="section-title">التواصل والمجتمع</h2>
-      <div class="card">
-        <a href="https://www.instagram.com/lapnight.tech/" target="_blank" rel="noopener" class="list-tile">
-          <div class="list-icon"><span class="material-symbols-outlined">camera_alt</span></div>
-          <div class="list-content">
-            <h4 class="list-title">إنستغرام</h4>
-          </div>
-          <span class="material-symbols-outlined list-trailing">chevron_left</span>
-        </a>
-        <div class="list-divider"></div>
-        <a href="https://www.youtube.com/@LapNight" target="_blank" rel="noopener" class="list-tile">
-          <div class="list-icon"><span class="material-symbols-outlined">play_circle</span></div>
-          <div class="list-content">
-            <h4 class="list-title">يوتيوب</h4>
-          </div>
-          <span class="material-symbols-outlined list-trailing">chevron_left</span>
-        </a>
-        <div class="list-divider"></div>
-        <a href="https://www.tiktok.com/@lapnight.tech" target="_blank" rel="noopener" class="list-tile">
-          <div class="list-icon"><span class="material-symbols-outlined">music_note</span></div>
-          <div class="list-content">
-            <h4 class="list-title">تيك توك</h4>
-          </div>
-          <span class="material-symbols-outlined list-trailing">chevron_left</span>
-        </a>
-        <div class="list-divider"></div>
-        <a href="https://www.facebook.com/LapNight.eg/" target="_blank" rel="noopener" class="list-tile">
-          <div class="list-icon"><span class="material-symbols-outlined">groups</span></div>
-          <div class="list-content">
-            <h4 class="list-title">فيسبوك</h4>
-          </div>
-          <span class="material-symbols-outlined list-trailing">chevron_left</span>
-        </a>
-        <div class="list-divider"></div>
-        <a href="https://t.me/mostafaYasserDev" target="_blank" rel="noopener" class="list-tile">
-          <div class="list-icon"><span class="material-symbols-outlined">send</span></div>
-          <div class="list-content">
-            <h4 class="list-title">تيليجرام</h4>
-            <p class="list-subtitle">القناة أو الحساب الشخصي</p>
-          </div>
-          <span class="material-symbols-outlined list-trailing">chevron_left</span>
-        </a>
-      </div>
-    </div>
-  </div>
+    <footer class="footer">
+        <p>تطوير: <strong>مصطفى ياسر (LapNight)</strong></p>
+        <div class="social-links">
+            <a href="https://www.youtube.com/@LapNight" target="_blank" title="YouTube"><i class="fa-brands fa-youtube"></i></a>
+            <a href="https://t.me/mostafaYasserDev" target="_blank" title="Telegram"><i class="fa-brands fa-telegram"></i></a>
+            <a href="https://www.facebook.com/LapNight.eg/" target="_blank" title="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+            <a href="https://www.instagram.com/lapnight.tech/" target="_blank" title="Instagram"><i class="fa-brands fa-instagram"></i></a>
+            <a href="https://www.tiktok.com/@lapnight.tech" target="_blank" title="TikTok"><i class="fa-brands fa-tiktok"></i></a>
+        </div>
+    </footer>
 
-  <script>
-    const modeBtn = document.getElementById("modeToggle");
-    const icon = document.getElementById("themeIcon");
-
-    // Light mode default
-    function setMode(isDark) {
-      document.body.classList.toggle("dark", isDark);
-      icon.textContent = isDark ? "light_mode" : "dark_mode";
-    }
-
-    const savedTheme = localStorage.getItem("alribat-theme");
-    // Only dark if explicitly saved as dark, otherwise light
-    setMode(savedTheme === "dark");
-
-    modeBtn.addEventListener("click", () => {
-      const isDark = document.body.classList.contains("dark");
-      setMode(!isDark);
-      localStorage.setItem("alribat-theme", !isDark ? "dark" : "light");
-    });
-
-    // Fetch latest release APK dynamically from GitHub
-    async function fetchLatestRelease() {
-      const downloadBtn = document.getElementById('downloadBtn');
-      if (!downloadBtn) return;
-      
-      try {
-        const response = await fetch('https://api.github.com/repos/mostafaYasserDev/Al-Ribat/releases/latest');
-        if (response.ok) {
-          const data = await response.json();
-          const apkAsset = data.assets.find(asset => asset.name.endsWith('.apk'));
-          if (apkAsset) {
-            downloadBtn.href = apkAsset.browser_download_url;
-            downloadBtn.removeAttribute('download'); // Let the browser handle the direct download link
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching latest release:', error);
-      }
-    }
-    fetchLatestRelease();
-  </script>
 </body>
-
 </html>

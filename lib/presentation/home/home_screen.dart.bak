@@ -1,0 +1,599 @@
+import 'dart:async';
+import 'dart:math';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' show DateFormat;
+
+import '../../application/providers.dart';
+import '../../core/constants/prayer_phase.dart';
+import '../../core/habit_anchor_phase.dart';
+import '../../core/prayer_slot_conflict.dart';
+import '../../core/task_time_rules.dart';
+import '../../core/ui_confirm.dart';
+import '../../core/ui_feedback.dart';
+import '../../domain/entities/app_settings.dart';
+import '../../domain/entities/habit_item.dart';
+import '../../domain/entities/prayer_schedule.dart';
+import '../../domain/entities/task_item.dart';
+import '../../domain/entities/prayer_time.dart';
+import '../../services/motivation_quotes.dart';
+import '../widgets/add_habit_sheet.dart';
+import '../widgets/add_task_sheet.dart';
+import '../widgets/prayer_card.dart';
+import '../widgets/reflection_card.dart';
+import 'widgets/home_day_details_sheet.dart';
+import 'widgets/home_task_edit_dialog.dart';
+
+class HomeScreen extends ConsumerStatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  Timer? _uiTicker;
+
+  PrayerTime _currentPrayerFor(List<PrayerTime> prayers, PrayerPhase currentPhase) {
+    for (final prayer in prayers) {
+      if (prayer.phase == currentPhase) return prayer;
+    }
+    return prayers.first;
+  }
+
+  List<HabitItem> _habitsForPhase(
+    PrayerSchedule schedule,
+    List<HabitItem> habits,
+    PrayerPhase phase,
+  ) {
+    final weekday = DateTime.now().weekday;
+    return habits.where((h) {
+      if (!habitIsActiveOnWeekday(h, weekday)) return false;
+      return anchorPrayerPhaseForReminder(schedule, h) == phase;
+    }).toList();
+  }
+
+  String _betweenAdhanSentence(PrayerTime current, PrayerSchedule schedule) {
+    final idx = schedule.today.indexWhere((p) => p.phase == current.phase);
+    final next = (idx >= 0 && idx < schedule.today.length - 1)
+        ? schedule.today[idx + 1]
+        : schedule.tomorrowFajr;
+    final d = next.time.difference(current.time);
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
+    final duration = h > 0 ? '$h ساعة${m > 0 ? ' و $m دقيقة' : ''}' : '$m دقيقة';
+    return 'بين أذان ${current.phase.arabicName} و${next.phase.arabicName}: $duration';
+  }
+
+  String _dailyMotivation() {
+    final key = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    return MotivationQuotes.pickFor(key);
+  }
+
+  Future<void> _refreshData() async {
+    ref.invalidate(prayerScheduleProvider);
+    await ref.read(tasksProvider.notifier).load();
+    await ref.read(habitsProvider.notifier).load();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _uiTicker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
+    });
+    Future<void>.microtask(() async {
+      await _refreshData();
+    });
+  }
+
+  @override
+  void dispose() {
+    _uiTicker?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      Future<void>.microtask(_refreshData);
+    }
+  }
+
+  void _showAddMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add_task),
+              title: const Text('مهمة جديدة'),
+              onTap: () {
+                Navigator.pop(context);
+                _openTaskSheet(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.event_repeat),
+              title: const Text('عادة جديدة'),
+              onTap: () {
+                Navigator.pop(context);
+                _openHabitSheet(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
+
+  @override
+  Widget build(BuildContext context) {
+    final scheduleAsync = ref.watch(prayerScheduleProvider);
+    final tasks = ref.watch(tasksProvider).valueOrNull ?? const <TaskItem>[];
+    final habits = ref.watch(habitsProvider).valueOrNull ?? const <HabitItem>[];
+    final dayState = ref.watch(dayStateProvider);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('الرباط'),
+        actions: [
+          IconButton(
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              _refreshData();
+            },
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          HapticFeedback.lightImpact();
+          _showAddMenu();
+        },
+        label: const Text('إضافة'),
+        icon: const Icon(Icons.add),
+      ),
+      body: scheduleAsync.when(
+        data: (schedule) {
+          final prayers = schedule.today;
+          if (prayers.isEmpty) {
+            return const Center(child: Text('لا تتوفر بيانات للصلاة اليوم.'));
+          }
+          final settings = ref.watch(settingsProvider).valueOrNull ?? AppSettings.defaults;
+          final suggestion = _buildSuggestion(prayers, tasks, dayState.currentPrayerPhase);
+          final currentPrayer = _currentPrayerFor(prayers, dayState.currentPrayerPhase);
+          final currentTasks =
+              tasks.where((t) => t.linkedPrayer == dayState.currentPrayerPhase).toList();
+          final currentHabits = _habitsForPhase(schedule, habits, dayState.currentPrayerPhase);
+          final light = Theme.of(context).brightness == Brightness.light;
+          final bgColors = light
+              ? dayState.currentPrayerPhase.lightGradient
+              : const [Color(0xFF071320), Color(0xFF0A1B2A), Color(0xFF122437)];
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 450),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: bgColors,
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final maxContentWidth = constraints.maxWidth > 700 ? 700.0 : constraints.maxWidth;
+                return Center(
+                  child: SizedBox(
+                    width: maxContentWidth,
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
+                      children: [
+                Text(
+                  DateFormat('EEEE · d MMMM', 'ar').format(DateTime.now()),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? const Color(0xFF142018)
+                            : null,
+                        shadows: Theme.of(context).brightness == Brightness.dark
+                            ? const [Shadow(blurRadius: 10, color: Colors.black26)]
+                            : null,
+                      ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: light ? const Color(0xFFEAF4ED) : const Color(0xFF123226),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: light ? const Color(0xFFC8E0CC) : const Color(0xFF2D5A49),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.auto_awesome, color: light ? const Color(0xFF2F6D4B) : const Color(0xFF9ED9B9)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _dailyMotivation(),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: light ? const Color(0xFF1E4F35) : const Color(0xFFD7F3E5),
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    gradient: LinearGradient(
+                      colors: light
+                          ? const [Color(0xFFF6F8FF), Color(0xFFEAF1FF)]
+                          : const [Color(0xFF0C2036), Color(0xFF15304A)],
+                      begin: Alignment.topRight,
+                      end: Alignment.bottomLeft,
+                    ),
+                    border: Border.all(
+                      color: light ? const Color(0xFFD2DBEE) : const Color(0xFF2B4D70),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: light ? 0.08 : 0.28),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.schedule),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'أولوياتك الحالية: ${currentPrayer.phase.arabicName}',
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                            ),
+                            Text(DateFormat.jm('ar').format(currentPrayer.time)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          suggestion,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'المهام الآن (${currentTasks.where((e) => !e.isCompleted).length} غير مكتملة)',
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                        const SizedBox(height: 6),
+                        if (currentTasks.isEmpty)
+                          Text(
+                            'لا توجد مهام لهذه الفترة.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          )
+                        else
+                          ...currentTasks.take(4).map(
+                                (task) => ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Checkbox(
+                                    value: task.isCompleted,
+                                    onChanged: (_) {
+                                      HapticFeedback.selectionClick();
+                                      ref.read(tasksProvider.notifier).toggleTask(task);
+                                    },
+                                  ),
+                                  title: Text(
+                                    task.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      decoration:
+                                          task.isCompleted ? TextDecoration.lineThrough : null,
+                                    ),
+                                  ),
+                                  trailing: PopupMenuButton<String>(
+                                    tooltip: 'خيارات المهمة',
+                                    onSelected: (value) async {
+                                      if (value == 'delete') {
+                                        final ok = await confirmDestructiveAction(
+                                          context,
+                                          title: 'حذف المهمة؟',
+                                          message: 'لن يمكن استرجاع «${task.title}».',
+                                        );
+                                        if (!ok || !context.mounted) return;
+                                        await ref.read(tasksProvider.notifier).deleteTask(task.id);
+                                        if (context.mounted) appSnack(context, 'حُذفت المهمة.');
+                                        return;
+                                      }
+                                      final updated = await showDialog<TaskItem>(
+                                        context: context,
+                                        builder: (context) => HomeTaskEditDialog(
+                                          task: task,
+                                          schedule: schedule,
+                                          slotMinutes: settings.prayerSlotDurationMinutes,
+                                        ),
+                                      );
+                                      if (updated != null) {
+                                        await ref.read(tasksProvider.notifier).editTask(updated);
+                                        if (context.mounted) appSnack(context, 'تم تعديل المهمة.');
+                                      }
+                                    },
+                                    itemBuilder: (context) => const [
+                                      PopupMenuItem(value: 'edit', child: Text('تعديل')),
+                                      PopupMenuItem(value: 'delete', child: Text('حذف')),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                        if (currentTasks.length > 4)
+                          Text(
+                            'هناك ${currentTasks.length - 4} مهام إضافية في التفاصيل.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        const SizedBox(height: 8),
+                        Text('العادات الآن', style: Theme.of(context).textTheme.labelLarge),
+                        const SizedBox(height: 6),
+                        if (currentHabits.isEmpty)
+                          Text(
+                            'لا توجد عادات لهذه الفترة.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          )
+                        else
+                          ...currentHabits.take(4).map(
+                                (habit) => ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: Icon(
+                                    habit.isDoneToday ? Icons.check_circle : Icons.circle_outlined,
+                                    color: habit.isDoneToday ? Colors.green : null,
+                                  ),
+                                  title: Text(
+                                    habit.title,
+                                    style: TextStyle(
+                                      decoration:
+                                          habit.isDoneToday ? TextDecoration.lineThrough : null,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    '${TimeOfDay(hour: habit.reminderHour, minute: habit.reminderMinute).format(context)}'
+                                    '${habit.description == null ? '' : ' · ${habit.description}'}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  trailing: Wrap(
+                                    spacing: 4,
+                                    children: [
+                                      IconButton(
+                                        tooltip: 'تعديل',
+                                        onPressed: () async {
+                                          final updated = await showModalBottomSheet<HabitItem>(
+                                            context: context,
+                                            isScrollControlled: true,
+                                            showDragHandle: true,
+                                            builder: (ctx) => AddHabitSheet(
+                                              initialHabit: habit,
+                                              onSave: (h) async {
+                                                Navigator.of(ctx).pop(h);
+                                                return true;
+                                              },
+                                            ),
+                                          );
+                                          if (updated != null) {
+                                            await ref.read(habitsProvider.notifier).updateHabit(updated);
+                                            if (context.mounted) appSnack(context, 'تم تعديل العادة.');
+                                          }
+                                        },
+                                        icon: const Icon(Icons.edit_outlined),
+                                      ),
+                                      if (!habit.isDoneToday)
+                                        IconButton(
+                                          tooltip: 'تم اليوم',
+                                          onPressed: () =>
+                                              ref.read(habitsProvider.notifier).markDoneToday(habit),
+                                          icon: const Icon(Icons.done_outline),
+                                        )
+                                      else
+                                        IconButton(
+                                          tooltip: 'إلغاء الإتمام',
+                                          onPressed: () => ref
+                                              .read(habitsProvider.notifier)
+                                              .clearDoneToday(habit),
+                                          icon: const Icon(Icons.undo),
+                                        ),
+                                      IconButton(
+                                        tooltip: 'حذف',
+                                        onPressed: () async {
+                                          final ok = await confirmDestructiveAction(
+                                            context,
+                                            title: 'حذف العادة؟',
+                                            message: 'لن يمكن استرجاع «${habit.title}».',
+                                          );
+                                          if (!ok || !context.mounted) return;
+                                          await ref.read(habitsProvider.notifier).deleteHabit(habit.id);
+                                          if (context.mounted) appSnack(context, 'تم حذف العادة.');
+                                        },
+                                        icon: const Icon(Icons.delete_outline),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => openDayDetailsSheet(
+                          context: context,
+                          schedule: schedule,
+                          settings: settings,
+                        ),
+                        icon: const Icon(Icons.view_agenda_outlined),
+                        label: const Text('عرض تفاصيل اليوم'),
+                      ),
+                    ),
+                  ],
+                ),
+                if (dayState.currentPrayerPhase == PrayerPhase.isha)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: ReflectionCard(
+                      streakCount: max(dayState.streakCount, 1),
+                      onSave: (value) async {
+                        await ref.read(reflectionsProvider.notifier).add(value);
+                        await updateStreakIfNeeded(ref);
+                        if (context.mounted) {
+                          lightSuccessHaptic();
+                          appSnack(context, 'حُفظ التأمل في السجل.');
+                        }
+                      },
+                    ),
+                  ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Text(
+              'تعذر تحميل أوقات الصلاة.\n$error',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openTaskSheet(BuildContext context) {
+    final schedule = ref.read(prayerScheduleProvider).valueOrNull;
+    final settings = ref.read(settingsProvider).valueOrNull ?? AppSettings.defaults;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => AddTaskSheet(
+        schedule: schedule,
+        prayerSlotMinutes: settings.prayerSlotDurationMinutes,
+        onSave: (title, description, prayer, type, startM, endM, reminderM) async {
+          final error = await ref.read(tasksProvider.notifier).validateAndAddTask(
+            title: title,
+            description: description,
+            prayer: prayer,
+            type: type,
+            startM: startM,
+            endM: endM,
+            reminderM: reminderM,
+            schedule: schedule,
+            settings: settings,
+          );
+          if (error != null) {
+            if (context.mounted) {
+              appSnackTop(context, error);
+            }
+            return false;
+          }
+          lightSuccessHaptic();
+          if (context.mounted) appSnack(context, 'أُضيفت المهمة.');
+          return true;
+        },
+      ),
+    );
+  }
+
+  void _openHabitSheet(BuildContext context) {
+    final schedule = ref.read(prayerScheduleProvider).valueOrNull;
+    final settings = ref.read(settingsProvider).valueOrNull ?? AppSettings.defaults;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => AddHabitSheet(
+        onSave: (habit) async {
+          final error = await ref.read(habitsProvider.notifier).validateAndAddHabit(
+            habit: habit,
+            schedule: schedule,
+            settings: settings,
+          );
+          if (error != null) {
+            if (context.mounted) {
+              appSnackTop(context, error);
+            }
+            return false;
+          }
+          lightSuccessHaptic();
+          if (context.mounted) {
+            appSnack(context, 'أُضيفت العادة — ${MotivationQuotes.randomLine()}');
+          }
+          return true;
+        },
+      ),
+    );
+  }
+
+  String _buildSuggestion(
+    List<PrayerTime> prayers,
+    List<TaskItem> tasks,
+    PrayerPhase currentPhase,
+  ) {
+    final now = DateTime.now();
+    final inCurrentPhase = tasks.where((e) => e.linkedPrayer == currentPhase).toList();
+    final completedRate = inCurrentPhase.isEmpty
+        ? 0
+        : (inCurrentPhase.where((e) => e.isCompleted).length * 100 ~/ inCurrentPhase.length);
+    for (var i = 0; i < prayers.length; i++) {
+      final current = prayers[i];
+      final next = i < prayers.length - 1 ? prayers[i + 1] : null;
+      final curTime = current.time;
+      if (next != null) {
+        if (!now.isAfter(curTime) || !now.isBefore(next.time)) {
+          continue;
+        }
+        final remaining = next.time.difference(now).inMinutes;
+        if (remaining <= 30) {
+          return 'تبقى $remaining دقيقة قبل ${next.phase.arabicName}.';
+        }
+      } else {
+        if (!now.isAfter(curTime)) {
+          continue;
+        }
+      }
+      if (completedRate >= 70) {
+        return 'أداؤك ممتاز في هذه المرحلة.';
+      }
+      final incomplete = tasks.where((e) => !e.isCompleted).length;
+      return incomplete == 0
+          ? 'مرحلة جديدة — ما الهدف التالي؟'
+          : 'لديك $incomplete مهام غير مكتملة.';
+    }
+    return 'هدوء وتركيز بين الصلوات.';
+  }
+}
+

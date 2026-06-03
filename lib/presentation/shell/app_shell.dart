@@ -210,7 +210,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         selectedIndex: _index,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), label: 'اليوم'),
-          NavigationDestination(icon: Icon(Icons.menu_book_outlined), label: 'التأملات'),
+          NavigationDestination(icon: Icon(Icons.menu_book_outlined), label: 'الحالات المزاجية'),
           NavigationDestination(
             icon: Icon(Icons.center_focus_strong_outlined),
             label: 'التركيز',

@@ -10,6 +10,7 @@ Future<void> bootstrap() async {
   await Hive.openBox<String>('meta_box');
   await Hive.openBox<String>('reflections_box');
   await Hive.openBox<String>('habits_box');
+  await Hive.openBox<String>('activities_box');
   await Hive.openBox<String>('work_sessions_box');
   await initializeDateFormatting('ar');
   tzDataInit();

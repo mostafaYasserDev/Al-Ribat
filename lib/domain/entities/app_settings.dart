@@ -71,7 +71,7 @@ class AppSettings {
   static const defaults = AppSettings(
     themeMode: AppThemeMode.light,
     prayerMethod: PrayerCalculationMethod.muslimWorldLeague,
-    notificationsEnabled: true,
+    notificationsEnabled: false,
     focusModeEnabled: true,
     focusLeadMinutes: 15,
     prayerSlotDurationMinutes: 20,

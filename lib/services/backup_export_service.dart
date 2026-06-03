@@ -10,17 +10,15 @@ import 'package:share_plus/share_plus.dart';
 class BackupExportService {
   static Future<String> buildJsonString() async {
     final meta = Hive.box<String>('meta_box');
-    final tasksBox = Hive.box<String>('tasks_box');
-    final habitsBox = Hive.box<String>('habits_box');
+    final activitiesBox = Hive.box<String>('activities_box');
     final reflBox = Hive.box<String>('reflections_box');
     final workBox = Hive.box<String>('work_sessions_box');
 
     final payload = <String, dynamic>{
-      'version': 1,
+      'version': 2,
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'settingsJson': meta.get('settings'),
-      'tasks': tasksBox.values.toList(),
-      'habits': habitsBox.values.toList(),
+      'activities': activitiesBox.values.toList(),
       'reflections': reflBox.values.toList(),
       'workSessions': workBox.values.toList(),
     };
@@ -91,48 +89,88 @@ class BackupExportService {
       throw const FormatException('هيكلة الملف غير صحيحة.');
     }
     final v = decoded['version'];
-    if (v is! int || v != 1) {
+    
+    final meta = Hive.box<String>('meta_box');
+    final activitiesBox = Hive.box<String>('activities_box');
+    final reflBox = Hive.box<String>('reflections_box');
+    final workBox = Hive.box<String>('work_sessions_box');
+
+    await activitiesBox.clear();
+    await reflBox.clear();
+    await workBox.clear();
+
+    if (v == 1) {
+      // V1 Migration
+      final tasks = _asStringList(decoded['tasks'] ?? [], key: 'tasks');
+      final habits = _asStringList(decoded['habits'] ?? [], key: 'habits');
+      final reflections = _asStringList(decoded['reflections'] ?? [], key: 'reflections');
+      final workSessions = _asStringList(decoded['workSessions'] ?? [], key: 'workSessions');
+
+      // Convert tasks to activities
+      for (final tStr in tasks) {
+        final t = jsonDecode(tStr) as Map<String, dynamic>;
+        final act = {
+          'id': t['id'],
+          'title': t['title'],
+          'description': t['description'],
+          'repetition': 'once',
+          'targetDate': t['date'],
+          'type': t['type'] ?? 'independent',
+          'linkedPrayer': t['linkedPrayer'],
+          'notificationsEnabled': t['notificationsEnabled'] ?? false,
+          'reminderHour': t['reminderHour'],
+          'reminderMinute': t['reminderMinute'],
+          'isMeasurable': false,
+          'createdAt': t['createdAt'],
+          'history': t['isCompleted'] == true ? [{'date': t['date'], 'isSkipped': false, 'progress': 1.0}] : [],
+          'historyDates': t['isCompleted'] == true ? [t['date']] : [],
+          'orderIndex': t['orderIndex'] ?? 0,
+        };
+        await activitiesBox.add(jsonEncode(act));
+      }
+
+      // Convert habits to activities
+      for (final hStr in habits) {
+        final h = jsonDecode(hStr) as Map<String, dynamic>;
+        final act = {
+          'id': h['id'],
+          'title': h['title'],
+          'description': h['description'],
+          'repetition': 'daily',
+          'type': 'independent',
+          'linkedPrayer': h['anchorPrayer'],
+          'notificationsEnabled': h['notificationsEnabled'] ?? false,
+          'reminderHour': h['reminderHour'],
+          'reminderMinute': h['reminderMinute'],
+          'isMeasurable': h['isMeasurable'] ?? false,
+          'targetGoal': h['targetGoal'],
+          'goalUnit': h['goalUnit'],
+          'createdAt': h['createdAt'],
+          'history': h['history'] ?? [],
+          'historyDates': (h['history'] as List<dynamic>?)?.map((e) => (e as Map)['date']).toList() ?? [],
+          'orderIndex': h['orderIndex'] ?? 0,
+        };
+        await activitiesBox.add(jsonEncode(act));
+      }
+
+      for (final item in reflections) await reflBox.add(item);
+      for (final item in workSessions) await workBox.add(item);
+
+    } else if (v == 2) {
+      final activities = _asStringList(decoded['activities'] ?? [], key: 'activities');
+      final reflections = _asStringList(decoded['reflections'] ?? [], key: 'reflections');
+      final workSessions = _asStringList(decoded['workSessions'] ?? [], key: 'workSessions');
+
+      for (final item in activities) await activitiesBox.add(item);
+      for (final item in reflections) await reflBox.add(item);
+      for (final item in workSessions) await workBox.add(item);
+    } else {
       throw const FormatException('إصدار النسخة غير مدعوم.');
     }
-    if (!decoded.containsKey('tasks') ||
-        !decoded.containsKey('habits') ||
-        !decoded.containsKey('reflections') ||
-        !decoded.containsKey('workSessions') ||
-        !decoded.containsKey('settingsJson')) {
-      throw const FormatException('الملف لا يطابق هيكلة التصدير.');
-    }
-    final tasks = _asStringList(decoded['tasks'], key: 'tasks');
-    final habits = _asStringList(decoded['habits'], key: 'habits');
-    final reflections = _asStringList(decoded['reflections'], key: 'reflections');
-    final workSessions = _asStringList(decoded['workSessions'], key: 'workSessions');
 
     final settingsRaw = decoded['settingsJson'];
     if (settingsRaw != null && settingsRaw is! String) {
       throw const FormatException('settingsJson يجب أن يكون نصاً أو null.');
-    }
-
-    final meta = Hive.box<String>('meta_box');
-    final tasksBox = Hive.box<String>('tasks_box');
-    final habitsBox = Hive.box<String>('habits_box');
-    final reflBox = Hive.box<String>('reflections_box');
-    final workBox = Hive.box<String>('work_sessions_box');
-
-    await tasksBox.clear();
-    await habitsBox.clear();
-    await reflBox.clear();
-    await workBox.clear();
-
-    for (final item in tasks) {
-      await tasksBox.add(item);
-    }
-    for (final item in habits) {
-      await habitsBox.add(item);
-    }
-    for (final item in reflections) {
-      await reflBox.add(item);
-    }
-    for (final item in workSessions) {
-      await workBox.add(item);
     }
 
     if (settingsRaw == null) {

@@ -11,6 +11,8 @@ import '../../domain/entities/app_settings.dart';
 import '../../services/app_permissions.dart';
 import '../../services/backup_export_service.dart';
 import 'developer_support_screen.dart';
+import 'about_app_screen.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 // RadioListTile: استخدام groupValue/onChanged ما زال الأساس في القنوات المستقرة؛ التحذير من RadioGroup قيد التطور.
 // ignore_for_file: deprecated_member_use
@@ -141,6 +143,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           Card(
             child: ListTile(
+              leading: Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+              title: const Text('عن التطبيق'),
+              subtitle: const Text('فكرة التطبيق وسياسة الخصوصية'),
+              trailing: const Icon(Icons.chevron_left),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const Directionality(
+                      textDirection: TextDirection.rtl,
+                      child: AboutAppScreen(),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: Icon(Icons.lock_outline, color: Theme.of(context).colorScheme.primary),
+              title: const Text('قفل التطبيق برمز مرور'),
+              subtitle: const Text('حماية بياناتك برمز PIN المكون من 4 أرقام'),
+              trailing: const Icon(Icons.chevron_left),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                _showAppLockDialog(context);
+              },
+            ),
+          ),
+          Card(
+            child: ListTile(
               leading: const Icon(Icons.save_alt_outlined),
               title: const Text('نسخ احتياطي (JSON)'),
               subtitle: const Text(
@@ -193,8 +226,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 try {
                   await BackupExportService.importInteractive();
                   ref.invalidate(settingsProvider);
-                  ref.invalidate(tasksProvider);
-                  ref.invalidate(habitsProvider);
+                  ref.invalidate(activitiesProvider);
                   ref.invalidate(workSessionsProvider);
                   ref.invalidate(reflectionsProvider);
                   ref.invalidate(prayerScheduleProvider);
@@ -218,6 +250,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 if (value) {
                   await AppPermissions.requestNotificationIfNeeded();
                   await AppPermissions.requestExactAlarmIfNeeded();
+                  await AppPermissions.requestIgnoreBatteryOptimizationsIfNeeded();
                 }
                 await ref.read(settingsProvider.notifier).updateSettings(
                       settings.copyWith(notificationsEnabled: value),
@@ -462,5 +495,64 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       case PrayerCalculationMethod.dubai:
         return 'دبي';
     }
+  }
+
+  void _showAppLockDialog(BuildContext context) {
+    final box = Hive.box<String>('meta_box');
+    final currentPin = box.get('app_pin');
+    final controller = TextEditingController(text: currentPin);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('رمز مرور التطبيق'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('أدخل 4 أرقام لقفل التطبيق، أو اتركه فارغاً لإلغاء القفل.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              obscureText: true,
+              textAlign: TextAlign.center,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'مثال: 1234',
+                counterText: '',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final pin = controller.text.trim();
+              if (pin.isEmpty) {
+                await box.delete('app_pin');
+                if (context.mounted) {
+                  appSnack(context, 'تم إلغاء قفل التطبيق.');
+                  Navigator.pop(ctx);
+                }
+              } else if (pin.length == 4 && int.tryParse(pin) != null) {
+                await box.put('app_pin', pin);
+                if (context.mounted) {
+                  appSnack(context, 'تم تعيين رمز المرور بنجاح.');
+                  Navigator.pop(ctx);
+                }
+              } else {
+                appSnack(context, 'يجب أن يكون الرمز 4 أرقام فقط.');
+              }
+            },
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
   }
 }

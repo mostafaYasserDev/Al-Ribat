@@ -64,10 +64,7 @@ DateTime _previousPrayerTime(PrayerSchedule schedule, PrayerPhase phase) {
       break;
     }
     if (point.isBefore(today.first.time)) {
-      prev = today.last.time;
-      prevPhase = today.last.phase;
-      next = today.first.time;
-      nextPhase = today.first.phase;
+      return (prayer: PrayerPhase.fajr, type: TaskType.before);
     }
   }
   final dPrev = point.difference(prev).abs();

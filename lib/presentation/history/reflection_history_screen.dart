@@ -34,7 +34,7 @@ class ReflectionHistoryScreen extends ConsumerWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('التأملات')),
+        appBar: AppBar(title: const Text('الحالات المزاجية والتأملات')),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => _openAdd(context, ref),
           icon: const Icon(Icons.edit_note),
@@ -101,6 +101,13 @@ class ReflectionHistoryScreen extends ConsumerWidget {
                                 color: Theme.of(context).colorScheme.primary,
                               ),
                         ),
+                        if (item.mood != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            item.mood!,
+                            style: const TextStyle(fontSize: 24),
+                          ),
+                        ],
                         const SizedBox(height: 10),
                         SelectableText(
                           item.text,

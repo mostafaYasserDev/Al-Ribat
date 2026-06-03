@@ -9,15 +9,15 @@ import '../../domain/repositories/prayer_repository.dart';
 
 class PrayerRepositoryImpl implements PrayerRepository {
   @override
-  Future<List<PrayerTime>> getPrayerTimesForToday(AppSettings settings) async {
-    final s = await getPrayerSchedule(settings);
+  Future<List<PrayerTime>> getPrayerTimesForToday(AppSettings settings, {DateTime? date}) async {
+    final s = await getPrayerSchedule(settings, date: date);
     return s.today;
   }
 
   @override
-  Future<PrayerSchedule> getPrayerSchedule(AppSettings settings) async {
+  Future<PrayerSchedule> getPrayerSchedule(AppSettings settings, {DateTime? date}) async {
     final coords = await _resolveCoordinates(settings);
-    final now = DateTime.now();
+    final now = date ?? DateTime.now();
     final tomorrow = now.add(const Duration(days: 1));
     if (coords == null) {
       final t = _fallbackForDate(now);
@@ -60,6 +60,18 @@ class PrayerRepositoryImpl implements PrayerRepository {
       if (permission == LocationPermission.deniedForever ||
           permission == LocationPermission.denied) {
         return null;
+      }
+
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        try {
+          final position = await Geolocator.getCurrentPosition().timeout(
+            const Duration(seconds: 3),
+          );
+          return Coordinates(position.latitude, position.longitude);
+        } catch (_) {
+          return Coordinates(lastKnown.latitude, lastKnown.longitude);
+        }
       }
 
       final position = await Geolocator.getCurrentPosition().timeout(

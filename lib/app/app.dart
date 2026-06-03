@@ -6,6 +6,7 @@ import '../application/providers.dart';
 import '../domain/entities/app_settings.dart';
 import '../core/theme/app_theme.dart';
 import '../presentation/shell/app_shell.dart';
+import '../presentation/widgets/app_lock_wrapper.dart';
 
 class AlRibatApp extends ConsumerWidget {
   const AlRibatApp({super.key});
@@ -28,8 +29,10 @@ class AlRibatApp extends ConsumerWidget {
       themeMode: mode,
       home: const Directionality(
         textDirection: TextDirection.rtl,
-        child: WithForegroundTask(
-          child: AppShell(),
+        child: AppLockWrapper(
+          child: WithForegroundTask(
+            child: AppShell(),
+          ),
         ),
       ),
     );

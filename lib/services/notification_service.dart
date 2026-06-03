@@ -4,17 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:intl/intl.dart';
 
 import '../core/constants/prayer_phase.dart';
 import '../domain/entities/app_settings.dart';
-import '../domain/entities/habit_item.dart';
+import '../domain/entities/activity_item.dart';
 import '../domain/entities/prayer_time.dart';
-import '../domain/entities/task_item.dart';
 import 'motivation_quotes.dart';
 
 class NotificationService {
-  static const _habitChannelId = 'habit_reminders_v2';
-  static const _taskChannelId = 'task_reminders_v2';
+  static const _activityChannelId = 'activity_reminders_v2';
+
   NotificationService() {
     _ready = _init();
   }
@@ -54,7 +54,7 @@ class NotificationService {
     return AndroidScheduleMode.inexactAllowWhileIdle;
   }
 
-  Future<void> _ensureNotificationPermission() async {
+  Future<void> ensureNotificationPermission() async {
     if (!Platform.isAndroid) return;
     try {
       final android = _plugin.resolvePlatformSpecificImplementation<
@@ -69,8 +69,6 @@ class NotificationService {
     } catch (_) {}
   }
 
-  /// Cancels only IDs that are still scheduled. Avoids thousands of no-op
-  /// platform calls (which could block the UI for minutes).
   Future<void> _cancelPendingWhere(bool Function(int id) test) async {
     await _ready;
     final pending = await _plugin.pendingNotificationRequests();
@@ -123,11 +121,11 @@ class NotificationService {
     AppSettings settings,
   ) async {
     await _ready;
-    await _ensureNotificationPermission();
     if (!settings.notificationsEnabled) {
       await _plugin.cancelAll();
       return;
     }
+    await ensureNotificationPermission();
 
     await _cancelPendingWhere(
       (id) => (id >= 1 && id <= 32) || (id >= 100 && id < 200),
@@ -169,7 +167,7 @@ class NotificationService {
           await _zonedScheduleWithFallback(
             id: 100 + i,
             title: 'بدأت مرحلة ${p.phase.arabicName}',
-            body: 'ما المهمة التي تريد إنجازها الآن؟',
+            body: 'ما المهمة أو النشاط الذي تريد إنجازه الآن؟',
             when: tz.TZDateTime.from(afterPrayerPrompt, tz.local),
             details: const NotificationDetails(
               android: AndroidNotificationDetails(
@@ -199,97 +197,110 @@ class NotificationService {
     return now.add(const Duration(days: 1));
   }
 
-  Future<void> scheduleHabitNotifications(
-    List<HabitItem> habits,
+  Future<void> scheduleActivityNotifications(
+    List<ActivityItem> activities,
     AppSettings settings,
   ) async {
     await _ready;
-    await _ensureNotificationPermission();
-    await _cancelPendingWhere((id) => id >= 2100 && id < 9000);
+    await _cancelPendingWhere((id) => id >= 2000 && id < 9900);
 
     if (!settings.notificationsEnabled) {
       return;
     }
+    await ensureNotificationPermission();
 
-    var nid = 2100;
+    var nid = 2000;
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
 
-    for (final h in habits) {
-      if (!h.notificationsEnabled) continue;
-      if (h.isDoneToday) continue;
-      final quote = MotivationQuotes.pickFor(h.id);
-      for (final wd in h.effectiveWeekdays) {
-        if (nid >= 8999) break;
-        final when = _nextDartWeekdayOccurrence(h.reminderHour, h.reminderMinute, wd);
+    for (final act in activities) {
+      if (!act.notificationsEnabled || act.reminderHour == null || act.reminderMinute == null) {
+        continue;
+      }
+      
+      if (act.isDoneOn(todayStr) || act.isSkippedOn(todayStr)) {
+        continue;
+      }
+
+      final quote = MotivationQuotes.pickFor(act.id);
+      final bodyText = '${act.description?.trim().isNotEmpty == true ? '${act.description} — ' : ''}$quote';
+      
+      if (act.repetition == ActivityRepetition.weekly) {
+        for (final wd in act.repeatDays) {
+          if (nid >= 9899) break;
+          final when = _nextDartWeekdayOccurrence(act.reminderHour!, act.reminderMinute!, wd);
+          try {
+            await _zonedScheduleWithFallback(
+              id: nid,
+              title: 'موعد نشاطك: ${act.title}',
+              body: bodyText,
+              when: when,
+              details: const NotificationDetails(
+                android: AndroidNotificationDetails(
+                  _activityChannelId,
+                  'تذكيرات الأنشطة والعادات',
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  playSound: true,
+                  enableVibration: true,
+                ),
+              ),
+              matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+            );
+          } catch (e, st) {}
+          nid++;
+        }
+      } else if (act.repetition == ActivityRepetition.daily) {
+        final now = tz.TZDateTime.now(tz.local);
+        var when = tz.TZDateTime(tz.local, now.year, now.month, now.day, act.reminderHour!, act.reminderMinute!);
+        if (!when.isAfter(now)) {
+          when = when.add(const Duration(days: 1));
+        }
         try {
           await _zonedScheduleWithFallback(
             id: nid,
-            title: 'حان وقت عادتك: ${h.title}',
-            body: '${h.description?.trim().isNotEmpty == true ? '${h.description} — ' : ''}$quote',
+            title: 'موعد نشاطك: ${act.title}',
+            body: bodyText,
             when: when,
             details: const NotificationDetails(
               android: AndroidNotificationDetails(
-                _habitChannelId,
-                'تذكيرات العادات',
-                channelDescription: 'تذكير بالعادات مع جمل تحفيزية.',
+                _activityChannelId,
+                'تذكيرات الأنشطة والعادات',
                 importance: Importance.max,
                 priority: Priority.high,
                 playSound: true,
                 enableVibration: true,
               ),
             ),
-            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+            matchDateTimeComponents: DateTimeComponents.time,
           );
-        } catch (e, st) {
-          debugPrint('Habit notification failed: $e\n$st');
-        }
+        } catch (e, st) {}
         nid++;
+      } else {
+        // Once or Monthly (simplified to just next occurrence if it's today)
+        final now = tz.TZDateTime.now(tz.local);
+        var when = tz.TZDateTime(tz.local, now.year, now.month, now.day, act.reminderHour!, act.reminderMinute!);
+        if (when.isAfter(now)) {
+          try {
+            await _zonedScheduleWithFallback(
+              id: nid,
+              title: 'موعد نشاطك: ${act.title}',
+              body: bodyText,
+              when: when,
+              details: const NotificationDetails(
+                android: AndroidNotificationDetails(
+                  _activityChannelId,
+                  'تذكيرات الأنشطة والعادات',
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  playSound: true,
+                  enableVibration: true,
+                ),
+              ),
+            );
+          } catch (e, st) {}
+          nid++;
+        }
       }
-    }
-  }
-
-  Future<void> scheduleTaskNotifications(
-    List<TaskItem> tasks,
-    AppSettings settings,
-  ) async {
-    await _ready;
-    await _ensureNotificationPermission();
-    await _cancelPendingWhere((id) => id >= 9200 && id < 9800);
-    if (!settings.notificationsEnabled) return;
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    var id = 9200;
-    for (final task in tasks) {
-      if (task.isCompleted) continue;
-      final reminderM = task.reminderMinutesFromMidnight ?? task.startMinutesFromMidnight;
-      if (reminderM == null) continue;
-      var when = todayStart.add(Duration(minutes: reminderM));
-      if (!when.isAfter(now)) {
-        when = todayStart.add(const Duration(days: 1)).add(Duration(minutes: reminderM));
-      }
-      final quote = MotivationQuotes.pickFor(task.id);
-      try {
-        await _zonedScheduleWithFallback(
-          id: id,
-          title: 'موعد مهمة: ${task.title}',
-          body: '${task.description?.trim().isNotEmpty == true ? '${task.description} — ' : ''}$quote',
-          when: tz.TZDateTime.from(when, tz.local),
-          details: const NotificationDetails(
-            android: AndroidNotificationDetails(
-              _taskChannelId,
-              'تذكيرات المهام',
-              channelDescription: 'تنبيهات مواعيد المهام مع جمل تحفيزية.',
-              importance: Importance.max,
-              priority: Priority.high,
-              playSound: true,
-              enableVibration: true,
-            ),
-          ),
-        );
-      } catch (e, st) {
-        debugPrint('Task notification failed: $e\n$st');
-      }
-      id++;
-      if (id >= 9800) break;
     }
   }
 
@@ -308,7 +319,6 @@ class NotificationService {
         android: AndroidNotificationDetails(
           'focus_complete',
           'انتهاء جلسة التركيز',
-          channelDescription: 'تنبيه عند انتهاء المؤقت مع صوت.',
           importance: Importance.max,
           priority: Priority.high,
           playSound: true,
@@ -317,5 +327,4 @@ class NotificationService {
       ),
     );
   }
-
 }

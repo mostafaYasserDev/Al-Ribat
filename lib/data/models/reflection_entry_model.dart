@@ -7,6 +7,7 @@ class ReflectionEntryModel extends ReflectionEntry {
     required super.id,
     required super.text,
     required super.createdAt,
+    super.mood,
   });
 
   factory ReflectionEntryModel.fromEntity(ReflectionEntry entry) {
@@ -14,6 +15,7 @@ class ReflectionEntryModel extends ReflectionEntry {
       id: entry.id,
       text: entry.text,
       createdAt: entry.createdAt,
+      mood: entry.mood,
     );
   }
 
@@ -23,6 +25,7 @@ class ReflectionEntryModel extends ReflectionEntry {
       id: json['id'] as String,
       text: json['text'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      mood: json['mood'] as String?,
     );
   }
 
@@ -31,6 +34,7 @@ class ReflectionEntryModel extends ReflectionEntry {
       'id': id,
       'text': text,
       'createdAt': createdAt.toIso8601String(),
+      'mood': mood,
     });
   }
 }

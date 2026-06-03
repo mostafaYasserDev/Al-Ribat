@@ -20,9 +20,29 @@ class StatsScreen extends ConsumerWidget {
             color: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(
-                stats.feedbackLine,
-                style: Theme.of(context).textTheme.titleMedium,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.insights, color: scheme.primary),
+                      const SizedBox(width: 8),
+                      Text('نظرة ذكية', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: scheme.primary)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    stats.feedbackLine,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  const SizedBox(height: 12),
+                  if (stats.mostProductivePhase != null)
+                    Text('✨ أكثر الأوقات إنتاجية: ${stats.mostProductivePhase!.arabicName}'),
+                  if (stats.mostSkippedActivity != null)
+                    Text('⚠️ العادة الأكثر تخطياً: ${stats.mostSkippedActivity}'),
+                  const SizedBox(height: 6),
+                  Text('📈 نسبة الالتزام هذا الأسبوع: ${(stats.completionRateThisWeek * 100).toStringAsFixed(1)}%'),
+                ],
               ),
             ),
           ),

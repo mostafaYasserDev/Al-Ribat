@@ -10,6 +10,9 @@ class StatsSnapshot {
     required this.focusMinutesThisWeek,
     required this.habitsMarkedThisWeek,
     required this.feedbackLine,
+    this.mostProductivePhase,
+    this.mostSkippedActivity,
+    this.completionRateThisWeek = 0.0,
   });
 
   final int weeklyCompleted;
@@ -20,4 +23,7 @@ class StatsSnapshot {
   final int focusMinutesThisWeek;
   final int habitsMarkedThisWeek;
   final String feedbackLine;
+  final PrayerPhase? mostProductivePhase;
+  final String? mostSkippedActivity;
+  final double completionRateThisWeek;
 }
