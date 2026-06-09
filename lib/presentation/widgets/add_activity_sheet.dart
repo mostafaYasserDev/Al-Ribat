@@ -350,11 +350,12 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                   ButtonSegment(value: ActivityRepetition.once, label: Text('مرة واحدة')),
                   ButtonSegment(value: ActivityRepetition.daily, label: Text('يومياً')),
                   ButtonSegment(value: ActivityRepetition.weekly, label: Text('أسبوعياً')),
+                  ButtonSegment(value: ActivityRepetition.monthly, label: Text('شهرياً')),
                 ],
                 selected: {_repetition},
                 onSelectionChanged: (v) => setState(() => _repetition = v.first),
               ),
-              
+
               if (_repetition == ActivityRepetition.weekly) ...[
                 const SizedBox(height: 8),
                 Wrap(
@@ -363,6 +364,30 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                     for (int i = 1; i <= 7; i++)
                       FilterChip(
                         label: Text(['إ', 'ث', 'أ', 'خ', 'ج', 'س', 'ح'][i - 1]),
+                        selected: _repeatDays.contains(i),
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _repeatDays.add(i);
+                            } else {
+                              _repeatDays.remove(i);
+                            }
+                          });
+                        },
+                      )
+                  ],
+                ),
+              ],
+
+              if (_repetition == ActivityRepetition.monthly) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (int i = 1; i <= 31; i++)
+                      FilterChip(
+                        label: Text('$i'),
                         selected: _repeatDays.contains(i),
                         onSelected: (selected) {
                           setState(() {
