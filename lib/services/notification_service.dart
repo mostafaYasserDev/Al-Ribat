@@ -275,11 +275,38 @@ class NotificationService {
           );
         } catch (e, st) {}
         nid++;
-      } else {
-        // Once or Monthly (simplified to just next occurrence if it's today)
+      } else if (act.repetition == ActivityRepetition.once) {
+        final target = act.targetDate;
+        if (target == null || target != todayStr) continue;
         final now = tz.TZDateTime.now(tz.local);
-        var when = tz.TZDateTime(tz.local, now.year, now.month, now.day, act.reminderHour!, act.reminderMinute!);
+        final when = tz.TZDateTime(tz.local, now.year, now.month, now.day, act.reminderHour!, act.reminderMinute!);
         if (when.isAfter(now)) {
+          try {
+            await _zonedScheduleWithFallback(
+              id: nid,
+              title: 'موعد نشاطك: ${act.title}',
+              body: bodyText,
+              when: when,
+              details: const NotificationDetails(
+                android: AndroidNotificationDetails(
+                  _activityChannelId,
+                  'تذكيرات الأنشطة والعادات',
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  playSound: true,
+                  enableVibration: true,
+                ),
+              ),
+            );
+          } catch (e, st) {}
+          nid++;
+        }
+      } else {
+        // Monthly
+        final tzNow = tz.TZDateTime.now(tz.local);
+        if (!act.repeatDays.contains(tzNow.day)) continue;
+        var when = tz.TZDateTime(tz.local, tzNow.year, tzNow.month, tzNow.day, act.reminderHour!, act.reminderMinute!);
+        if (when.isAfter(tzNow)) {
           try {
             await _zonedScheduleWithFallback(
               id: nid,

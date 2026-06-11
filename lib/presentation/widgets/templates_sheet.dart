@@ -42,9 +42,9 @@ class TemplatesSheet extends StatelessWidget {
         ActivityTemplate(title: 'صلاة الضحى', type: ActivityType.independent, iconName: 'light_mode', colorHex: '#FDD835', isMeasurable: true, targetGoal: 2, goalUnit: 'ركعة'),
         ActivityTemplate(title: 'صلاة الوتر', type: ActivityType.afterPrayer, linkedPrayer: PrayerPhase.isha, iconName: 'star', colorHex: '#1E88E5', isMeasurable: true, targetGoal: 1, goalUnit: 'ركعة'),
         ActivityTemplate(title: 'سورة الكهف', type: ActivityType.independent, iconName: 'menu_book', colorHex: '#8D6E63', repetition: ActivityRepetition.weekly, isMeasurable: true, targetGoal: 1, goalUnit: 'سورة'),
-        ActivityTemplate(title: 'ورد القرآن', description: 'قراءة جزء يومياً', type: ActivityType.independent, iconName: 'menu_book', colorHex: '#4CAF50', isMeasurable: true, targetGoal: 1, goalUnit: 'جزء'),
+        ActivityTemplate(title: 'ورد القرآن', description: 'قراءة جزء يوميًا', type: ActivityType.independent, iconName: 'menu_book', colorHex: '#4CAF50', isMeasurable: true, targetGoal: 1, goalUnit: 'جزء'),
         ActivityTemplate(title: 'صلاة قيام الليل', type: ActivityType.independent, iconName: 'nights_stay', colorHex: '#1A237E', isMeasurable: true, targetGoal: 2, goalUnit: 'ركعة'),
-        ActivityTemplate(title: 'الاستغفار 100 مرة', type: ActivityType.independent, iconName: 'spa', colorHex: '#00BCD4', isMeasurable: true, targetGoal: 100, goalUnit: 'مرة'),
+        ActivityTemplate(title: 'الاستغفار 100 مرة', type: ActivityType.independent, iconName: 'water_drop', colorHex: '#00BCD4', isMeasurable: true, targetGoal: 100, goalUnit: 'مرة'),
         ActivityTemplate(title: 'الصلاة على النبي', type: ActivityType.independent, iconName: 'favorite', colorHex: '#E91E63', isMeasurable: true, targetGoal: 100, goalUnit: 'مرة'),
       ]
     },
@@ -73,7 +73,7 @@ class TemplatesSheet extends StatelessWidget {
         ActivityTemplate(title: 'تمارين منزلية بوزن الجسم', type: ActivityType.independent, iconName: 'sports_gymnastics', colorHex: '#FF5722'),
         ActivityTemplate(title: 'ركوب الدراجة', type: ActivityType.independent, iconName: 'directions_bike', colorHex: '#009688', isMeasurable: true, targetGoal: 20, goalUnit: 'دقيقة'),
         ActivityTemplate(title: 'السباحة', type: ActivityType.independent, iconName: 'pool', colorHex: '#03A9F4'),
-        ActivityTemplate(title: 'اليوجا', type: ActivityType.independent, iconName: 'self_improvement', colorHex: '#9C27B0', isMeasurable: true, targetGoal: 15, goalUnit: 'دقيقة'),
+        ActivityTemplate(title: 'تمارين استرخاء', type: ActivityType.independent, iconName: 'accessibility', colorHex: '#9C27B0', isMeasurable: true, targetGoal: 15, goalUnit: 'دقيقة'),
         ActivityTemplate(title: 'تمارين التنفس', type: ActivityType.independent, iconName: 'air', colorHex: '#8BC34A', isMeasurable: true, targetGoal: 5, goalUnit: 'دقيقة'),
         ActivityTemplate(title: 'صعود السلم', type: ActivityType.independent, iconName: 'stairs', colorHex: '#795548', isMeasurable: true, targetGoal: 5, goalUnit: 'طابق'),
       ]
@@ -119,7 +119,7 @@ class TemplatesSheet extends StatelessWidget {
         ActivityTemplate(title: 'الجلوس بوضعية صحيحة', type: ActivityType.independent, iconName: 'airline_seat_recline_normal', colorHex: '#4CAF50'),
         ActivityTemplate(title: 'فحص طبي دوري', type: ActivityType.independent, iconName: 'medical_services', colorHex: '#E53935'),
         ActivityTemplate(title: 'استخدام خيط الأسنان', type: ActivityType.independent, iconName: 'sanitizer', colorHex: '#009688'),
-        ActivityTemplate(title: 'غسل اليدين جيداً', type: ActivityType.independent, iconName: 'wash', colorHex: '#2196F3'),
+        ActivityTemplate(title: 'غسل اليدين جيدًا', type: ActivityType.independent, iconName: 'wash', colorHex: '#2196F3'),
         ActivityTemplate(title: 'التعرض للشمس', type: ActivityType.independent, iconName: 'wb_sunny', colorHex: '#FFEB3B'),
       ]
     },
@@ -156,14 +156,14 @@ class TemplatesSheet extends StatelessWidget {
     {
       'name': 'نمط حياة',
       'templates': [
-        ActivityTemplate(title: 'الاستيقاظ مبكراً', type: ActivityType.independent, iconName: 'alarm', colorHex: '#FF9800'),
+        ActivityTemplate(title: 'الاستيقاظ مبكرًا', type: ActivityType.independent, iconName: 'alarm', colorHex: '#FF9800'),
         ActivityTemplate(title: 'الامتنان لثلاثة أشياء', type: ActivityType.independent, iconName: 'favorite_border', colorHex: '#E91E63'),
         ActivityTemplate(title: 'ترشيد الاستهلاك', type: ActivityType.independent, iconName: 'savings', colorHex: '#4CAF50'),
         ActivityTemplate(title: 'التعلم من خطأ', type: ActivityType.independent, iconName: 'psychology', colorHex: '#9C27B0'),
         ActivityTemplate(title: 'تخصيص وقت هواية', type: ActivityType.independent, iconName: 'palette', colorHex: '#F44336'),
         ActivityTemplate(title: 'الابتعاد عن الأخبار السلبية', type: ActivityType.independent, iconName: 'tv_off', colorHex: '#607D8B'),
         ActivityTemplate(title: 'متابعة المصروفات', type: ActivityType.independent, iconName: 'account_balance_wallet', colorHex: '#009688'),
-        ActivityTemplate(title: 'تأمل الطبيعة', type: ActivityType.independent, iconName: 'park', colorHex: '#8BC34A'),
+        ActivityTemplate(title: 'التنزه في الطبيعة', type: ActivityType.independent, iconName: 'park', colorHex: '#8BC34A'),
         ActivityTemplate(title: 'التبرع بشيء لا تحتاجه', type: ActivityType.independent, iconName: 'redeem', colorHex: '#03A9F4'),
         ActivityTemplate(title: 'الابتسامة', type: ActivityType.independent, iconName: 'sentiment_very_satisfied', colorHex: '#FFC107'),
       ]
@@ -180,13 +180,11 @@ class TemplatesSheet extends StatelessWidget {
       case 'menu_book': return Icons.menu_book;
       case 'book': return Icons.book;
       case 'translate': return Icons.translate;
-      case 'self_improvement': return Icons.self_improvement;
       case 'fitness_center': return Icons.fitness_center;
       case 'directions_walk': return Icons.directions_walk;
       case 'water_drop': return Icons.water_drop;
       case 'family_restroom': return Icons.family_restroom;
       case 'group': return Icons.group;
-      case 'spa': return Icons.spa;
       case 'favorite': return Icons.favorite;
       case 'edit': return Icons.edit;
       case 'headphones': return Icons.headphones;

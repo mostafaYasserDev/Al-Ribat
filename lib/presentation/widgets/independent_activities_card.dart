@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../core/ui_confirm.dart';
@@ -18,6 +16,7 @@ class IndependentActivitiesCard extends StatelessWidget {
     required this.onEditActivity,
     required this.onAddProgressActivity,
     required this.onReorder,
+    required this.dateStr,
   });
 
   final List<ActivityItem> activities;
@@ -27,6 +26,7 @@ class IndependentActivitiesCard extends StatelessWidget {
   final Future<void> Function(ActivityItem) onEditActivity;
   final Future<void> Function(ActivityItem, String, double) onAddProgressActivity;
   final void Function(ActivityItem movedActivity, int newIndex) onReorder;
+  final String dateStr;
 
   static const _onGradient = TextStyle(
     color: Color(0xFFF2F6FC),
@@ -57,7 +57,6 @@ class IndependentActivitiesCard extends StatelessWidget {
       case 'menu_book': return Icons.menu_book;
       case 'book': return Icons.book;
       case 'translate': return Icons.translate;
-      case 'self_improvement': return Icons.self_improvement;
       case 'fitness_center': return Icons.fitness_center;
       case 'directions_walk': return Icons.directions_walk;
       case 'water_drop': return Icons.water_drop;
@@ -76,9 +75,6 @@ class IndependentActivitiesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final todayStr = DateFormat('yyyy-MM-dd').format(now);
-    
     final cardGradient = Theme.of(context).brightness == Brightness.light
         ? const [Color(0xFF80CBC4), Color(0xFF4DB6AC)]
         : const [Color(0xFF004D40), Color(0xFF00695C)];
@@ -143,8 +139,8 @@ class IndependentActivitiesCard extends StatelessWidget {
                   },
                   itemBuilder: (context, index) {
                     final activity = activities[index];
-                    final isDone = activity.isDoneOn(todayStr);
-                    final isSkipped = activity.isSkippedOn(todayStr);
+                    final isDone = activity.isDoneOn(dateStr);
+                    final isSkipped = activity.isSkippedOn(dateStr);
                     
                     return Slidable(
                       key: ValueKey(activity.id),
@@ -154,7 +150,7 @@ class IndependentActivitiesCard extends StatelessWidget {
                           SlidableAction(
                             onPressed: (_) {
                               HapticFeedback.selectionClick();
-                              onToggleActivity(activity, todayStr);
+                              onToggleActivity(activity, dateStr);
                             },
                             backgroundColor: isDone ? Colors.grey : Colors.green,
                             foregroundColor: Colors.white,
@@ -166,25 +162,42 @@ class IndependentActivitiesCard extends StatelessWidget {
                       endActionPane: ActionPane(
                         motion: const ScrollMotion(),
                         children: [
-                          SlidableAction(
-                            onPressed: (_) {
-                              HapticFeedback.selectionClick();
-                              onSkipActivity(activity, todayStr);
-                            },
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                            icon: isSkipped ? Icons.undo : Icons.skip_next,
-                            label: isSkipped ? 'تراجع عن التخطي' : 'تخطي',
-                          ),
+                          if (!isDone)
+                            SlidableAction(
+                              onPressed: (_) {
+                                HapticFeedback.selectionClick();
+                                onSkipActivity(activity, dateStr);
+                              },
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              icon: isSkipped ? Icons.undo : Icons.skip_next,
+                              label: isSkipped ? 'تراجع عن التخطي' : 'تخطي',
+                            ),
                           SlidableAction(
                             onPressed: (_) async {
-                              final ok = await confirmDestructiveAction(
-                                context,
-                                title: 'حذف؟',
-                                message: 'لن يمكن استرجاع «${activity.title}».',
-                              );
-                              if (ok && context.mounted) {
-                                await onDeleteActivity(activity);
+                              final option = await showActivityDeleteOptions(context, activity.title);
+                              if (option == null || !context.mounted) return;
+                              switch (option) {
+                                case ActivityDeleteOption.skipToday:
+                                  onSkipActivity(activity, dateStr);
+                                  break;
+                                case ActivityDeleteOption.endFuture:
+                                  // Archive: we set the endDate to today, but wait: 
+                                  // if we set endDate to today, it will not appear tomorrow.
+                                  // If the user is on today's view, we might also want to skip it for today? 
+                                  // Usually "end future" implies keeping it today or skipping it today.
+                                  // Actually, if we set `endDate` to yesterday's date, it won't appear today.
+                                  // Let's set it to dateStr (so it doesn't appear after dateStr). But wait, we want it removed TODAY as well?
+                                  // The user says "حذف لليوم والمستقبل" (Delete for today and future).
+                                  // So the `endDate` should be yesterday (or before dateStr).
+                                  final previousDate = DateTime.parse(dateStr).subtract(const Duration(days: 1));
+                                  // Format it back to string
+                                  final prevStr = "${previousDate.year.toString().padLeft(4, '0')}-${previousDate.month.toString().padLeft(2, '0')}-${previousDate.day.toString().padLeft(2, '0')}";
+                                  onEditActivity(activity.copyWith(endDate: prevStr));
+                                  break;
+                                case ActivityDeleteOption.deleteCompletely:
+                                  await onDeleteActivity(activity);
+                                  break;
                               }
                             },
                             backgroundColor: Colors.red,
@@ -257,12 +270,12 @@ class IndependentActivitiesCard extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${_formatProgress(activity.getProgressOn(todayStr))} / ${_formatProgress(activity.targetGoal ?? 1)} ${activity.goalUnit ?? ""}',
+                                    '${_formatProgress(activity.getProgressOn(dateStr))} / ${_formatProgress(activity.targetGoal ?? 1)} ${activity.goalUnit ?? ""}',
                                     style: bodySmall,
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.add_circle_outline),
-                                    onPressed: () => _showAddProgressDialog(context, activity, todayStr),
+                                    onPressed: () => _showAddProgressDialog(context, activity, dateStr),
                                   ),
                                 ],
                               )

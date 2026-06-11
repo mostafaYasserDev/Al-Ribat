@@ -52,6 +52,7 @@ class ActivityItem {
     this.history = const [],
     this.historyDates = const {},
     this.skippedDates = const {},
+    this.endDate,
     this.orderIndex = 0,
     this.colorHex,
     this.iconName,
@@ -68,6 +69,7 @@ class ActivityItem {
   final ActivityRepetition repetition;
   final List<int> repeatDays; // Weekdays for weekly, Month days for monthly
   final String? targetDate; // yyyy-MM-dd for 'once'
+  final String? endDate;
 
   final ActivityType type;
   final PrayerPhase? linkedPrayer;
@@ -113,6 +115,7 @@ class ActivityItem {
     ActivityRepetition? repetition,
     List<int>? repeatDays,
     String? targetDate,
+    String? endDate,
     ActivityType? type,
     PrayerPhase? linkedPrayer,
     bool? notificationsEnabled,
@@ -138,6 +141,7 @@ class ActivityItem {
       repetition: repetition ?? this.repetition,
       repeatDays: repeatDays ?? this.repeatDays,
       targetDate: targetDate ?? this.targetDate,
+      endDate: endDate ?? this.endDate,
       type: type ?? this.type,
       linkedPrayer: linkedPrayer ?? this.linkedPrayer,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,

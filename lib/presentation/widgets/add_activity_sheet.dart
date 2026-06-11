@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import '../../application/providers.dart';
 import '../../domain/entities/activity_item.dart';
 import '../../core/constants/prayer_phase.dart';
@@ -39,7 +40,7 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
 
   final List<String> _icons = [
     'task_alt', 'wb_sunny', 'nights_stay', 'bedtime', 'light_mode', 'star',
-    'menu_book', 'book', 'translate', 'self_improvement', 'fitness_center',
+    'menu_book', 'book', 'translate', 'fitness_center',
     'directions_walk', 'water_drop', 'family_restroom', 'group'
   ];
   
@@ -98,7 +99,6 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
       case 'menu_book': return Icons.menu_book;
       case 'book': return Icons.book;
       case 'translate': return Icons.translate;
-      case 'self_improvement': return Icons.self_improvement;
       case 'fitness_center': return Icons.fitness_center;
       case 'directions_walk': return Icons.directions_walk;
       case 'water_drop': return Icons.water_drop;
@@ -220,7 +220,7 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                             focusNode: focusNode,
                             decoration: const InputDecoration(
                               labelText: 'النوع (مثال: صفحة)',
-                              hintText: 'اختر أو اكتب نوعاً...',
+                              hintText: 'اختر أو اكتب نوعًا...',
                             ),
                           );
                         },
@@ -348,13 +348,22 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
               SegmentedButton<ActivityRepetition>(
                 segments: const [
                   ButtonSegment(value: ActivityRepetition.once, label: Text('مرة واحدة')),
-                  ButtonSegment(value: ActivityRepetition.daily, label: Text('يومياً')),
-                  ButtonSegment(value: ActivityRepetition.weekly, label: Text('أسبوعياً')),
+                  ButtonSegment(value: ActivityRepetition.daily, label: Text('يوميًا')),
+                  ButtonSegment(value: ActivityRepetition.weekly, label: Text('أسبوعيًا')),
+                  ButtonSegment(value: ActivityRepetition.monthly, label: Text('شهريًا')),
                 ],
                 selected: {_repetition},
                 onSelectionChanged: (v) => setState(() => _repetition = v.first),
               ),
               
+              if (_repetition == ActivityRepetition.once) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'سيظهر في: ${DateFormat('yyyy/MM/dd').format(ref.watch(selectedDateProvider))}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+
               if (_repetition == ActivityRepetition.weekly) ...[
                 const SizedBox(height: 8),
                 Wrap(
@@ -363,6 +372,30 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                     for (int i = 1; i <= 7; i++)
                       FilterChip(
                         label: Text(['إ', 'ث', 'أ', 'خ', 'ج', 'س', 'ح'][i - 1]),
+                        selected: _repeatDays.contains(i),
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _repeatDays.add(i);
+                            } else {
+                              _repeatDays.remove(i);
+                            }
+                          });
+                        },
+                      )
+                  ],
+                ),
+              ],
+
+              if (_repetition == ActivityRepetition.monthly) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    for (int i = 1; i <= 31; i++)
+                      FilterChip(
+                        label: Text('$i'),
                         selected: _repeatDays.contains(i),
                         onSelected: (selected) {
                           setState(() {
@@ -432,19 +465,28 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
               FilledButton(
                 onPressed: () async {
                   if (_titleController.text.trim().isEmpty) return;
-                  
+
+                  final selectedDate = ref.read(selectedDateProvider);
+                  final selectedDateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
+                  final onceTargetDate = _repetition == ActivityRepetition.once
+                      ? (widget.initialActivity?.targetDate ?? selectedDateStr)
+                      : null;
+                  final createdAt = widget.initialActivity?.createdAt ??
+                      DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 12);
+
                   final act = ActivityItem(
                     id: widget.initialActivity?.id ?? DateTime.now().microsecondsSinceEpoch.toString(),
                     title: _titleController.text.trim(),
                     description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
                     repetition: _repetition,
-                    repeatDays: _repetition == ActivityRepetition.weekly ? _repeatDays.toList() : const [],
+                    targetDate: onceTargetDate,
+                    repeatDays: (_repetition == ActivityRepetition.weekly || _repetition == ActivityRepetition.monthly) ? _repeatDays.toList() : const [],
                     type: _type,
                     linkedPrayer: _type != ActivityType.independent ? _linkedPrayer : null,
                     notificationsEnabled: _notificationsEnabled,
                     reminderHour: _notificationsEnabled ? _reminderTime.hour : null,
                     reminderMinute: _notificationsEnabled ? _reminderTime.minute : null,
-                    createdAt: widget.initialActivity?.createdAt ?? DateTime.now(),
+                    createdAt: createdAt,
                     history: widget.initialActivity?.history ?? const [],
                     orderIndex: widget.initialActivity?.orderIndex ?? 0,
                     iconName: _selectedIcon,

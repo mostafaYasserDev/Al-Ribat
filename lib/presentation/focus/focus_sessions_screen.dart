@@ -305,6 +305,20 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
                       );
                     }).toList(),
                   ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'أو مدة مخصصة (دقائق)',
+                      hintText: 'مثال: 60',
+                    ),
+                    onChanged: (val) {
+                      final m = int.tryParse(val);
+                      if (m != null && m > 0) {
+                        setModal(() => minutes = m);
+                      }
+                    },
+                  ),
                   const SizedBox(height: 16),
                   if (Platform.isAndroid)
                     Text(
@@ -577,13 +591,13 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                Icons.self_improvement,
+                                Icons.center_focus_strong,
                                 size: 56,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                'ابدأ جلسة تركيزاً عميقاً.',
+                                'ابدأ جلسة تركيزٍ عميقة.',
                                 textAlign: TextAlign.center,
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),

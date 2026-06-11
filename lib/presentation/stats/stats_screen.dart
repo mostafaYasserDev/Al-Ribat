@@ -37,11 +37,35 @@ class StatsScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   if (stats.mostProductivePhase != null)
-                    Text('✨ أكثر الأوقات إنتاجية: ${stats.mostProductivePhase!.arabicName}'),
-                  if (stats.mostSkippedActivity != null)
-                    Text('⚠️ العادة الأكثر تخطياً: ${stats.mostSkippedActivity}'),
+                    Row(
+                      children: [
+                        Icon(Icons.wb_sunny_outlined, size: 18, color: scheme.primary),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text('أكثر الأوقات إنتاجية: ${stats.mostProductivePhase!.arabicName}')),
+                      ],
+                    ),
+                  if (stats.mostSkippedActivity != null) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.warning_amber_outlined, size: 18, color: scheme.error),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text('النشاط الأكثر تخطيًا: ${stats.mostSkippedActivity}')),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 6),
-                  Text('📈 نسبة الالتزام هذا الأسبوع: ${(stats.completionRateThisWeek * 100).toStringAsFixed(1)}%'),
+                  Row(
+                    children: [
+                      Icon(Icons.trending_up, size: 18, color: scheme.primary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'نسبة الالتزام هذا الأسبوع: ${(stats.completionRateThisWeek * 100).toStringAsFixed(1)}%',
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -49,12 +73,12 @@ class StatsScreen extends ConsumerWidget {
           const SizedBox(height: 14),
           _StatRow(
             icon: Icons.task_alt,
-            title: 'مهام مكتملة هذا الأسبوع',
+            title: 'أنشطة مكتملة هذا الأسبوع',
             value: '${stats.weeklyCompleted}',
           ),
           _StatRow(
             icon: Icons.calendar_month,
-            title: 'مهام مكتملة هذا الشهر',
+            title: 'أنشطة مكتملة هذا الشهر',
             value: '${stats.monthlyCompleted}',
           ),
           _StatRow(

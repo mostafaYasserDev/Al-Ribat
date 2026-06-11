@@ -20,4 +20,14 @@ class ReflectionRepositoryImpl implements ReflectionRepository {
   Future<void> add(ReflectionEntry entry) async {
     await _box.put(entry.id, ReflectionEntryModel.fromEntity(entry).toJson());
   }
+
+  @override
+  Future<void> update(ReflectionEntry entry) async {
+    await _box.put(entry.id, ReflectionEntryModel.fromEntity(entry).toJson());
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    await _box.delete(id);
+  }
 }

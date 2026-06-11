@@ -22,7 +22,7 @@ class AlRibatApp extends ConsumerWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Al-Ribat',
+      title: 'الرباط',
       locale: const Locale('ar'),
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

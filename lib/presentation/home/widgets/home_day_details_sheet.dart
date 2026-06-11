@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../application/providers.dart';
+import '../../../core/activity_schedule.dart';
 import '../../../core/constants/prayer_phase.dart';
 import '../../../core/ui_feedback.dart';
 import '../../../domain/entities/app_settings.dart';
@@ -29,46 +30,6 @@ String _betweenAdhanSentence(PrayerTime current, PrayerSchedule schedule) {
   return 'بين أذان ${current.phase.arabicName} و${next.phase.arabicName}: $duration';
 }
 
-List<ActivityItem> _activitiesForPhase(
-  List<ActivityItem> activities,
-  PrayerPhase phase,
-  DateTime selectedDate,
-) {
-  final todayStr = DateFormat('yyyy-MM-dd').format(selectedDate);
-  return activities.where((a) {
-    final createdDate = DateTime(a.createdAt.year, a.createdAt.month, a.createdAt.day);
-    final queryDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-    if (queryDate.isBefore(createdDate)) return false;
-
-    if (a.repetition == ActivityRepetition.weekly) {
-      if (!a.repeatDays.contains(selectedDate.weekday)) return false;
-    } else if (a.repetition == ActivityRepetition.once) {
-      if (a.targetDate != null && a.targetDate != todayStr) return false;
-    }
-    return a.linkedPrayer == phase;
-  }).toList();
-}
-
-List<ActivityItem> _independentActivities(
-  List<ActivityItem> activities,
-  DateTime selectedDate,
-) {
-  final todayStr = DateFormat('yyyy-MM-dd').format(selectedDate);
-  return activities.where((a) {
-    if (a.type != ActivityType.independent) return false;
-    
-    final createdDate = DateTime(a.createdAt.year, a.createdAt.month, a.createdAt.day);
-    final queryDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-    if (queryDate.isBefore(createdDate)) return false;
-
-    if (a.repetition == ActivityRepetition.weekly) {
-      if (!a.repeatDays.contains(selectedDate.weekday)) return false;
-    } else if (a.repetition == ActivityRepetition.once) {
-      if (a.targetDate != null && a.targetDate != todayStr) return false;
-    }
-    return true;
-  }).toList();
-}
 
 void openDayDetailsSheet({
   required BuildContext context,
@@ -87,7 +48,7 @@ void openDayDetailsSheet({
           final currentPhase = dayState.currentPrayerPhase;
           final selectedDate = ref.watch(selectedDateProvider);
           final todayStr = DateFormat('yyyy-MM-dd').format(selectedDate);
-          final independentActs = _independentActivities(activities, selectedDate);
+          final independentActs = independentActivities(activities, selectedDate);
 
           return Directionality(
             textDirection: TextDirection.rtl,
@@ -106,6 +67,7 @@ void openDayDetailsSheet({
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: IndependentActivitiesCard(
+                          dateStr: todayStr,
                           activities: independentActs,
                           onToggleActivity: (activity, date) async {
                             HapticFeedback.selectionClick();
@@ -151,10 +113,11 @@ void openDayDetailsSheet({
                       (p) => Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: PrayerCard(
+                          dateStr: todayStr,
                           prayer: p,
                           prayerSchedule: schedule,
                           footerNote: _betweenAdhanSentence(p, schedule),
-                          activities: _activitiesForPhase(activities, p.phase, selectedDate),
+                          activities: activitiesForPhase(activities, p.phase, selectedDate),
                           onToggleActivity: (activity, date) async {
                             HapticFeedback.selectionClick();
                             final wasDone = activity.isDoneOn(date);
@@ -191,23 +154,30 @@ void openDayDetailsSheet({
                             }
                           },
                           onReorderWithinPhase: (movedActivity, newIndex) {
-                            final phaseActivities = _activitiesForPhase(activities, p.phase, selectedDate);
+                            final phaseActivities = activitiesForPhase(activities, p.phase, selectedDate);
                             ref.read(activitiesProvider.notifier).reorder(movedActivity, newIndex, phaseActivities);
                           },
                         ),
                       ),
                     ),
-                    if (currentPhase == PrayerPhase.isha)
+                    if (currentPhase == PrayerPhase.isha || todayStr != DateFormat('yyyy-MM-dd').format(DateTime.now()))
                       Padding(
                         padding: const EdgeInsets.only(top: 4),
                         child: ReflectionCard(
                           streakCount: max(ref.watch(dayStateProvider).streakCount, 1),
                           onSave: (value, mood) async {
-                            await ref.read(reflectionsProvider.notifier).add(value, mood: mood);
+                            final at = DateTime(
+                              selectedDate.year,
+                              selectedDate.month,
+                              selectedDate.day,
+                              DateTime.now().hour,
+                              DateTime.now().minute,
+                            );
+                            await ref.read(reflectionsProvider.notifier).add(value, mood: mood, createdAt: at);
                             await updateStreakIfNeeded(ref);
                             if (context.mounted) {
                               lightSuccessHaptic();
-                              appSnack(context, 'حُفظ التأمل في السجل.');
+                              appSnack(context, 'حُفِظ التأمل في السجل.');
                             }
                           },
                         ),

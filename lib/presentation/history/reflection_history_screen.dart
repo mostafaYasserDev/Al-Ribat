@@ -5,6 +5,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../application/providers.dart';
 import '../../core/ui_feedback.dart';
+import '../../domain/entities/reflection_entry.dart';
 import '../widgets/add_reflection_sheet.dart';
 
 class ReflectionHistoryScreen extends ConsumerWidget {
@@ -26,6 +27,154 @@ class ReflectionHistoryScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  void _openEdit(BuildContext context, WidgetRef ref, ReflectionEntry entry) {
+    HapticFeedback.lightImpact();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => AddReflectionSheet(
+        initialText: entry.text,
+        onSave: (text) async {
+          await ref.read(reflectionsProvider.notifier).updateReflection(entry, text);
+          if (ctx.mounted) {
+            lightSuccessHaptic();
+            appSnack(ctx, 'تم تعديل التأمل بنجاح.');
+          }
+        },
+      ),
+    );
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref, String id) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف التأمل'),
+        content: const Text('هل أنت متأكد من حذف هذا التأمل؟ لا يمكن التراجع عن هذا الإجراء.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await ref.read(reflectionsProvider.notifier).delete(id);
+              if (ctx.mounted) {
+                Navigator.of(ctx).pop();
+                lightSuccessHaptic();
+                appSnack(context, 'تم حذف التأمل.');
+              }
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditHistory(BuildContext context, ReflectionEntry entry) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('سجل التعديلات', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 16),
+              if (entry.editHistory.isEmpty)
+                const Text('لا توجد تعديلات سابقة لهذا التأمل.')
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: entry.editHistory.length,
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemBuilder: (context, i) {
+                      final h = entry.editHistory.reversed.toList()[i];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            DateFormat('d MMM yyyy · h:mm a', 'ar').format(h.editedAt),
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(h.oldText),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFullReflection(BuildContext context, ReflectionEntry entry, WidgetRef ref) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('التأمل كاملاً', style: Theme.of(context).textTheme.titleLarge),
+                  if (entry.editHistory.isNotEmpty)
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        _showEditHistory(context, entry);
+                      },
+                      icon: const Icon(Icons.history, size: 18),
+                      label: const Text('السجل'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    entry.text,
+                    textAlign: TextAlign.right,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.6),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  bool _isLong(String text) {
+    return text.length > 150 || text.split('\n').length > 4;
   }
 
   @override
@@ -94,12 +243,70 @@ class ReflectionHistoryScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(
-                          DateFormat('EEEE · d MMM yyyy · h:mm a', 'ar').format(item.createdAt),
-                          textAlign: TextAlign.right,
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    DateFormat('EEEE · d MMM yyyy · h:mm a', 'ar').format(item.createdAt),
+                                    textAlign: TextAlign.right,
+                                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                  ),
+                                  if (item.editHistory.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    InkWell(
+                                      onTap: () => _showEditHistory(context, item),
+                                      child: Text(
+                                        'تم التعديل (شاهد السجل)',
+                                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                              color: Theme.of(context).colorScheme.secondary,
+                                              decoration: TextDecoration.underline,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
+                            ),
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert, size: 20),
+                              onSelected: (val) {
+                                if (val == 'edit') {
+                                  _openEdit(context, ref, item);
+                                } else if (val == 'delete') {
+                                  _confirmDelete(context, ref, item.id);
+                                }
+                              },
+                              itemBuilder: (ctx) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit, size: 20),
+                                      SizedBox(width: 8),
+                                      Text('تعديل'),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.delete, size: 20, color: Theme.of(context).colorScheme.error),
+                                      const SizedBox(width: 8),
+                                      Text('حذف', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                         if (item.mood != null) ...[
                           const SizedBox(height: 8),
@@ -109,11 +316,28 @@ class ReflectionHistoryScreen extends ConsumerWidget {
                           ),
                         ],
                         const SizedBox(height: 10),
-                        SelectableText(
-                          item.text,
-                          textAlign: TextAlign.right,
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.55),
-                        ),
+                        if (_isLong(item.text)) ...[
+                          Text(
+                            item.text,
+                            textAlign: TextAlign.right,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.55),
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton(
+                              onPressed: () => _showFullReflection(context, item, ref),
+                              child: const Text('عرض التأمل'),
+                            ),
+                          ),
+                        ] else ...[
+                          SelectableText(
+                            item.text,
+                            textAlign: TextAlign.right,
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.55),
+                          ),
+                        ],
                       ],
                     ),
                   ),

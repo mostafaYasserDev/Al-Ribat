@@ -7,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../application/providers.dart';
 import '../../core/ui_feedback.dart';
 import '../../domain/entities/app_settings.dart';
+import '../../services/cloud_sync_service.dart';
 import '../focus/focus_sessions_screen.dart';
 import '../history/reflection_history_screen.dart';
 import '../home/home_screen.dart';
@@ -34,7 +35,53 @@ class _AppShellState extends ConsumerState<AppShell> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeAskLocationMode());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _maybeAskLocationMode();
+      await _maybeShowSyncWelcome();
+    });
+  }
+
+  Future<void> _maybeShowSyncWelcome() async {
+    if (!mounted) return;
+    final box = Hive.box<String>('meta_box');
+    if (box.get('sync_welcome_v1') == '1') return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حفظ بياناتك ومزامنتها'),
+        content: const Text(
+          'يمكنك تسجيل الدخول بحساب Google (اختياري) لمزامنة بياناتك سحابيًا عبر Firebase.\n\n'
+          'أو يمكنك حفظ نسخة احتياطية بصيغة JSON من الإعدادات في أي وقت — دون الحاجة لتسجيل الدخول.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await box.put('sync_welcome_v1', '1');
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('لاحقًا'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await box.put('sync_welcome_v1', '1');
+              if (ctx.mounted) Navigator.pop(ctx);
+              try {
+                await CloudSyncService.signInWithGoogle();
+                if (mounted) {
+                  appSnack(context, 'تم تسجيل الدخول. يمكنك المزامنة من الإعدادات.');
+                }
+              } catch (e) {
+                if (mounted) {
+                  appSnack(context, 'تعذر تسجيل الدخول: $e');
+                }
+              }
+            },
+            child: const Text('تسجيل الدخول بـ Google'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _maybeAskLocationMode() async {
@@ -48,7 +95,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       builder: (ctx) => AlertDialog(
         title: const Text('ضبط الموقع لأوقات الصلاة'),
         content: const Text(
-          'هل تريد ضبط الموقع تلقائياً (GPS) أم يدوياً بالبحث عن مدينتك أو حيّك؟',
+          'هل تريد ضبط الموقع تلقائيًا (GPS) أم يدويًا بالبحث عن مدينتك أو حيّك؟',
         ),
         actions: [
           TextButton(

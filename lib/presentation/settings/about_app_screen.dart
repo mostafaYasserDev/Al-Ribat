@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AboutAppScreen extends StatelessWidget {
   const AboutAppScreen({super.key});
@@ -34,6 +35,18 @@ class AboutAppScreen extends StatelessWidget {
           const Text('• إدارة الأنشطة وربطها بالصلوات\n• أوقات الصلاة الدقيقة وتنبيهات مخصصة\n• إحصائيات ذكية لمتابعة الأداء\n• متتبع الحالات المزاجية والتأملات'),
           const SizedBox(height: 32),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.feedback_outlined),
+            title: const Text('الشكاوى والاقتراحات'),
+            subtitle: const Text('يفتح نموذج خارجي (Google Forms)'),
+            trailing: const Icon(Icons.open_in_new),
+            onTap: () async {
+              final uri = Uri.parse('https://forms.gle/HSGemvnVdrfsNxWM8');
+              try {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } catch (_) {}
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.privacy_tip_outlined),
             title: const Text('سياسة الخصوصية'),
@@ -72,13 +85,16 @@ class PrivacyPolicyScreen extends StatelessWidget {
             const SizedBox(height: 16),
             const Text(
               '1. حماية البيانات المحلية\n'
-              'نحن نؤمن بأن بياناتك الشخصية ملك لك وحدك. جميع البيانات التي تدخلها في التطبيق (كالأنشطة، والحالات المزاجية، والإعدادات) يتم حفظها محلياً على جهازك فقط (Offline). لا توجد خوادم خارجية تخزن أو تعالج هذه البيانات.\n\n'
-              '2. الأذونات المطلوبة\n'
-              '• الموقع الجغرافي: يُستخدم فقط لحساب أوقات الصلاة بدقة بناءً على موقعك، ولا يتم إرسال موقعك لأي جهة خارجية.\n'
+              'نحن نؤمن بأن بياناتك الشخصية ملك لك وحدك. جميع البيانات التي تدخلها في التطبيق (الأنشطة، الحالات المزاجية، والإعدادات) تُحفظ محليًا على جهازك بشكل افتراضي.\n\n'
+              '2. المزامنة السحابية الاختيارية\n'
+              'يمكنك اختيار تسجيل الدخول بحساب Google لمزامنة نسخة احتياطية من بياناتك عبر Firebase. هذه الميزة اختيارية بالكامل؛ ويمكنك دائمًا الاعتماد على التصدير اليدوي بصيغة JSON من الإعدادات.\n'
+              'عند تفعيل المزامنة، تُرفع بياناتك إلى حسابك الخاص في Firebase ولا يصل إليها مستخدم آخر.\n\n'
+              '3. الأذونات المطلوبة\n'
+              '• الموقع الجغرافي: يُستخدم فقط لحساب أوقات الصلاة بدقة بناءً على موقعك.\n'
               '• الإشعارات: تُستخدم لتنبيهك بأوقات الصلاة والأنشطة.\n\n'
-              '3. طرف ثالث\n'
-              'نحن لا نستخدم أي أدوات تتبع (Trackers) أو إعلانات لجمع معلومات عنك. التطبيق يركز بالكامل على توفير بيئة آمنة ومركزة.\n\n'
-              '4. التعديلات على سياسة الخصوصية\n'
+              '4. طرف ثالث\n'
+              'نستخدم Firebase (Google) فقط عند اختيارك للمزامنة السحابية. لا نستخدم أدوات تتبع أو إعلانات.\n\n'
+              '5. التعديلات على سياسة الخصوصية\n'
               'قد نقوم بتحديث سياسة الخصوصية من وقت لآخر لإضافة توضيحات أكثر بناءً على الميزات الجديدة، وسيتم إشعارك بذلك.'
             ),
           ],

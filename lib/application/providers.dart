@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:home_widget/home_widget.dart';
 
+import '../core/activity_schedule.dart';
 import '../core/constants/prayer_phase.dart';
 import '../data/repositories/activity_repository_impl.dart';
 import '../data/repositories/prayer_repository_impl.dart';
@@ -113,12 +114,11 @@ final activitiesProvider = AsyncNotifierProvider<ActivitiesNotifier, List<Activi
 );
 
 class ActivitiesNotifier extends AsyncNotifier<List<ActivityItem>> {
-  late ActivityRepository _repository;
+  ActivityRepository get _repository => ref.read(activityRepositoryProvider);
 
   @override
   Future<List<ActivityItem>> build() async {
-    _repository = ref.watch(activityRepositoryProvider);
-    return _repository.loadAll();
+    return ref.watch(activityRepositoryProvider).loadAll();
   }
 
   Future<void> _syncActivityNotifications() async {
@@ -137,25 +137,14 @@ class ActivitiesNotifier extends AsyncNotifier<List<ActivityItem>> {
     // Format date for display in Arabic (example: ١٤ رجب - although we can just use normal date)
     final dateDisplay = DateFormat('yyyy/MM/dd').format(now);
     
-    final dueToday = activities.where((act) {
-      if (act.repetition == ActivityRepetition.once) {
-        return act.targetDate == todayStr;
-      } else if (act.repetition == ActivityRepetition.daily) {
-        return true;
-      } else if (act.repetition == ActivityRepetition.weekly) {
-        return act.repeatDays.contains(now.weekday);
-      } else if (act.repetition == ActivityRepetition.monthly) {
-        return act.repeatDays.contains(now.day);
-      }
-      return false;
-    }).toList();
+    final dueToday = activities.where((act) => activityVisibleOnDate(act, now)).toList();
 
     final totalHabits = dueToday.length;
     final completedHabits = dueToday.where((a) => a.isDoneOn(todayStr)).length;
     
     final habitsListString = dueToday.map((a) {
       final isDone = a.isDoneOn(todayStr);
-      return '${isDone ? "✅" : "⭕"} ${a.title}';
+      return '${isDone ? "[x]" : "[ ]"} ${a.title}';
     }).join('\n');
 
     try {
@@ -237,6 +226,9 @@ class ActivitiesNotifier extends AsyncNotifier<List<ActivityItem>> {
       historyDates: newHistoryDates,
       skippedDates: newSkippedDates,
     ));
+    if (!isDone) {
+      await updateStreakIfNeeded(ref, date);
+    }
   }
 
   Future<void> toggleSkip(ActivityItem activity, String date) async {
@@ -294,6 +286,10 @@ class ActivitiesNotifier extends AsyncNotifier<List<ActivityItem>> {
       historyDates: newHistoryDates,
       skippedDates: newSkippedDates,
     ));
+    
+    if (newProgress >= (activity.targetGoal ?? 1.0) && (activity.targetGoal ?? 1.0) > 0) {
+      await updateStreakIfNeeded(ref, date);
+    }
   }
 }
 
@@ -303,12 +299,11 @@ final workSessionsProvider =
 );
 
 class WorkSessionsNotifier extends AsyncNotifier<List<WorkSessionItem>> {
-  late final WorkSessionRepository _repo;
+  WorkSessionRepository get _repo => ref.read(workSessionRepositoryProvider);
 
   @override
   Future<List<WorkSessionItem>> build() async {
-    _repo = ref.watch(workSessionRepositoryProvider);
-    return _repo.loadAll();
+    return ref.watch(workSessionRepositoryProvider).loadAll();
   }
 
   Future<void> addSession(WorkSessionItem session) async {
@@ -323,22 +318,44 @@ final reflectionsProvider =
 );
 
 class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
-  late final ReflectionRepository _repo;
+  ReflectionRepository get _repo => ref.read(reflectionRepositoryProvider);
 
   @override
   Future<List<ReflectionEntry>> build() async {
-    _repo = ref.watch(reflectionRepositoryProvider);
-    return _repo.loadAll();
+    return ref.watch(reflectionRepositoryProvider).loadAll();
   }
 
-  Future<void> add(String text, {String? mood}) async {
+  Future<void> add(String text, {String? mood, DateTime? createdAt}) async {
+    final at = createdAt ?? DateTime.now();
     final entry = ReflectionEntry(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: at.microsecondsSinceEpoch.toString(),
       text: text.trim(),
-      createdAt: DateTime.now(),
+      createdAt: at,
       mood: mood,
     );
     await _repo.add(entry);
+    state = AsyncData(await _repo.loadAll());
+  }
+
+  Future<void> updateReflection(ReflectionEntry oldEntry, String newText, {String? newMood}) async {
+    final editRecord = ReflectionEditRecord(
+      editedAt: DateTime.now(),
+      oldText: oldEntry.text,
+      oldMood: oldEntry.mood,
+    );
+    
+    final updatedEntry = oldEntry.copyWith(
+      text: newText.trim(),
+      mood: newMood,
+      editHistory: [...oldEntry.editHistory, editRecord],
+    );
+    
+    await _repo.update(updatedEntry);
+    state = AsyncData(await _repo.loadAll());
+  }
+
+  Future<void> delete(String id) async {
+    await _repo.delete(id);
     state = AsyncData(await _repo.loadAll());
   }
 }
@@ -371,7 +388,6 @@ final statsProvider = Provider<StatsSnapshot>((ref) {
   final workSessions = ref.watch(workSessionsProvider).valueOrNull ?? const <WorkSessionItem>[];
   
   final now = DateTime.now();
-  final todayStr = DateFormat('yyyy-MM-dd').format(now);
   final weekStart = now.subtract(Duration(days: now.weekday - 1));
   final monthStart = DateTime(now.year, now.month, 1);
   
@@ -492,26 +508,30 @@ final dayStateProvider = Provider<DayState>((ref) {
   return DayState(currentPrayerPhase: current, streakCount: streak);
 });
 
-Future<void> updateStreakIfNeeded(WidgetRef ref) async {
+Future<void> updateStreakIfNeeded(dynamic ref, [String? dateStr]) async {
   final activities = ref.read(activitiesProvider).valueOrNull ?? const <ActivityItem>[];
-  final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+  final targetDateStr = dateStr ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
   
-  final doneToday = activities.where((a) => a.isDoneOn(todayStr)).length;
-  if (doneToday == 0) return;
+  final doneOnTargetDate = activities.where((a) => a.isDoneOn(targetDateStr)).length;
+  if (doneOnTargetDate == 0) return;
   
   final box = Hive.box<String>('meta_box');
-  final yesterday = DateFormat('yyyy-MM-dd')
-      .format(DateTime.now().subtract(const Duration(days: 1)));
+  final targetDate = DateTime.parse(targetDateStr);
+  final previousDate = DateFormat('yyyy-MM-dd').format(targetDate.subtract(const Duration(days: 1)));
+  
   final lastDate = box.get('streak_last_date');
   var streak = int.tryParse(box.get('streak_count') ?? '0') ?? 0;
 
-  if (lastDate == todayStr) return;
-  if (lastDate == yesterday) {
+  if (lastDate == targetDateStr) return;
+  if (lastDate == previousDate) {
     streak += 1;
   } else {
+    if (lastDate != null && DateTime.parse(lastDate).isAfter(targetDate)) {
+      return; 
+    }
     streak = 1;
   }
   await box.put('streak_count', '$streak');
-  await box.put('streak_last_date', todayStr);
+  await box.put('streak_last_date', targetDateStr);
   ref.invalidate(streakProvider);
 }

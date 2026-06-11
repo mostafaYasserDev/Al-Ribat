@@ -1,8 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../application/providers.dart';
@@ -10,9 +12,9 @@ import '../../core/ui_feedback.dart';
 import '../../domain/entities/app_settings.dart';
 import '../../services/app_permissions.dart';
 import '../../services/backup_export_service.dart';
+import '../../services/cloud_sync_service.dart';
 import 'developer_support_screen.dart';
 import 'about_app_screen.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 // RadioListTile: استخدام groupValue/onChanged ما زال الأساس في القنوات المستقرة؛ التحذير من RadioGroup قيد التطور.
 // ignore_for_file: deprecated_member_use
@@ -164,7 +166,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: ListTile(
               leading: Icon(Icons.lock_outline, color: Theme.of(context).colorScheme.primary),
               title: const Text('قفل التطبيق برمز مرور'),
-              subtitle: const Text('حماية بياناتك برمز PIN المكون من 4 أرقام'),
+              subtitle: const Text('حماية بياناتك برمز مرور مكون من 4 أرقام'),
               trailing: const Icon(Icons.chevron_left),
               onTap: () {
                 HapticFeedback.lightImpact();
@@ -172,12 +174,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               },
             ),
           ),
+          const _CloudSyncCard(),
           Card(
             child: ListTile(
               leading: const Icon(Icons.save_alt_outlined),
               title: const Text('نسخ احتياطي (JSON)'),
               subtitle: const Text(
-                'المهام، العادات، التأملات، الجلسات، وإعدادات التطبيق — احفظ الملف حيث تريد أو شاركه.',
+                'الأنشطة، التأملات، الجلسات، وإعدادات التطبيق — احفظ الملف حيث تريد أو شاركه.',
               ),
               onTap: () async {
                 HapticFeedback.lightImpact();
@@ -208,7 +211,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   builder: (ctx) => AlertDialog(
                     title: const Text('استيراد واستبدال البيانات؟'),
                     content: const Text(
-                      'سيتم استبدال المهام والعادات والتأملات والجلسات والإعدادات الحالية ببيانات الملف.',
+                      'سيتم استبدال الأنشطة والتأملات والجلسات والإعدادات الحالية ببيانات الملف.',
                     ),
                     actions: [
                       TextButton(
@@ -230,6 +233,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ref.invalidate(workSessionsProvider);
                   ref.invalidate(reflectionsProvider);
                   ref.invalidate(prayerScheduleProvider);
+                  ref.invalidate(streakProvider);
                   if (context.mounted) {
                     appSnack(context, 'تم الاستيراد بنجاح.');
                   }
@@ -262,7 +266,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: ListTile(
               title: const Text('إذن التنبيه في الوقت المحدد (أندرويد)'),
               subtitle: const Text(
-                'إذا ظهرت رسالة «Exact alarms not permitted»، افتح إعدادات التطبيق واسمح بالتنبيهات الدقيقة.',
+                'إذا ظهرت رسالة رفض التنبيهات الدقيقة، افتح إعدادات التطبيق واسمح بالتنبيهات في الوقت المحدد.',
               ),
               trailing: const Icon(Icons.open_in_new),
               onTap: () => openAppSettings(),
@@ -553,6 +557,124 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CloudSyncCard extends ConsumerStatefulWidget {
+  const _CloudSyncCard();
+
+  @override
+  ConsumerState<_CloudSyncCard> createState() => _CloudSyncCardState();
+}
+
+class _CloudSyncCardState extends ConsumerState<_CloudSyncCard> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action, String successMsg) async {
+    setState(() => _busy = true);
+    try {
+      await action();
+      if (mounted) appSnack(context, successMsg);
+    } catch (e) {
+      if (mounted) appSnack(context, 'خطأ: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _invalidateAll() {
+    ref.invalidate(settingsProvider);
+    ref.invalidate(activitiesProvider);
+    ref.invalidate(workSessionsProvider);
+    ref.invalidate(reflectionsProvider);
+    ref.invalidate(prayerScheduleProvider);
+    ref.invalidate(streakProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: CloudSyncService.authStateChanges,
+      builder: (context, snapshot) {
+        final user = snapshot.data;
+        final signedIn = user != null;
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.cloud_outlined, color: Theme.of(context).colorScheme.primary),
+                  title: const Text('المزامنة السحابية (Google)'),
+                  subtitle: Text(
+                    signedIn
+                        ? 'مسجل الدخول: ${user.email ?? user.displayName ?? "حساب Google"}'
+                        : 'اختياري — لمزامنة بياناتك عبر Firebase',
+                  ),
+                ),
+                if (_busy)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: LinearProgressIndicator(),
+                  ),
+                if (!signedIn)
+                  FilledButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () => _run(() async {
+                              await CloudSyncService.signInWithGoogle();
+                            }, 'تم تسجيل الدخول.'),
+                    icon: const Icon(Icons.login),
+                    label: const Text('تسجيل الدخول بـ Google'),
+                  )
+                else ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _busy
+                              ? null
+                              : () => _run(() async {
+                                    await CloudSyncService.uploadBackup();
+                                  }, 'تم رفع النسخة السحابية.'),
+                          icon: const Icon(Icons.cloud_upload_outlined),
+                          label: const Text('رفع'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _busy
+                              ? null
+                              : () => _run(() async {
+                                    await CloudSyncService.downloadBackup();
+                                    _invalidateAll();
+                                  }, 'تم استعادة البيانات من السحابة.'),
+                          icon: const Icon(Icons.cloud_download_outlined),
+                          label: const Text('استعادة'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () => _run(() async {
+                              await CloudSyncService.signOut();
+                            }, 'تم تسجيل الخروج.'),
+                    icon: const Icon(Icons.logout),
+                    label: const Text('تسجيل الخروج'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

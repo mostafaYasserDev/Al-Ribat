@@ -128,8 +128,6 @@ class ProjectsScreen extends ConsumerWidget {
         return Icons.fitness_center;
       case 'water_drop':
         return Icons.water_drop;
-      case 'self_improvement':
-        return Icons.self_improvement;
       case 'menu_book':
         return Icons.menu_book;
       case 'favorite':

@@ -19,14 +19,14 @@ class _ReflectionCardState extends State<ReflectionCard> {
   bool _submitted = false;
   String? _selectedMood;
 
-  final List<Map<String, String>> _moods = const [
-    {'icon': '😄', 'label': 'سعيد'},
-    {'icon': '😌', 'label': 'هادئ'},
-    {'icon': '🙏', 'label': 'ممتن'},
-    {'icon': '🚀', 'label': 'متحمس'},
-    {'icon': ' خ', 'label': 'مرهق'},
-    {'icon': '😟', 'label': 'متوتر'},
-    {'icon': '😔', 'label': 'حزين'},
+  static const _moods = [
+    (icon: Icons.sentiment_very_satisfied, label: 'سعيد'),
+    (icon: Icons.cloud_outlined, label: 'هادئ'),
+    (icon: Icons.favorite_border, label: 'ممتن'),
+    (icon: Icons.bolt, label: 'متحمس'),
+    (icon: Icons.battery_alert, label: 'مرهق'),
+    (icon: Icons.sentiment_neutral, label: 'متوتر'),
+    (icon: Icons.sentiment_dissatisfied, label: 'حزين'),
   ];
 
   @override
@@ -59,12 +59,13 @@ class _ReflectionCardState extends State<ReflectionCard> {
                 spacing: 8,
                 runSpacing: 8,
                 children: _moods.map((mood) {
-                  final isSelected = _selectedMood == mood['label'];
+                  final isSelected = _selectedMood == mood.label;
                   return ChoiceChip(
-                    label: Text('${mood['icon']} ${mood['label']}'),
+                    avatar: Icon(mood.icon, size: 18),
+                    label: Text(mood.label),
                     selected: isSelected,
                     onSelected: (selected) {
-                      setState(() => _selectedMood = selected ? mood['label'] : null);
+                      setState(() => _selectedMood = selected ? mood.label : null);
                     },
                   );
                 }).toList(),

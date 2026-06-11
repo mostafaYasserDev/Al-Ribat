@@ -9,6 +9,7 @@ import 'package:intl/intl.dart' show DateFormat;
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../application/providers.dart';
+import '../../core/activity_schedule.dart';
 import '../../core/constants/prayer_phase.dart';
 import '../../core/ui_confirm.dart';
 import '../../core/ui_feedback.dart';
@@ -44,42 +45,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     List<ActivityItem> activities,
     PrayerPhase phase,
     DateTime selectedDate,
-  ) {
-    final todayStr = DateFormat('yyyy-MM-dd').format(selectedDate);
-    return activities.where((a) {
-      if (a.type == ActivityType.independent) return false;
-      final createdDate = DateTime(a.createdAt.year, a.createdAt.month, a.createdAt.day);
-      final queryDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-      if (queryDate.isBefore(createdDate)) return false;
-      
-      if (a.repetition == ActivityRepetition.weekly) {
-        if (!a.repeatDays.contains(selectedDate.weekday)) return false;
-      } else if (a.repetition == ActivityRepetition.once) {
-        if (a.targetDate != null && a.targetDate != todayStr) return false;
-      }
-      return a.linkedPrayer == phase;
-    }).toList();
-  }
+  ) =>
+      activitiesForPhase(activities, phase, selectedDate);
 
   List<ActivityItem> _independentActivities(
     List<ActivityItem> activities,
     DateTime selectedDate,
-  ) {
-    final todayStr = DateFormat('yyyy-MM-dd').format(selectedDate);
-    return activities.where((a) {
-      if (a.type != ActivityType.independent) return false;
-      final createdDate = DateTime(a.createdAt.year, a.createdAt.month, a.createdAt.day);
-      final queryDate = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-      if (queryDate.isBefore(createdDate)) return false;
-      
-      if (a.repetition == ActivityRepetition.weekly) {
-        if (!a.repeatDays.contains(selectedDate.weekday)) return false;
-      } else if (a.repetition == ActivityRepetition.once) {
-        if (a.targetDate != null && a.targetDate != todayStr) return false;
-      }
-      return true;
-    }).toList();
-  }
+  ) =>
+      independentActivities(activities, selectedDate);
 
   String _dailyMotivation() {
     final key = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -127,7 +100,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           await ref.read(activitiesProvider.notifier).addActivity(activity);
           lightSuccessHaptic();
           if (context.mounted) {
-            appSnack(context, 'أُضيف النشاط — ${MotivationQuotes.randomLine()}');
+            appSnack(context, 'أُضِيف النشاط — ${MotivationQuotes.randomLine()}');
           }
           return true;
         },
@@ -432,31 +405,65 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                                       endActionPane: ActionPane(
                                         motion: const ScrollMotion(),
                                         children: [
-                                          SlidableAction(
-                                            onPressed: (_) {
-                                              HapticFeedback.selectionClick();
-                                              ref.read(activitiesProvider.notifier).toggleSkip(act, todayStr);
-                                            },
-                                            backgroundColor: Colors.orange,
-                                            foregroundColor: Colors.white,
-                                            icon: isSkipped ? Icons.undo : Icons.skip_next,
-                                            label: isSkipped ? 'تراجع عن التخطي' : 'تخطي',
-                                          ),
+                                          if (!isDone)
+                                            SlidableAction(
+                                              onPressed: (_) {
+                                                HapticFeedback.selectionClick();
+                                                ref.read(activitiesProvider.notifier).toggleSkip(act, todayStr);
+                                              },
+                                              backgroundColor: Colors.orange,
+                                              foregroundColor: Colors.white,
+                                              icon: isSkipped ? Icons.undo : Icons.skip_next,
+                                              label: isSkipped ? 'تراجع عن التخطي' : 'تخطي',
+                                            ),
                                           SlidableAction(
                                             onPressed: (_) async {
-                                              final ok = await confirmDestructiveAction(
-                                                context,
-                                                title: 'حذف النشاط؟',
-                                                message: 'لن يمكن استرجاع «${act.title}».',
-                                              );
-                                              if (!ok || !context.mounted) return;
-                                              await ref.read(activitiesProvider.notifier).deleteActivity(act.id);
-                                              if (context.mounted) appSnack(context, 'تم حذف النشاط.');
+                                              final option = await showActivityDeleteOptions(context, act.title);
+                                              if (option == null || !context.mounted) return;
+                                              switch (option) {
+                                                case ActivityDeleteOption.skipToday:
+                                                  ref.read(activitiesProvider.notifier).toggleSkip(act, todayStr);
+                                                  break;
+                                                case ActivityDeleteOption.endFuture:
+                                                  final previousDate = DateTime.parse(todayStr).subtract(const Duration(days: 1));
+                                                  final prevStr = "${previousDate.year.toString().padLeft(4, '0')}-${previousDate.month.toString().padLeft(2, '0')}-${previousDate.day.toString().padLeft(2, '0')}";
+                                                  await ref.read(activitiesProvider.notifier).updateActivity(act.copyWith(endDate: prevStr));
+                                                  break;
+                                                case ActivityDeleteOption.deleteCompletely:
+                                                  await ref.read(activitiesProvider.notifier).deleteActivity(act.id);
+                                                  break;
+                                              }
+                                              if (context.mounted) appSnack(context, 'تم تنفيذ الإجراء بنجاح.');
                                             },
                                             backgroundColor: Colors.red,
                                             foregroundColor: Colors.white,
                                             icon: Icons.delete,
                                             label: 'حذف',
+                                          ),
+                                          SlidableAction(
+                                            onPressed: (_) async {
+                                              final updated = await showModalBottomSheet<ActivityItem>(
+                                                context: context,
+                                                isScrollControlled: true,
+                                                showDragHandle: true,
+                                                builder: (ctx) => AddActivitySheet(
+                                                  initialActivity: act,
+                                                  onSave: (edited) async {
+                                                    Navigator.of(ctx).pop(edited);
+                                                    return true;
+                                                  },
+                                                ),
+                                              );
+                                              if (updated != null) {
+                                                HapticFeedback.lightImpact();
+                                                await ref.read(activitiesProvider.notifier).updateActivity(updated);
+                                                if (context.mounted) appSnack(context, 'تم تعديل النشاط.');
+                                              }
+                                            },
+                                            backgroundColor: Colors.blue,
+                                            foregroundColor: Colors.white,
+                                            icon: Icons.edit,
+                                            label: 'تعديل',
                                           ),
                                         ],
                                       ),
@@ -586,30 +593,65 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                                   endActionPane: ActionPane(
                                     motion: const ScrollMotion(),
                                     children: [
-                                      SlidableAction(
-                                        onPressed: (_) {
-                                          HapticFeedback.selectionClick();
-                                          ref.read(activitiesProvider.notifier).toggleSkip(act, todayStr);
-                                        },
-                                        backgroundColor: Colors.orange,
-                                        foregroundColor: Colors.white,
-                                        icon: isSkipped ? Icons.undo : Icons.skip_next,
-                                        label: isSkipped ? 'تراجع عن التخطي' : 'تخطي',
-                                      ),
+                                      if (!isDone)
+                                        SlidableAction(
+                                          onPressed: (_) {
+                                            HapticFeedback.selectionClick();
+                                            ref.read(activitiesProvider.notifier).toggleSkip(act, todayStr);
+                                          },
+                                          backgroundColor: Colors.orange,
+                                          foregroundColor: Colors.white,
+                                          icon: isSkipped ? Icons.undo : Icons.skip_next,
+                                          label: isSkipped ? 'تراجع عن التخطي' : 'تخطي',
+                                        ),
                                       SlidableAction(
                                         onPressed: (_) async {
-                                          final ok = await confirmDestructiveAction(
-                                            context,
-                                            title: 'حذف النشاط؟',
-                                            message: 'لن يمكن استرجاع «${act.title}».',
-                                          );
-                                          if (!ok || !context.mounted) return;
-                                          await ref.read(activitiesProvider.notifier).deleteActivity(act.id);
+                                          final option = await showActivityDeleteOptions(context, act.title);
+                                          if (option == null || !context.mounted) return;
+                                          switch (option) {
+                                            case ActivityDeleteOption.skipToday:
+                                              ref.read(activitiesProvider.notifier).toggleSkip(act, todayStr);
+                                              break;
+                                            case ActivityDeleteOption.endFuture:
+                                              final previousDate = DateTime.parse(todayStr).subtract(const Duration(days: 1));
+                                              final prevStr = "${previousDate.year.toString().padLeft(4, '0')}-${previousDate.month.toString().padLeft(2, '0')}-${previousDate.day.toString().padLeft(2, '0')}";
+                                              await ref.read(activitiesProvider.notifier).updateActivity(act.copyWith(endDate: prevStr));
+                                              break;
+                                            case ActivityDeleteOption.deleteCompletely:
+                                              await ref.read(activitiesProvider.notifier).deleteActivity(act.id);
+                                              break;
+                                          }
+                                          if (context.mounted) appSnack(context, 'تم تنفيذ الإجراء بنجاح.');
                                         },
                                         backgroundColor: Colors.red,
                                         foregroundColor: Colors.white,
                                         icon: Icons.delete,
                                         label: 'حذف',
+                                      ),
+                                      SlidableAction(
+                                        onPressed: (_) async {
+                                          final updated = await showModalBottomSheet<ActivityItem>(
+                                            context: context,
+                                            isScrollControlled: true,
+                                            showDragHandle: true,
+                                            builder: (ctx) => AddActivitySheet(
+                                              initialActivity: act,
+                                              onSave: (edited) async {
+                                                Navigator.of(ctx).pop(edited);
+                                                return true;
+                                              },
+                                            ),
+                                          );
+                                          if (updated != null) {
+                                            HapticFeedback.lightImpact();
+                                            await ref.read(activitiesProvider.notifier).updateActivity(updated);
+                                            if (context.mounted) appSnack(context, 'تم تعديل النشاط.');
+                                          }
+                                        },
+                                        backgroundColor: Colors.blue,
+                                        foregroundColor: Colors.white,
+                                        icon: Icons.edit,
+                                        label: 'تعديل',
                                       ),
                                     ],
                                   ),
@@ -673,17 +715,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       ),
                     ],
                   ),
-                  if (dayState.currentPrayerPhase == PrayerPhase.isha)
+                  if (dayState.currentPrayerPhase == PrayerPhase.isha || todayStr != DateFormat('yyyy-MM-dd').format(DateTime.now()))
                     Padding(
                       padding: const EdgeInsets.only(top: 4),
                       child: ReflectionCard(
                         streakCount: max(dayState.streakCount, 1),
                         onSave: (value, mood) async {
-                          await ref.read(reflectionsProvider.notifier).add(value, mood: mood);
+                          final selectedDate = ref.read(selectedDateProvider);
+                          final at = DateTime(
+                            selectedDate.year,
+                            selectedDate.month,
+                            selectedDate.day,
+                            DateTime.now().hour,
+                            DateTime.now().minute,
+                          );
+                          await ref.read(reflectionsProvider.notifier).add(value, mood: mood, createdAt: at);
                           await updateStreakIfNeeded(ref);
                           if (context.mounted) {
                             lightSuccessHaptic();
-                            appSnack(context, 'حُفظ التأمل في السجل.');
+                            appSnack(context, 'حُفِظ التأمل في السجل.');
                           }
                         },
                       ),

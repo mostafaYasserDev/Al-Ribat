@@ -18,6 +18,9 @@ class BackupExportService {
       'version': 2,
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'settingsJson': meta.get('settings'),
+      'streakCount': meta.get('streak_count'),
+      'streakLastDate': meta.get('streak_last_date'),
+      'appPin': meta.get('app_pin'),
       'activities': activitiesBox.values.toList(),
       'reflections': reflBox.values.toList(),
       'workSessions': workBox.values.toList(),
@@ -80,16 +83,20 @@ class BackupExportService {
     if (raw == null || raw.trim().isEmpty) {
       throw const FormatException('الملف فارغ أو غير قابل للقراءة.');
     }
-    await _restoreFromJson(raw);
+    await restoreFromJsonString(raw);
   }
 
-  static Future<void> _restoreFromJson(String raw) async {
+  static Future<void> restoreFromJsonString(String raw) async {
     final decoded = jsonDecode(raw);
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException('هيكلة الملف غير صحيحة.');
     }
+    await _restoreFromMap(decoded);
+  }
+
+  static Future<void> _restoreFromMap(Map<String, dynamic> decoded) async {
     final v = decoded['version'];
-    
+
     final meta = Hive.box<String>('meta_box');
     final activitiesBox = Hive.box<String>('activities_box');
     final reflBox = Hive.box<String>('reflections_box');
@@ -100,13 +107,11 @@ class BackupExportService {
     await workBox.clear();
 
     if (v == 1) {
-      // V1 Migration
       final tasks = _asStringList(decoded['tasks'] ?? [], key: 'tasks');
       final habits = _asStringList(decoded['habits'] ?? [], key: 'habits');
       final reflections = _asStringList(decoded['reflections'] ?? [], key: 'reflections');
       final workSessions = _asStringList(decoded['workSessions'] ?? [], key: 'workSessions');
 
-      // Convert tasks to activities
       for (final tStr in tasks) {
         final t = jsonDecode(tStr) as Map<String, dynamic>;
         final act = {
@@ -125,11 +130,11 @@ class BackupExportService {
           'history': t['isCompleted'] == true ? [{'date': t['date'], 'isSkipped': false, 'progress': 1.0}] : [],
           'historyDates': t['isCompleted'] == true ? [t['date']] : [],
           'orderIndex': t['orderIndex'] ?? 0,
+          'skippedDates': <String>[],
         };
-        await activitiesBox.add(jsonEncode(act));
+        await _putByEntityId(activitiesBox, jsonEncode(act));
       }
 
-      // Convert habits to activities
       for (final hStr in habits) {
         final h = jsonDecode(hStr) as Map<String, dynamic>;
         final act = {
@@ -149,28 +154,28 @@ class BackupExportService {
           'history': h['history'] ?? [],
           'historyDates': (h['history'] as List<dynamic>?)?.map((e) => (e as Map)['date']).toList() ?? [],
           'orderIndex': h['orderIndex'] ?? 0,
+          'skippedDates': h['skippedDates'] ?? <String>[],
         };
-        await activitiesBox.add(jsonEncode(act));
+        await _putByEntityId(activitiesBox, jsonEncode(act));
       }
 
-      for (final item in reflections) await reflBox.add(item);
-      for (final item in workSessions) await workBox.add(item);
-
+      for (final item in reflections) await _putByEntityId(reflBox, item);
+      for (final item in workSessions) await _putByEntityId(workBox, item);
     } else if (v == 2) {
       final activities = _asStringList(decoded['activities'] ?? [], key: 'activities');
       final reflections = _asStringList(decoded['reflections'] ?? [], key: 'reflections');
       final workSessions = _asStringList(decoded['workSessions'] ?? [], key: 'workSessions');
 
-      for (final item in activities) await activitiesBox.add(item);
-      for (final item in reflections) await reflBox.add(item);
-      for (final item in workSessions) await workBox.add(item);
+      for (final item in activities) await _putByEntityId(activitiesBox, item);
+      for (final item in reflections) await _putByEntityId(reflBox, item);
+      for (final item in workSessions) await _putByEntityId(workBox, item);
     } else {
       throw const FormatException('إصدار النسخة غير مدعوم.');
     }
 
     final settingsRaw = decoded['settingsJson'];
     if (settingsRaw != null && settingsRaw is! String) {
-      throw const FormatException('settingsJson يجب أن يكون نصاً أو null.');
+      throw const FormatException('settingsJson يجب أن يكون نصًا أو null.');
     }
 
     if (settingsRaw == null) {
@@ -178,6 +183,36 @@ class BackupExportService {
     } else {
       await meta.put('settings', settingsRaw);
     }
+
+    final streakCount = decoded['streakCount'];
+    if (streakCount is String && streakCount.isNotEmpty) {
+      await meta.put('streak_count', streakCount);
+    } else {
+      await meta.delete('streak_count');
+    }
+
+    final streakLastDate = decoded['streakLastDate'];
+    if (streakLastDate is String && streakLastDate.isNotEmpty) {
+      await meta.put('streak_last_date', streakLastDate);
+    } else {
+      await meta.delete('streak_last_date');
+    }
+
+    final appPin = decoded['appPin'];
+    if (appPin is String && appPin.isNotEmpty) {
+      await meta.put('app_pin', appPin);
+    } else {
+      await meta.delete('app_pin');
+    }
+  }
+
+  static Future<void> _putByEntityId(Box<String> box, String jsonStr) async {
+    final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+    final id = map['id']?.toString();
+    if (id == null || id.isEmpty) {
+      throw const FormatException('عنصر النسخة الاحتياطية يفتقد حقل id.');
+    }
+    await box.put(id, jsonStr);
   }
 
   static List<String> _asStringList(Object? source, {required String key}) {
@@ -191,7 +226,7 @@ class BackupExportService {
       } else if (item is Map || item is List) {
         out.add(jsonEncode(item));
       } else {
-        throw FormatException('$key يحتوي عنصراً غير مدعوم.');
+        throw FormatException('$key يحتوي عنصرًا غير مدعوم.');
       }
     }
     return out;

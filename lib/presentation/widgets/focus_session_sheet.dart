@@ -84,65 +84,85 @@ class _FocusSessionSheetState extends State<FocusSessionSheet> {
     final mm = (_remaining ~/ 60).toString().padLeft(2, '0');
     final ss = (_remaining % 60).toString().padLeft(2, '0');
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 12,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('جلسة تركيز', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _nameController,
-            enabled: !_running,
-            decoration: const InputDecoration(labelText: 'اسم الجلسة'),
-          ),
-          const SizedBox(height: 10),
-          Text('المدة', style: Theme.of(context).textTheme.labelLarge),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [15, 25, 45, 50].map((m) {
-              return ChoiceChip(
-                label: Text('$m د'),
-                selected: _minutes == m && !_running,
-                onSelected: _running
-                    ? null
-                    : (_) => setState(() {
-                          _minutes = m;
-                        }),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 16),
-          if (_running)
-            Text(
-              '$mm:$ss',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.displaySmall,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 12,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('جلسة تركيز', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              enabled: !_running,
+              textDirection: TextDirection.rtl,
+              decoration: const InputDecoration(labelText: 'اسم الجلسة'),
             ),
-          const SizedBox(height: 12),
-          if (!_running)
-            FilledButton(
-              onPressed: _start,
-              child: const Text('بدء'),
-            )
-          else ...[
-            FilledButton(
-              onPressed: () => _finish(completed: true),
-              child: const Text('إنهاء الجلسة'),
+            const SizedBox(height: 10),
+            Text('المدة', style: Theme.of(context).textTheme.labelLarge),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [15, 25, 45, 50].map((m) {
+                return ChoiceChip(
+                  label: Text('$m د'),
+                  selected: _minutes == m && !_running,
+                  onSelected: _running
+                      ? null
+                      : (_) => setState(() {
+                            _minutes = m;
+                          }),
+                );
+              }).toList(),
             ),
-            TextButton(
-              onPressed: () => _finish(completed: false),
-              child: const Text('إيقاف مبكر'),
-            ),
+            const SizedBox(height: 8),
+            if (!_running)
+              TextField(
+                keyboardType: TextInputType.number,
+                textDirection: TextDirection.rtl,
+                decoration: const InputDecoration(
+                  labelText: 'أو مدة مخصصة (دقائق)',
+                  hintText: 'مثال: 60',
+                ),
+                onChanged: (val) {
+                  final m = int.tryParse(val);
+                  if (m != null && m > 0) {
+                    setState(() => _minutes = m);
+                  }
+                },
+              ),
+            const SizedBox(height: 16),
+            if (_running)
+              Text(
+                '$mm:$ss',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
+            const SizedBox(height: 12),
+            if (!_running)
+              FilledButton(
+                onPressed: _start,
+                child: const Text('بدء'),
+              )
+            else ...[
+              FilledButton(
+                onPressed: () => _finish(completed: true),
+                child: const Text('إنهاء الجلسة'),
+              ),
+              TextButton(
+                onPressed: () => _finish(completed: false),
+                child: const Text('إيقاف مبكر'),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -108,6 +108,18 @@ class DeveloperSupportScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+          Text('ملاحظاتك تهمنا', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.feedback_outlined),
+              title: const Text('الشكاوى والاقتراحات'),
+              subtitle: const Text('أخبرنا برأيك أو اقترح ميزة جديدة'),
+              trailing: const Icon(Icons.open_in_new),
+              onTap: () => _openUrl(context, 'https://forms.gle/HSGemvnVdrfsNxWM8'),
+            ),
+          ),
+          const SizedBox(height: 16),
           Text('الدعم المالي', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Card(
