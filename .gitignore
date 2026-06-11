@@ -49,3 +49,6 @@ app.*.map.json
 
 # Editor directories
 .cursor/
+
+# Firebase
+android/app/google-services.json
