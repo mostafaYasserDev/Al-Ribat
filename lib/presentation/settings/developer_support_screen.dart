@@ -156,11 +156,21 @@ class DeveloperSupportScreen extends StatelessWidget {
                   onTap: () => _openUrl(context, DeveloperProfile.instapayUrl),
                 ),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(Icons.account_balance_wallet_outlined),
-                  title: const Text(DeveloperProfile.paypalHint),
-                  trailing: const Icon(Icons.open_in_new),
-                  onTap: () => _openUrl(context, DeveloperProfile.paypalUrl),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: ElevatedButton.icon(
+                    onPressed: () => _openUrl(context, DeveloperProfile.paypalUrl),
+                    icon: const Icon(Icons.volunteer_activism),
+                    label: const Text(DeveloperProfile.paypalHint),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                      backgroundColor: const Color(0xFF0070BA), // PayPal Blue
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),

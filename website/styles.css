@@ -112,7 +112,29 @@ body {
 .btn-secondary:hover {
     background-color: #E8EEEA;
 }
-
+.btn-qabilah {
+    background-color: white;
+    color: #FF5722 ;
+    border: 1px solid var(--border-color);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 18px 24px;
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: 1.1rem;
+    width: 100%;
+        filter:drop-shadow(0px 0px 0px black);
+  
+}
+.btn-qabilah img {
+    width: 24px;
+    height: 24px;
+}
+.btn-qabilah:hover {
+    filter:drop-shadow(2px 4px 6px black);
+}
 /* Support Section */
 .support {
     width: 100%;
