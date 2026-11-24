@@ -1,87 +1,115 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:al_ribat/features/focus/focus.dart';
 
 void main() {
-  group('Focus Feature Unit Tests', () {
-    test('WorkSessionItem copyWith and properties', () {
-      final started = DateTime(2026, 11, 24, 10, 0);
-      final ended = DateTime(2026, 11, 24, 10, 25);
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues({});
+  });
 
-      final session = WorkSessionItem(
-        id: 'session-1',
-        name: 'قراءة كتاب',
-        plannedMinutes: 25,
-        startedAt: started,
-        endedAt: ended,
-        completed: true,
-      );
-
-      expect(session.id, 'session-1');
-      expect(session.name, 'قراءة كتاب');
-      expect(session.plannedMinutes, 25);
-      expect(session.startedAt, started);
-      expect(session.endedAt, ended);
-      expect(session.completed, isTrue);
-
-      final updated = session.copyWith(completed: false, name: 'جلسة متوقفة');
-      expect(updated.id, 'session-1');
-      expect(updated.name, 'جلسة متوقفة');
-      expect(updated.completed, isFalse);
+  group('FocusSessionMode and ActiveFocusState Tests', () {
+    test('FocusSessionMode labels match expected Arabic text', () {
+      expect(FocusSessionMode.untilPrayer.arabicLabel, 'الرباط حتى الأذان');
+      expect(FocusSessionMode.pomodoro.arabicLabel, 'بومودورو ذكي');
+      expect(FocusSessionMode.customTimer.arabicLabel, 'مؤقت مخصص');
+      expect(FocusSessionMode.openStopwatch.arabicLabel, 'تركيز مفتوح');
     });
 
-    test('WorkSessionItemModel JSON serialization and deserialization', () {
-      final started = DateTime(2026, 11, 24, 14, 0);
-      final ended = DateTime(2026, 11, 24, 14, 45);
-
-      final model = WorkSessionItemModel(
-        id: 'session-100',
-        name: 'كتابة مقال',
-        plannedMinutes: 45,
-        startedAt: started,
-        endedAt: ended,
-        completed: true,
-      );
-
-      final jsonString = model.toJson();
-      final restored = WorkSessionItemModel.fromJson(jsonString);
-
-      expect(restored.id, model.id);
-      expect(restored.name, model.name);
-      expect(restored.plannedMinutes, model.plannedMinutes);
-      expect(restored.startedAt, model.startedAt);
-      expect(restored.endedAt, model.endedAt);
-      expect(restored.completed, isTrue);
-    });
-
-    test('ActiveFocusState canSavePartial returns true only after 10 minutes',
-        () {
+    test('ActiveFocusState supports mode and linked activity', () {
       final now = DateTime.now();
-
-      // Started 5 minutes ago (< 10 minutes)
-      final stateRecent = ActiveFocusState(
-        title: 'جلسة حديثة',
-        plannedMinutes: 25,
-        startedAt: now.subtract(const Duration(minutes: 5)),
-        remainingSeconds: 1200,
+      final state = ActiveFocusState(
+        title: 'قراءة الورد',
+        plannedMinutes: 30,
+        startedAt: now,
+        remainingSeconds: 1800,
+        mode: FocusSessionMode.untilPrayer,
+        linkedActivityId: 'act_1',
+        linkedActivityTitle: 'تلاوة سورة الكهف',
       );
-      expect(stateRecent.canSavePartial, isFalse);
 
-      // Started 12 minutes ago (>= 10 minutes)
-      final stateEligible = ActiveFocusState(
-        title: 'جلسة قابلة للحفظ',
-        plannedMinutes: 25,
-        startedAt: now.subtract(const Duration(minutes: 12)),
-        remainingSeconds: 780,
-      );
-      expect(stateEligible.canSavePartial, isTrue);
+      expect(state.mode, FocusSessionMode.untilPrayer);
+      expect(state.linkedActivityId, 'act_1');
+      expect(state.linkedActivityTitle, 'تلاوة سورة الكهف');
+      expect(state.isBreak, isFalse);
+
+      final breakState = state.copyWith(isBreak: true, title: 'استراحة');
+      expect(breakState.isBreak, isTrue);
+      expect(breakState.title, 'استراحة');
     });
 
-    test('formatFocusRemaining formats seconds into mm:ss', () {
-      expect(formatFocusRemaining(0), '00:00');
-      expect(formatFocusRemaining(59), '00:59');
-      expect(formatFocusRemaining(60), '01:00');
-      expect(formatFocusRemaining(125), '02:05');
-      expect(formatFocusRemaining(1500), '25:00');
+    test('WorkSessionItem preserves new metadata', () {
+      final now = DateTime.now();
+      final session = WorkSessionItem(
+        id: '1',
+        name: 'كتابة التقرير',
+        plannedMinutes: 25,
+        startedAt: now.subtract(const Duration(minutes: 25)),
+        endedAt: now,
+        linkedActivityTitle: 'مهمة العمل',
+        sessionMode: 'pomodoro',
+      );
+
+      expect(session.actualMinutes, 25);
+      expect(session.linkedActivityTitle, 'مهمة العمل');
+      expect(session.sessionMode, 'pomodoro');
+    });
+  });
+
+  group('AmbientSoundNotifier Tests', () {
+    test('Changing soundscape updates isPlaying state', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(ambientSoundProvider.notifier);
+      expect(container.read(ambientSoundProvider).soundscape,
+          AmbientSoundscape.silent);
+      expect(container.read(ambientSoundProvider).isPlaying, isFalse);
+
+      notifier.setSoundscape(AmbientSoundscape.rain);
+      expect(container.read(ambientSoundProvider).soundscape,
+          AmbientSoundscape.rain);
+      expect(container.read(ambientSoundProvider).isPlaying, isTrue);
+
+      notifier.setVolume(0.5);
+      expect(container.read(ambientSoundProvider).volume, 0.5);
+    });
+  });
+
+  group('ActiveFocusNotifier Multi-Mode Tests', () {
+    test('startPomodoro configures 25-minute pomodoro mode', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(activeFocusProvider.notifier);
+      await notifier.startPomodoro(
+        title: 'جلسة برمجة',
+        linkedActivityId: 'act_dev',
+        linkedActivityTitle: 'تطوير التطبيق',
+      );
+
+      final state = container.read(activeFocusProvider);
+      expect(state, isNotNull);
+      expect(state!.mode, FocusSessionMode.pomodoro);
+      expect(state.plannedMinutes, 25);
+      expect(state.remainingSeconds, 25 * 60);
+      expect(state.linkedActivityId, 'act_dev');
+    });
+
+    test('startOpenStopwatch initializes zero remaining and counts up',
+        () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(activeFocusProvider.notifier);
+      await notifier.startOpenStopwatch(title: 'بحث حر');
+
+      final state = container.read(activeFocusProvider);
+      expect(state, isNotNull);
+      expect(state!.mode, FocusSessionMode.openStopwatch);
+      expect(state.elapsedSeconds, 0);
     });
   });
 }

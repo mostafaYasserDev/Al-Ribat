@@ -6,6 +6,9 @@ class WorkSessionItem {
     required this.startedAt,
     required this.endedAt,
     this.completed = true,
+    this.linkedActivityTitle,
+    this.sessionMode,
+    this.reflection,
   });
 
   final String id;
@@ -14,6 +17,9 @@ class WorkSessionItem {
   final DateTime startedAt;
   final DateTime endedAt;
   final bool completed;
+  final String? linkedActivityTitle;
+  final String? sessionMode;
+  final String? reflection;
 
   int get actualMinutes {
     final d = endedAt.difference(startedAt).inMinutes;
@@ -27,6 +33,9 @@ class WorkSessionItem {
     DateTime? startedAt,
     DateTime? endedAt,
     bool? completed,
+    String? linkedActivityTitle,
+    String? sessionMode,
+    String? reflection,
   }) {
     return WorkSessionItem(
       id: id ?? this.id,
@@ -35,6 +44,9 @@ class WorkSessionItem {
       startedAt: startedAt ?? this.startedAt,
       endedAt: endedAt ?? this.endedAt,
       completed: completed ?? this.completed,
+      linkedActivityTitle: linkedActivityTitle ?? this.linkedActivityTitle,
+      sessionMode: sessionMode ?? this.sessionMode,
+      reflection: reflection ?? this.reflection,
     );
   }
 }

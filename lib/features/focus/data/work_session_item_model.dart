@@ -10,6 +10,9 @@ class WorkSessionItemModel extends WorkSessionItem {
     required super.startedAt,
     required super.endedAt,
     super.completed = true,
+    super.linkedActivityTitle,
+    super.sessionMode,
+    super.reflection,
   });
 
   factory WorkSessionItemModel.fromEntity(WorkSessionItem e) {
@@ -20,6 +23,9 @@ class WorkSessionItemModel extends WorkSessionItem {
       startedAt: e.startedAt,
       endedAt: e.endedAt,
       completed: e.completed,
+      linkedActivityTitle: e.linkedActivityTitle,
+      sessionMode: e.sessionMode,
+      reflection: e.reflection,
     );
   }
 
@@ -32,6 +38,9 @@ class WorkSessionItemModel extends WorkSessionItem {
       startedAt: DateTime.parse(json['startedAt'] as String),
       endedAt: DateTime.parse(json['endedAt'] as String),
       completed: json['completed'] as bool? ?? true,
+      linkedActivityTitle: json['linkedActivityTitle'] as String?,
+      sessionMode: json['sessionMode'] as String?,
+      reflection: json['reflection'] as String?,
     );
   }
 
@@ -43,6 +52,9 @@ class WorkSessionItemModel extends WorkSessionItem {
       'startedAt': startedAt.toIso8601String(),
       'endedAt': endedAt.toIso8601String(),
       'completed': completed,
+      'linkedActivityTitle': linkedActivityTitle,
+      'sessionMode': sessionMode,
+      'reflection': reflection,
     });
   }
 }

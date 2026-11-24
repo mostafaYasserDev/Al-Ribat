@@ -2,17 +2,22 @@ import 'dart:async';
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/services/focus_foreground_service.dart';
 import 'package:al_ribat/services/motivation_quotes.dart';
 import '../domain/active_focus_state.dart';
 import '../domain/work_session_item.dart';
+import 'ambient_sound_service.dart';
 
 final activeFocusProvider =
     NotifierProvider<ActiveFocusNotifier, ActiveFocusState?>(
   ActiveFocusNotifier.new,
 );
+
+final lastCompletedSessionProvider =
+    StateProvider<WorkSessionItem?>((ref) => null);
 
 class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
   Timer? _ticker;
@@ -48,6 +53,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
         plannedMinutes: planned,
         startedAt: DateTime.fromMillisecondsSinceEpoch(startedMs),
         remainingSeconds: remain,
+        elapsedSeconds: (planned * 60) - remain,
         isPaused: isPaused,
       );
 
@@ -63,7 +69,11 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     if (type == 'focus_tick') {
       final s = data['remainSec'] as int?;
       if (s != null && state != null) {
-        state = state!.copyWith(remainingSeconds: s, isPaused: false);
+        state = state!.copyWith(
+          remainingSeconds: s,
+          elapsedSeconds: (state!.plannedMinutes * 60) - s,
+          isPaused: false,
+        );
       }
     } else if (type == 'focus_paused_tick') {
       final s = data['remainSec'] as int?;
@@ -111,6 +121,10 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
   Future<void> startSession({
     required String title,
     required int plannedMinutes,
+    FocusSessionMode mode = FocusSessionMode.customTimer,
+    String? linkedActivityId,
+    String? linkedActivityTitle,
+    String? projectName,
   }) async {
     _ticker?.cancel();
     final now = DateTime.now();
@@ -121,15 +135,83 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
       plannedMinutes: plannedMinutes,
       startedAt: now,
       remainingSeconds: totalSeconds,
+      elapsedSeconds: 0,
       isPaused: false,
+      mode: mode,
+      linkedActivityId: linkedActivityId,
+      linkedActivityTitle: linkedActivityTitle,
+      projectName: projectName,
     );
 
-    if (FocusForegroundService.isAndroidForegroundSupported) {
+    if (FocusForegroundService.isAndroidForegroundSupported &&
+        mode != FocusSessionMode.openStopwatch) {
       await FocusForegroundService.startCountdown(
         title: state!.title,
         plannedMinutes: plannedMinutes,
       );
     }
+
+    _startInternalTicker();
+  }
+
+  Future<void> startUntilPrayer({
+    required String title,
+    required DateTime nextPrayerTime,
+    String? linkedActivityId,
+    String? linkedActivityTitle,
+  }) async {
+    final now = DateTime.now();
+    var diffSeconds = nextPrayerTime.difference(now).inSeconds;
+    if (diffSeconds <= 60) {
+      diffSeconds = 300; // 5 min fallback
+    }
+    final plannedMin = (diffSeconds / 60).ceil();
+
+    await startSession(
+      title: title.isEmpty ? 'الرباط حتى الأذان' : title,
+      plannedMinutes: plannedMin,
+      mode: FocusSessionMode.untilPrayer,
+      linkedActivityId: linkedActivityId,
+      linkedActivityTitle: linkedActivityTitle,
+    );
+  }
+
+  Future<void> startPomodoro({
+    required String title,
+    int workMinutes = 25,
+    String? linkedActivityId,
+    String? linkedActivityTitle,
+  }) async {
+    await startSession(
+      title: title.isEmpty ? 'بومودورو تركيز' : title,
+      plannedMinutes: workMinutes,
+      mode: FocusSessionMode.pomodoro,
+      linkedActivityId: linkedActivityId,
+      linkedActivityTitle: linkedActivityTitle,
+    );
+  }
+
+  Future<void> startOpenStopwatch({
+    required String title,
+    String? linkedActivityId,
+    String? linkedActivityTitle,
+    String? projectName,
+  }) async {
+    _ticker?.cancel();
+    final now = DateTime.now();
+
+    state = ActiveFocusState(
+      title: title.trim().isEmpty ? 'تركيز مفتوح' : title.trim(),
+      plannedMinutes: 0,
+      startedAt: now,
+      remainingSeconds: 0,
+      elapsedSeconds: 0,
+      isPaused: false,
+      mode: FocusSessionMode.openStopwatch,
+      linkedActivityId: linkedActivityId,
+      linkedActivityTitle: linkedActivityTitle,
+      projectName: projectName,
+    );
 
     _startInternalTicker();
   }
@@ -143,12 +225,34 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
         return;
       }
 
+      if (current.mode == FocusSessionMode.openStopwatch) {
+        state = current.copyWith(
+          elapsedSeconds: current.elapsedSeconds + 1,
+          plannedMinutes: (current.elapsedSeconds + 1) ~/ 60,
+        );
+        return;
+      }
+
       if (current.remainingSeconds <= 1) {
-        timer.cancel();
-        _completeSession(current.title);
+        if (current.mode == FocusSessionMode.pomodoro && !current.isBreak) {
+          // Switch to 5-minute break
+          ref.read(ambientSoundProvider.notifier).playCompletionChime();
+          state = current.copyWith(
+            title: 'استراحة قصيرة ☕',
+            isBreak: true,
+            plannedMinutes: 5,
+            remainingSeconds: 5 * 60,
+            elapsedSeconds: 0,
+          );
+        } else {
+          timer.cancel();
+          _completeSession(current.title);
+        }
       } else {
-        state =
-            current.copyWith(remainingSeconds: current.remainingSeconds - 1);
+        state = current.copyWith(
+          remainingSeconds: current.remainingSeconds - 1,
+          elapsedSeconds: current.elapsedSeconds + 1,
+        );
       }
     });
   }
@@ -185,7 +289,8 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     final current = state;
     if (current == null) return false;
 
-    if (!current.canSavePartial) {
+    if (!current.canSavePartial &&
+        current.mode != FocusSessionMode.openStopwatch) {
       return false;
     }
 
@@ -199,6 +304,9 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
       plannedMinutes: current.plannedMinutes,
       startedAt: current.startedAt,
       completed: false,
+      linkedActivityId: current.linkedActivityId,
+      linkedActivityTitle: current.linkedActivityTitle,
+      mode: current.mode.name,
     );
 
     state = null;
@@ -210,6 +318,9 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     final title = current?.title ?? titleHint;
     final planned = current?.plannedMinutes ?? 25;
     final started = current?.startedAt ?? DateTime.now();
+    final linkedActId = current?.linkedActivityId;
+    final linkedActTitle = current?.linkedActivityTitle;
+    final modeName = current?.mode.name ?? FocusSessionMode.customTimer.name;
 
     _ticker?.cancel();
     if (FocusForegroundService.isAndroidForegroundSupported) {
@@ -219,12 +330,18 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
 
     state = null;
 
-    await _saveSessionRecord(
+    final session = await _saveSessionRecord(
       title: title,
       plannedMinutes: planned,
       startedAt: started,
       completed: true,
+      linkedActivityId: linkedActId,
+      linkedActivityTitle: linkedActTitle,
+      mode: modeName,
     );
+
+    ref.read(lastCompletedSessionProvider.notifier).state = session;
+    ref.read(ambientSoundProvider.notifier).playCompletionChime();
 
     final quote = MotivationQuotes.randomLine();
     try {
@@ -235,20 +352,44 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     } catch (_) {}
   }
 
-  Future<void> _saveSessionRecord({
+  Future<WorkSessionItem> _saveSessionRecord({
     required String title,
     required int plannedMinutes,
     required DateTime startedAt,
     required bool completed,
+    String? linkedActivityId,
+    String? linkedActivityTitle,
+    String? mode,
   }) async {
+    final ended = DateTime.now();
     final session = WorkSessionItem(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: title,
       plannedMinutes: plannedMinutes,
       startedAt: startedAt,
-      endedAt: DateTime.now(),
+      endedAt: ended,
       completed: completed,
+      linkedActivityTitle: linkedActivityTitle,
+      sessionMode: mode,
     );
     await ref.read(workSessionsProvider.notifier).addSession(session);
+
+    // Sync progress to linked activity if measurable
+    if (linkedActivityId != null) {
+      try {
+        final acts = ref.read(activitiesProvider).valueOrNull ?? [];
+        final act = acts.where((a) => a.id == linkedActivityId).firstOrNull;
+        if (act != null) {
+          final todayStr = DateFormat('yyyy-MM-dd').format(ended);
+          final elapsedMins =
+              ended.difference(startedAt).inMinutes.clamp(1, 1440).toDouble();
+          await ref
+              .read(activitiesProvider.notifier)
+              .addProgress(act, todayStr, elapsedMins);
+        }
+      } catch (_) {}
+    }
+
+    return session;
   }
 }
