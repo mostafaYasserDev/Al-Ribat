@@ -173,12 +173,9 @@ class _HomeIndependentActivitiesSection extends StatelessWidget {
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final pendingActs =
-        indActs.where((a) => !a.historyDates.contains(todayStr)).toList();
-    final completedActs =
-        indActs.where((a) => a.historyDates.contains(todayStr)).toList();
-
-    final allDone = pendingActs.isEmpty && completedActs.isNotEmpty;
+    final pendingCount =
+        indActs.where((a) => !a.historyDates.contains(todayStr)).length;
+    final allDone = pendingCount == 0 && indActs.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.only(top: 16),
@@ -220,7 +217,7 @@ class _HomeIndependentActivitiesSection extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  allDone ? 'مكتملة ✓' : '${pendingActs.length} متبقية',
+                  allDone ? 'مكتملة ✓' : '$pendingCount متبقية',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -242,10 +239,7 @@ class _HomeIndependentActivitiesSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          // Pending activities first
-          ...pendingActs.map(_buildTile),
-          // Completed activities shown cleanly with their green completed card style
-          ...completedActs.map(_buildTile),
+          ...indActs.map(_buildTile),
         ],
       ),
     );

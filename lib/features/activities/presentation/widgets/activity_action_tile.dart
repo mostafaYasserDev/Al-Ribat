@@ -230,9 +230,11 @@ class ActivityActionTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    activity.title,
-                    style: theme.textTheme.titleMedium?.copyWith(
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeInOut,
+                    style: (theme.textTheme.titleMedium ?? const TextStyle())
+                        .copyWith(
                       color: titleColor,
                       fontWeight: FontWeight.w600,
                       decoration: isDone
@@ -240,6 +242,7 @@ class ActivityActionTile extends StatelessWidget {
                           : (isSkipped ? TextDecoration.lineThrough : null),
                       decorationColor: isDone ? Colors.green : Colors.orange,
                     ),
+                    child: Text(activity.title),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -344,7 +347,9 @@ class ActivityActionTile extends StatelessWidget {
       borderColor = colorScheme.outlineVariant.withValues(alpha: 0.35);
     }
 
-    final cardWidget = Container(
+    final cardWidget = AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(16),
