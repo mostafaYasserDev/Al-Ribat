@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../application/providers.dart';
-import '../../../core/ui_feedback.dart';
-import 'project_groups_service.dart';
+import 'package:al_ribat/application/providers.dart';
+import 'package:al_ribat/core/ui_feedback.dart';
+import '../../data/project_metadata_service.dart';
 
 class ProjectDetailsDialogs {
   static void showAddGroup(

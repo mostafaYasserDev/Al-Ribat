@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_icons.dart';
-import '../../../domain/entities/activity_item.dart';
+import 'package:al_ribat/core/theme/app_icons.dart';
+import 'package:al_ribat/domain/entities/activity_item.dart';
 
 class ProjectTaskTile extends StatelessWidget {
   const ProjectTaskTile({

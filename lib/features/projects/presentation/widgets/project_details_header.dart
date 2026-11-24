@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../parts/project_models.dart';
+import '../../domain/project_aggregate.dart';
 
 class ProjectDetailsHeader extends StatelessWidget {
   const ProjectDetailsHeader({

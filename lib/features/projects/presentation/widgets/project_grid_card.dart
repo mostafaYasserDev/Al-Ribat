@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'project_models.dart';
+import '../../domain/project_aggregate.dart';
 
 class ProjectGridCard extends StatelessWidget {
   const ProjectGridCard({

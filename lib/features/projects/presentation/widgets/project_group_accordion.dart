@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../domain/entities/activity_item.dart';
+import 'package:al_ribat/domain/entities/activity_item.dart';
 import 'project_task_tile.dart';
 
 class ProjectGroupAccordion extends StatelessWidget {

@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../application/providers.dart';
-import '../../../core/ui_feedback.dart';
-import '../../../domain/entities/activity_item.dart';
-import '../../widgets/activity_add_progress_sheet.dart';
-import '../../widgets/activity_details_sheet.dart';
-import '../../widgets/add_activity_sheet.dart';
+import 'package:al_ribat/application/providers.dart';
+import 'package:al_ribat/core/ui_feedback.dart';
+import 'package:al_ribat/domain/entities/activity_item.dart';
+import 'package:al_ribat/presentation/widgets/activity_add_progress_sheet.dart';
+import 'package:al_ribat/presentation/widgets/activity_details_sheet.dart';
+import 'package:al_ribat/presentation/widgets/add_activity_sheet.dart';
 
 class ProjectTaskActions {
   static Future<void> toggleDone(

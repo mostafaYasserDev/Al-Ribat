@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_icons.dart';
+import 'package:al_ribat/core/theme/app_icons.dart';
 
 class NewProjectDialog extends StatefulWidget {
   const NewProjectDialog({super.key, required this.onCreate});
