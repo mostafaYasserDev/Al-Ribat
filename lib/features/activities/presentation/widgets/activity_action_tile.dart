@@ -165,6 +165,7 @@ class ActivityActionTile extends StatelessWidget {
     bool isSkipped,
   ) {
     final theme = Theme.of(context);
+    final light = theme.brightness == Brightness.light;
     final colorScheme = theme.colorScheme;
     final iconColor =
         AppIcons.parseColor(activity.colorHex) ?? colorScheme.primary;
@@ -237,10 +238,17 @@ class ActivityActionTile extends StatelessWidget {
                         .copyWith(
                       color: titleColor,
                       fontWeight: FontWeight.w600,
-                      decoration: isDone
+                      decoration: (isDone || isSkipped)
                           ? TextDecoration.lineThrough
-                          : (isSkipped ? TextDecoration.lineThrough : null),
-                      decorationColor: isDone ? Colors.green : Colors.orange,
+                          : TextDecoration.none,
+                      decorationColor: (isDone || isSkipped)
+                          ? (isDone
+                              ? (light
+                                  ? const Color(0xFF4B5563)
+                                  : const Color(0xFF9CA3AF))
+                              : Colors.orange)
+                          : Colors.transparent,
+                      decorationThickness: 2.2,
                     ),
                     child: Text(activity.title),
                   ),
