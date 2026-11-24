@@ -23,7 +23,8 @@ class ActivityRepositoryImpl implements ActivityRepository {
 
   @override
   Future<void> save(ActivityItem activity) async {
-    await _box.put(activity.id, ActivityItemModel.fromEntity(activity).toJson());
+    await _box.put(
+        activity.id, ActivityItemModel.fromEntity(activity).toJson());
   }
 
   @override
@@ -36,7 +37,8 @@ class ActivityRepositoryImpl implements ActivityRepository {
     for (int i = 0; i < activities.length; i++) {
       final act = activities[i];
       final updated = act.copyWith(orderIndex: i);
-      await _box.put(updated.id, ActivityItemModel.fromEntity(updated).toJson());
+      await _box.put(
+          updated.id, ActivityItemModel.fromEntity(updated).toJson());
     }
   }
 }

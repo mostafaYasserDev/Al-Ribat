@@ -42,7 +42,8 @@ class AppSettingsModel extends AppSettings {
     final json = jsonDecode(source) as Map<String, dynamic>;
     return AppSettingsModel(
       themeMode: AppThemeMode.values.firstWhere(
-        (e) => e.name == (json['themeMode'] as String? ?? AppThemeMode.dark.name),
+        (e) =>
+            e.name == (json['themeMode'] as String? ?? AppThemeMode.dark.name),
       ),
       prayerMethod: PrayerCalculationMethod.values.firstWhere(
         (e) =>
@@ -53,8 +54,10 @@ class AppSettingsModel extends AppSettings {
       notificationsEnabled: json['notificationsEnabled'] as bool? ?? true,
       focusModeEnabled: json['focusModeEnabled'] as bool? ?? true,
       focusLeadMinutes: json['focusLeadMinutes'] as int? ?? 15,
-      prayerSlotDurationMinutes: json['prayerSlotDurationMinutes'] as int? ?? 20,
-      prayerLocationMode: _parseLocationMode(json['prayerLocationMode'] as String?),
+      prayerSlotDurationMinutes:
+          json['prayerSlotDurationMinutes'] as int? ?? 20,
+      prayerLocationMode:
+          _parseLocationMode(json['prayerLocationMode'] as String?),
       manualLatitude: (json['manualLatitude'] as num?)?.toDouble(),
       manualLongitude: (json['manualLongitude'] as num?)?.toDouble(),
       manualLocationLabel: json['manualLocationLabel'] as String?,

@@ -15,10 +15,9 @@ void main() {
     TestWidgetsFlutterBinding.ensureInitialized();
     final dir = await Directory.systemTemp.createTemp('al_ribat_widget_');
     Hive.init(dir.path);
-    await Hive.openBox<String>('tasks_box');
     await Hive.openBox<String>('meta_box');
+    await Hive.openBox<String>('activities_box');
     await Hive.openBox<String>('reflections_box');
-    await Hive.openBox<String>('habits_box');
     await Hive.openBox<String>('work_sessions_box');
     await initializeDateFormatting('ar');
   });
@@ -32,13 +31,24 @@ void main() {
             final d = DateTime.now();
             final base = DateTime(d.year, d.month, d.day);
             final today = [
-              PrayerTime(phase: PrayerPhase.fajr, time: base.add(const Duration(hours: 5))),
-              PrayerTime(phase: PrayerPhase.dhuhr, time: base.add(const Duration(hours: 12))),
-              PrayerTime(phase: PrayerPhase.asr, time: base.add(const Duration(hours: 15))),
-              PrayerTime(phase: PrayerPhase.maghrib, time: base.add(const Duration(hours: 18))),
-              PrayerTime(phase: PrayerPhase.isha, time: base.add(const Duration(hours: 20))),
+              PrayerTime(
+                  phase: PrayerPhase.fajr,
+                  time: base.add(const Duration(hours: 5))),
+              PrayerTime(
+                  phase: PrayerPhase.dhuhr,
+                  time: base.add(const Duration(hours: 12))),
+              PrayerTime(
+                  phase: PrayerPhase.asr,
+                  time: base.add(const Duration(hours: 15))),
+              PrayerTime(
+                  phase: PrayerPhase.maghrib,
+                  time: base.add(const Duration(hours: 18))),
+              PrayerTime(
+                  phase: PrayerPhase.isha,
+                  time: base.add(const Duration(hours: 20))),
             ];
-            final fajrNext = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 5, 10);
+            final fajrNext =
+                DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 5, 10);
             return PrayerSchedule(
               today: today,
               tomorrowFajr: PrayerTime(phase: PrayerPhase.fajr, time: fajrNext),

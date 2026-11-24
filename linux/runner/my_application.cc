@@ -14,6 +14,19 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
+// ---------------------------------------------------------------------------
+// معاينة الموبايل على سطح المكتب
+//
+// التطبيق موجّه للموبايل، لكن تشغيل نسخة Linux أسرع بكتير في التطوير (hot
+// reload من غير Gradle ولا محاكي). عشان كده النافذة بتفتح بمقاس شاشة هاتف
+// منطقي شائع (390×844) وبدون تكبير، فيبقى التخطيط اللي بتشوفه هو نفسه اللي
+// هيظهر على الجهاز.
+//
+// لو حبيت تجرب مقاس تاني: 360×800 (شائع في أندرويد) أو 412×915 (Pixel).
+// ---------------------------------------------------------------------------
+static const int kPhonePreviewWidth = 390;
+static const int kPhonePreviewHeight = 844;
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
@@ -45,14 +58,39 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "al_ribat");
+    gtk_header_bar_set_title(header_bar, "الرباط — معاينة موبايل");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "al_ribat");
+    gtk_window_set_title(window, "الرباط — معاينة موبايل");
   }
 
-  gtk_window_set_default_size(window, 1280, 720);
+  // الحجم المطلوب هنا = مساحة عرض Flutter نفسها؛ شريط العنوان والظل بيضيفهم GTK.
+  gtk_window_set_default_size(window, kPhonePreviewWidth, kPhonePreviewHeight);
+  // مقاس ثابت: تحجيم النافذة بيغيّر التخطيط وبيخلي المعاينة مضللة.
+  gtk_window_set_resizable(window, FALSE);
+  gtk_window_set_position(window, GTK_WIN_POS_CENTER);
+
+  // تعيين أيقونة التطبيق لنافذة لينكس
+  g_autofree gchar* exe_path = g_file_read_link("/proc/self/exe", nullptr);
+  g_autofree gchar* exe_dir = exe_path ? g_path_get_dirname(exe_path) : nullptr;
+  g_autofree gchar* bundle_icon = exe_dir
+      ? g_build_filename(exe_dir, "data", "flutter_assets", "assets", "app_icon.png", nullptr)
+      : nullptr;
+
+  const gchar* icon_candidates[] = {
+      bundle_icon,
+      "assets/app_icon.png",
+      nullptr
+  };
+
+  for (int i = 0; icon_candidates[i] != nullptr; i++) {
+    if (icon_candidates[i] != nullptr && g_file_test(icon_candidates[i], G_FILE_TEST_EXISTS)) {
+      gtk_window_set_icon_from_file(window, icon_candidates[i], nullptr);
+      gtk_window_set_default_icon_from_file(icon_candidates[i], nullptr);
+      break;
+    }
+  }
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(

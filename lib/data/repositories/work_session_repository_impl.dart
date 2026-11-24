@@ -18,6 +18,7 @@ class WorkSessionRepositoryImpl implements WorkSessionRepository {
 
   @override
   Future<void> save(WorkSessionItem session) async {
-    await _box.put(session.id, WorkSessionItemModel.fromEntity(session).toJson());
+    await _box.put(
+        session.id, WorkSessionItemModel.fromEntity(session).toJson());
   }
 }

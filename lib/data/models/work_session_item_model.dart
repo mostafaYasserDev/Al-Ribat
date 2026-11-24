@@ -30,7 +30,9 @@ class WorkSessionItemModel extends WorkSessionItem {
       name: json['name'] as String,
       plannedMinutes: json['plannedMinutes'] as int? ?? 25,
       startedAt: DateTime.parse(json['startedAt'] as String),
-      endedAt: json['endedAt'] == null ? null : DateTime.parse(json['endedAt'] as String),
+      endedAt: json['endedAt'] == null
+          ? null
+          : DateTime.parse(json['endedAt'] as String),
       completed: json['completed'] as bool? ?? false,
     );
   }

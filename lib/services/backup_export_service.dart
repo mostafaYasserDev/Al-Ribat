@@ -1,234 +1,30 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:al_ribat/core/errors/error_reporter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+part 'backup/backup_json.dart';
+part 'backup/backup_export.dart';
+part 'backup/backup_import.dart';
+part 'backup/backup_restore.dart';
+part 'backup/backup_restore_v1.dart';
+part 'backup/backup_restore_v1_tasks.dart';
+part 'backup/backup_restore_v1_habits.dart';
+part 'backup/backup_restore_v2.dart';
+part 'backup/backup_restore_helpers.dart';
+
 class BackupExportService {
-  static Future<String> buildJsonString() async {
-    final meta = Hive.box<String>('meta_box');
-    final activitiesBox = Hive.box<String>('activities_box');
-    final reflBox = Hive.box<String>('reflections_box');
-    final workBox = Hive.box<String>('work_sessions_box');
+  static Future<String> buildJsonString() => _buildBackupJson();
 
-    final payload = <String, dynamic>{
-      'version': 2,
-      'exportedAt': DateTime.now().toUtc().toIso8601String(),
-      'settingsJson': meta.get('settings'),
-      'streakCount': meta.get('streak_count'),
-      'streakLastDate': meta.get('streak_last_date'),
-      'appPin': meta.get('app_pin'),
-      'activities': activitiesBox.values.toList(),
-      'reflections': reflBox.values.toList(),
-      'workSessions': workBox.values.toList(),
-    };
-    return const JsonEncoder.withIndent('  ').convert(payload);
-  }
+  static Future<void> exportInteractive() => _exportBackupInteractive();
 
-  static Future<void> exportInteractive() async {
-    final json = await buildJsonString();
-    final name = 'al_ribat_backup_${DateTime.now().millisecondsSinceEpoch}.json';
+  static Future<void> importInteractive() => _importBackupInteractive();
 
-    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-      try {
-        final dir = await getTemporaryDirectory();
-        final path = '${dir.path}/$name';
-        final file = File(path);
-        await file.writeAsString(json, flush: true);
-        await Share.shareXFiles([XFile(path)], subject: name);
-        return;
-      } catch (e, st) {
-        debugPrint('BackupExportService shareXFiles: $e\n$st');
-      }
-
-      try {
-        final path = await FilePicker.platform.saveFile(
-          dialogTitle: 'حفظ النسخة الاحتياطية',
-          fileName: name,
-          type: FileType.custom,
-          allowedExtensions: const ['json'],
-        );
-        if (path != null) {
-          final p = path.toLowerCase().endsWith('.json') ? path : '$path.json';
-          await File(p).writeAsString(json);
-          return;
-        }
-      } catch (e, st) {
-        debugPrint('BackupExportService saveFile: $e\n$st');
-      }
-    }
-
-    await Share.share(json, subject: name);
-  }
-
-  static Future<void> importInteractive() async {
-    final picked = await FilePicker.platform.pickFiles(
-      dialogTitle: 'اختر ملف النسخة الاحتياطية',
-      type: FileType.custom,
-      allowedExtensions: const ['json'],
-      withData: true,
-    );
-    if (picked == null || picked.files.isEmpty) {
-      throw Exception('تم إلغاء اختيار الملف.');
-    }
-    final file = picked.files.single;
-    String? raw = file.bytes == null ? null : utf8.decode(file.bytes!);
-    final path = file.path;
-    if ((raw == null || raw.trim().isEmpty) && path != null) {
-      raw = await File(path).readAsString();
-    }
-    if (raw == null || raw.trim().isEmpty) {
-      throw const FormatException('الملف فارغ أو غير قابل للقراءة.');
-    }
-    await restoreFromJsonString(raw);
-  }
-
-  static Future<void> restoreFromJsonString(String raw) async {
-    final decoded = jsonDecode(raw);
-    if (decoded is! Map<String, dynamic>) {
-      throw const FormatException('هيكلة الملف غير صحيحة.');
-    }
-    await _restoreFromMap(decoded);
-  }
-
-  static Future<void> _restoreFromMap(Map<String, dynamic> decoded) async {
-    final v = decoded['version'];
-
-    final meta = Hive.box<String>('meta_box');
-    final activitiesBox = Hive.box<String>('activities_box');
-    final reflBox = Hive.box<String>('reflections_box');
-    final workBox = Hive.box<String>('work_sessions_box');
-
-    await activitiesBox.clear();
-    await reflBox.clear();
-    await workBox.clear();
-
-    if (v == 1) {
-      final tasks = _asStringList(decoded['tasks'] ?? [], key: 'tasks');
-      final habits = _asStringList(decoded['habits'] ?? [], key: 'habits');
-      final reflections = _asStringList(decoded['reflections'] ?? [], key: 'reflections');
-      final workSessions = _asStringList(decoded['workSessions'] ?? [], key: 'workSessions');
-
-      for (final tStr in tasks) {
-        final t = jsonDecode(tStr) as Map<String, dynamic>;
-        final act = {
-          'id': t['id'],
-          'title': t['title'],
-          'description': t['description'],
-          'repetition': 'once',
-          'targetDate': t['date'],
-          'type': t['type'] ?? 'independent',
-          'linkedPrayer': t['linkedPrayer'],
-          'notificationsEnabled': t['notificationsEnabled'] ?? false,
-          'reminderHour': t['reminderHour'],
-          'reminderMinute': t['reminderMinute'],
-          'isMeasurable': false,
-          'createdAt': t['createdAt'],
-          'history': t['isCompleted'] == true ? [{'date': t['date'], 'isSkipped': false, 'progress': 1.0}] : [],
-          'historyDates': t['isCompleted'] == true ? [t['date']] : [],
-          'orderIndex': t['orderIndex'] ?? 0,
-          'skippedDates': <String>[],
-        };
-        await _putByEntityId(activitiesBox, jsonEncode(act));
-      }
-
-      for (final hStr in habits) {
-        final h = jsonDecode(hStr) as Map<String, dynamic>;
-        final act = {
-          'id': h['id'],
-          'title': h['title'],
-          'description': h['description'],
-          'repetition': 'daily',
-          'type': 'independent',
-          'linkedPrayer': h['anchorPrayer'],
-          'notificationsEnabled': h['notificationsEnabled'] ?? false,
-          'reminderHour': h['reminderHour'],
-          'reminderMinute': h['reminderMinute'],
-          'isMeasurable': h['isMeasurable'] ?? false,
-          'targetGoal': h['targetGoal'],
-          'goalUnit': h['goalUnit'],
-          'createdAt': h['createdAt'],
-          'history': h['history'] ?? [],
-          'historyDates': (h['history'] as List<dynamic>?)?.map((e) => (e as Map)['date']).toList() ?? [],
-          'orderIndex': h['orderIndex'] ?? 0,
-          'skippedDates': h['skippedDates'] ?? <String>[],
-        };
-        await _putByEntityId(activitiesBox, jsonEncode(act));
-      }
-
-      for (final item in reflections) await _putByEntityId(reflBox, item);
-      for (final item in workSessions) await _putByEntityId(workBox, item);
-    } else if (v == 2) {
-      final activities = _asStringList(decoded['activities'] ?? [], key: 'activities');
-      final reflections = _asStringList(decoded['reflections'] ?? [], key: 'reflections');
-      final workSessions = _asStringList(decoded['workSessions'] ?? [], key: 'workSessions');
-
-      for (final item in activities) await _putByEntityId(activitiesBox, item);
-      for (final item in reflections) await _putByEntityId(reflBox, item);
-      for (final item in workSessions) await _putByEntityId(workBox, item);
-    } else {
-      throw const FormatException('إصدار النسخة غير مدعوم.');
-    }
-
-    final settingsRaw = decoded['settingsJson'];
-    if (settingsRaw != null && settingsRaw is! String) {
-      throw const FormatException('settingsJson يجب أن يكون نصًا أو null.');
-    }
-
-    if (settingsRaw == null) {
-      await meta.delete('settings');
-    } else {
-      await meta.put('settings', settingsRaw);
-    }
-
-    final streakCount = decoded['streakCount'];
-    if (streakCount is String && streakCount.isNotEmpty) {
-      await meta.put('streak_count', streakCount);
-    } else {
-      await meta.delete('streak_count');
-    }
-
-    final streakLastDate = decoded['streakLastDate'];
-    if (streakLastDate is String && streakLastDate.isNotEmpty) {
-      await meta.put('streak_last_date', streakLastDate);
-    } else {
-      await meta.delete('streak_last_date');
-    }
-
-    final appPin = decoded['appPin'];
-    if (appPin is String && appPin.isNotEmpty) {
-      await meta.put('app_pin', appPin);
-    } else {
-      await meta.delete('app_pin');
-    }
-  }
-
-  static Future<void> _putByEntityId(Box<String> box, String jsonStr) async {
-    final map = jsonDecode(jsonStr) as Map<String, dynamic>;
-    final id = map['id']?.toString();
-    if (id == null || id.isEmpty) {
-      throw const FormatException('عنصر النسخة الاحتياطية يفتقد حقل id.');
-    }
-    await box.put(id, jsonStr);
-  }
-
-  static List<String> _asStringList(Object? source, {required String key}) {
-    if (source is! List) {
-      throw FormatException('$key يجب أن يكون قائمة.');
-    }
-    final out = <String>[];
-    for (final item in source) {
-      if (item is String) {
-        out.add(item);
-      } else if (item is Map || item is List) {
-        out.add(jsonEncode(item));
-      } else {
-        throw FormatException('$key يحتوي عنصرًا غير مدعوم.');
-      }
-    }
-    return out;
-  }
+  static Future<void> restoreFromJsonString(String raw) =>
+      _restoreBackupFromJson(raw);
 }

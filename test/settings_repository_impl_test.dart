@@ -25,8 +25,9 @@ void main() {
 
   test('returns defaults when no data exists', () async {
     final loaded = await repo.load();
-    expect(loaded.themeMode, AppThemeMode.dark);
-    expect(loaded.notificationsEnabled, true);
+    expect(loaded.themeMode, AppSettings.defaults.themeMode);
+    expect(
+        loaded.notificationsEnabled, AppSettings.defaults.notificationsEnabled);
   });
 
   test('saves and loads settings', () async {

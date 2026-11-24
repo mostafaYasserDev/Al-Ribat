@@ -1,0 +1,33 @@
+import 'package:hive_flutter/hive_flutter.dart';
+
+import '../domain/reflection_entry.dart';
+import '../domain/reflection_repository.dart';
+import 'reflection_entry_model.dart';
+
+class ReflectionRepositoryImpl implements ReflectionRepository {
+  ReflectionRepositoryImpl(this._box);
+
+  final Box<String> _box;
+
+  @override
+  Future<List<ReflectionEntry>> loadAll() async {
+    final all = _box.values.map(ReflectionEntryModel.fromJson).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return all;
+  }
+
+  @override
+  Future<void> add(ReflectionEntry entry) async {
+    await _box.put(entry.id, ReflectionEntryModel.fromEntity(entry).toJson());
+  }
+
+  @override
+  Future<void> update(ReflectionEntry entry) async {
+    await _box.put(entry.id, ReflectionEntryModel.fromEntity(entry).toJson());
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    await _box.delete(id);
+  }
+}

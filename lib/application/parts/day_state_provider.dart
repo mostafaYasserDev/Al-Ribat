@@ -1,0 +1,34 @@
+part of '../providers.dart';
+
+final dayStateProvider = Provider<DayState>((ref) {
+  final sched = ref.watch(prayerScheduleProvider).valueOrNull;
+  final prayers = sched?.today ?? const <PrayerTime>[];
+  final streak = ref.watch(streakProvider).valueOrNull ?? 0;
+  final selectedDate = ref.watch(selectedDateProvider);
+  final now = DateTime.now();
+
+  PrayerPhase current = PrayerPhase.fajr;
+
+  // If the selected date is in the past, default to Isha. If in the future, default to Fajr.
+  if (selectedDate.year < now.year ||
+      (selectedDate.year == now.year && selectedDate.month < now.month) ||
+      (selectedDate.year == now.year &&
+          selectedDate.month == now.month &&
+          selectedDate.day < now.day)) {
+    current = PrayerPhase.isha;
+  } else if (selectedDate.year > now.year ||
+      (selectedDate.year == now.year && selectedDate.month > now.month) ||
+      (selectedDate.year == now.year &&
+          selectedDate.month == now.month &&
+          selectedDate.day > now.day)) {
+    current = PrayerPhase.fajr;
+  } else {
+    for (final p in prayers) {
+      if (now.isAfter(p.time)) {
+        current = p.phase;
+      }
+    }
+  }
+
+  return DayState(currentPrayerPhase: current, streakCount: streak);
+});

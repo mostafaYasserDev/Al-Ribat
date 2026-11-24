@@ -61,10 +61,14 @@ class AppSettings {
       prayerSlotDurationMinutes:
           prayerSlotDurationMinutes ?? this.prayerSlotDurationMinutes,
       prayerLocationMode: prayerLocationMode ?? this.prayerLocationMode,
-      manualLatitude: clearManualLocation ? null : (manualLatitude ?? this.manualLatitude),
-      manualLongitude: clearManualLocation ? null : (manualLongitude ?? this.manualLongitude),
-      manualLocationLabel:
-          clearManualLocation ? null : (manualLocationLabel ?? this.manualLocationLabel),
+      manualLatitude:
+          clearManualLocation ? null : (manualLatitude ?? this.manualLatitude),
+      manualLongitude: clearManualLocation
+          ? null
+          : (manualLongitude ?? this.manualLongitude),
+      manualLocationLabel: clearManualLocation
+          ? null
+          : (manualLocationLabel ?? this.manualLocationLabel),
     );
   }
 

@@ -27,14 +27,16 @@ bool activityVisibleOnDate(ActivityItem activity, DateTime date) {
   if (activity.endDate != null) {
     final endTarget = DateTime.tryParse(activity.endDate!);
     if (endTarget != null) {
-      final endTargetDate = DateTime(endTarget.year, endTarget.month, endTarget.day);
+      final endTargetDate =
+          DateTime(endTarget.year, endTarget.month, endTarget.day);
       if (queryDate.isAfter(endTargetDate)) return false;
     }
   }
 
   switch (activity.repetition) {
     case ActivityRepetition.once:
-      final target = activity.targetDate ?? DateFormat('yyyy-MM-dd').format(activity.createdAt);
+      final target = activity.targetDate ??
+          DateFormat('yyyy-MM-dd').format(activity.createdAt);
       return target == dateStr;
     case ActivityRepetition.daily:
       return true;

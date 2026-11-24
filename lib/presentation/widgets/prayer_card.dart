@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../core/arabic_duration.dart';
 import '../../core/constants/prayer_phase.dart';
-import '../../core/ui_confirm.dart';
 import '../../domain/entities/activity_item.dart';
 import '../../domain/entities/prayer_schedule.dart';
 import '../../domain/entities/prayer_time.dart';
-import 'add_activity_sheet.dart';
+import 'activity_action_tile.dart';
+
+part 'prayer_card_view.dart';
+part 'prayer_card_details.dart';
 
 class PrayerCard extends StatelessWidget {
   const PrayerCard({
@@ -33,351 +33,21 @@ class PrayerCard extends StatelessWidget {
   final Future<void> Function(ActivityItem, String date) onSkipActivity;
   final Future<void> Function(ActivityItem) onDeleteActivity;
   final Future<void> Function(ActivityItem) onEditActivity;
-  final Future<void> Function(ActivityItem, String, double) onAddProgressActivity;
-  final void Function(ActivityItem movedActivity, int newIndex) onReorderWithinPhase;
+  final Future<void> Function(ActivityItem, String, double)
+      onAddProgressActivity;
+  final void Function(ActivityItem movedActivity, int newIndex)
+      onReorderWithinPhase;
   final String dateStr;
   final PrayerSchedule? prayerSchedule;
   final String? footerNote;
 
   static const _onGradient = TextStyle(
     color: Color(0xFFF2F6FC),
-    shadows: [Shadow(offset: Offset(0, 1), blurRadius: 8, color: Colors.black38)],
+    shadows: [
+      Shadow(offset: Offset(0, 1), blurRadius: 8, color: Colors.black38)
+    ],
   );
 
-  String _activitySubtitle(ActivityItem activity, BuildContext context) {
-    if (activity.type == ActivityType.independent && activity.reminderHour == null) {
-      return activity.description ?? 'حر (غير مرتبط)';
-    }
-    final List<String> parts = [];
-    if (activity.type == ActivityType.beforePrayer) parts.add('قبل الصلاة');
-    if (activity.type == ActivityType.afterPrayer) parts.add('بعد الصلاة');
-    if (activity.projectName != null && activity.projectName!.isNotEmpty) {
-      parts.add('[${activity.projectName}]');
-    }
-    if (activity.reminderHour != null && activity.reminderMinute != null) {
-      parts.add(TimeOfDay(hour: activity.reminderHour!, minute: activity.reminderMinute!).format(context));
-    }
-    if (activity.description != null && activity.description!.isNotEmpty) {
-      parts.add(activity.description!);
-    }
-    return parts.join(' · ');
-  }
-
   @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final statusLine = _prayerStatusLine(now);
-    
-    final cardGradient = Theme.of(context).brightness == Brightness.light
-        ? prayer.phase.lightGradient
-        : prayer.phase.gradient;
-    final light = Theme.of(context).brightness == Brightness.light;
-    
-    final titleMed = light
-        ? Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: const Color(0xFF142018),
-              fontWeight: FontWeight.w700,
-            ) ?? const TextStyle(color: Color(0xFF142018), fontWeight: FontWeight.w700)
-        : Theme.of(context).textTheme.titleMedium?.merge(_onGradient) ?? _onGradient;
-    final bodyMed = light
-        ? Theme.of(context).textTheme.bodyMedium?.copyWith(color: const Color(0xFF2C3530)) ??
-            const TextStyle(color: Color(0xFF2C3530))
-        : Theme.of(context).textTheme.bodyMedium?.merge(_onGradient) ?? _onGradient;
-    final bodySmall = light
-        ? Theme.of(context).textTheme.bodySmall?.copyWith(color: const Color(0xFF4A5568)) ??
-            const TextStyle(color: Color(0xFF4A5568))
-        : Theme.of(context).textTheme.bodySmall?.merge(_onGradient) ?? _onGradient;
-        
-    final taskTitleDone = light ? const Color(0xFF8A9590) : const Color(0xFFB8C4D4);
-    final taskTitleActive = light ? const Color(0xFF142018) : const Color(0xFFF2F6FC);
-    final taskSubDone = light ? const Color(0xFF9AA8A0) : const Color(0xFF9AA8B8);
-    final taskSubActive = light ? const Color(0xFF5C6560) : const Color(0xFFD0DAE8);
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(colors: cardGradient),
-      ),
-      child: Card(
-        color: Colors.transparent,
-        elevation: 0,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(prayer.phase.arabicName, style: titleMed),
-                  ),
-                  Text(
-                    DateFormat.jm('ar').format(prayer.time),
-                    style: bodyMed.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(statusLine, style: bodySmall),
-              const SizedBox(height: 10),
-              
-              if (activities.isEmpty)
-                Text('لا توجد مهام أو عادات في هذه المرحلة', style: bodySmall)
-              else
-                ReorderableListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: activities.length,
-                  onReorder: (oldIndex, newIndex) {
-                    HapticFeedback.selectionClick();
-                    final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;
-                    onReorderWithinPhase(activities[oldIndex], adjusted);
-                  },
-                  itemBuilder: (context, index) {
-                    final activity = activities[index];
-                    final isDone = activity.isDoneOn(dateStr);
-                    final isSkipped = activity.isSkippedOn(dateStr);
-                    return Slidable(
-                      key: ValueKey(activity.id),
-                      startActionPane: ActionPane(
-                        motion: const ScrollMotion(),
-                        children: [
-                          SlidableAction(
-                            onPressed: (_) {
-                              HapticFeedback.selectionClick();
-                              onToggleActivity(activity, dateStr);
-                            },
-                            backgroundColor: isDone ? Colors.grey : Colors.green,
-                            foregroundColor: Colors.white,
-                            icon: isDone ? Icons.undo : Icons.done,
-                            label: isDone ? 'تراجع' : 'إنجاز',
-                          ),
-                        ],
-                      ),
-                      endActionPane: ActionPane(
-                        motion: const ScrollMotion(),
-                        children: [
-                          if (!isDone)
-                            SlidableAction(
-                              onPressed: (_) {
-                                HapticFeedback.selectionClick();
-                                onSkipActivity(activity, dateStr);
-                              },
-                              backgroundColor: Colors.orange,
-                              foregroundColor: Colors.white,
-                              icon: isSkipped ? Icons.undo : Icons.skip_next,
-                              label: isSkipped ? 'تراجع عن التخطي' : 'تخطي',
-                            ),
-                          SlidableAction(
-                            onPressed: (_) async {
-                              final option = await showActivityDeleteOptions(context, activity.title);
-                              if (option == null || !context.mounted) return;
-                              switch (option) {
-                                case ActivityDeleteOption.skipToday:
-                                  onSkipActivity(activity, dateStr);
-                                  break;
-                                case ActivityDeleteOption.endFuture:
-                                  final previousDate = DateTime.parse(dateStr).subtract(const Duration(days: 1));
-                                  final prevStr = "${previousDate.year.toString().padLeft(4, '0')}-${previousDate.month.toString().padLeft(2, '0')}-${previousDate.day.toString().padLeft(2, '0')}";
-                                  onEditActivity(activity.copyWith(endDate: prevStr));
-                                  break;
-                                case ActivityDeleteOption.deleteCompletely:
-                                  await onDeleteActivity(activity);
-                                  break;
-                              }
-                            },
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            icon: Icons.delete,
-                            label: 'حذف',
-                          ),
-                          SlidableAction(
-                            onPressed: (_) async {
-                              final updated = await showModalBottomSheet<ActivityItem>(
-                                context: context,
-                                isScrollControlled: true,
-                                showDragHandle: true,
-                                builder: (ctx) => AddActivitySheet(
-                                  initialActivity: activity,
-                                  onSave: (act) async {
-                                    Navigator.of(ctx).pop(act);
-                                    return true;
-                                  },
-                                ),
-                              );
-                              if (updated != null) {
-                                HapticFeedback.lightImpact();
-                                onEditActivity(updated);
-                              }
-                            },
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
-                            icon: Icons.edit,
-                            label: 'تعديل',
-                          ),
-                        ],
-                      ),
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          isDone ? Icons.check_circle : (isSkipped ? Icons.next_plan : Icons.circle_outlined),
-                          color: isDone ? Colors.green : (isSkipped ? Colors.orange : null),
-                        ),
-                        title: Row(
-                          children: [
-                            if (activity.iconName != null) ...[
-                              Icon(
-                                _getIconData(activity.iconName!),
-                                size: 18,
-                                color: activity.colorHex != null ? _getColorData(activity.colorHex!) : null,
-                              ),
-                              const SizedBox(width: 6),
-                            ],
-                            Expanded(
-                              child: Text(
-                                activity.title,
-                                style: bodyMed.copyWith(
-                                  decoration: (isDone || isSkipped) ? TextDecoration.lineThrough : null,
-                                  color: isDone ? taskTitleDone : (isSkipped ? Colors.orange : taskTitleActive),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        subtitle: Text(
-                          _activitySubtitle(activity, context),
-                          style: bodySmall.copyWith(
-                            color: isDone ? taskSubDone : taskSubActive,
-                            decoration: (isDone || isSkipped) ? TextDecoration.lineThrough : null,
-                          ),
-                        ),
-                        trailing: activity.isMeasurable
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '${_formatProgress(activity.getProgressOn(dateStr))} / ${_formatProgress(activity.targetGoal ?? 1)} ${activity.goalUnit ?? ""}',
-                                    style: bodySmall,
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.add_circle_outline),
-                                    onPressed: () => _showAddProgressDialog(context, activity, dateStr),
-                                  ),
-                                ],
-                              )
-                            : null,
-                      ),
-                    );
-                  },
-                ),
-              if (footerNote != null && footerNote!.trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  footerNote!,
-                  style: bodySmall.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _prayerStatusLine(DateTime now) {
-    if (prayerSchedule == null) {
-      final remaining = prayer.time.difference(now);
-      return formatArabicPrayerRemaining(remaining);
-    }
-    final start = prayer.time;
-    DateTime end = prayerSchedule!.tomorrowFajr.time;
-    if (prayer.phase == PrayerPhase.fajr) {
-      end = prayerSchedule!.todaySunrise;
-    } else {
-      final idx = prayerSchedule!.today.indexWhere((p) => p.phase == prayer.phase);
-      if (idx >= 0 && idx < prayerSchedule!.today.length - 1) {
-        end = prayerSchedule!.today[idx + 1].time;
-      }
-    }
-
-    if (now.isBefore(start)) {
-      return 'متبقي ${_formatCompact(start.difference(now))} حتى الأذان';
-    }
-    if (now.isBefore(end)) {
-      return 'دخل وقت الصلاة — ينتهي ${DateFormat.jm('ar').format(end)}';
-    }
-    return 'انقضى وقت هذه الصلاة';
-  }
-
-  String _formatCompact(Duration d) {
-    final min = d.inMinutes;
-    if (min < 1) return 'أقل من دقيقة';
-    final h = min ~/ 60;
-    final m = min % 60;
-    if (h == 0) return '$m د';
-    if (m == 0) return '$h س';
-    return '$h س $m د';
-  }
-
-  String _formatProgress(double p) {
-    return p == p.toInt() ? p.toInt().toString() : p.toStringAsFixed(1);
-  }
-
-  Future<void> _showAddProgressDialog(BuildContext context, ActivityItem activity, String date) async {
-    final controller = TextEditingController();
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('إضافة إنجاز: ${activity.title}'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            hintText: 'أدخل المقدار (مثال: 5)',
-            suffixText: activity.goalUnit,
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('إلغاء')),
-          FilledButton(
-            onPressed: () {
-              final val = double.tryParse(controller.text.trim()) ?? 0.0;
-              if (val > 0) {
-                onAddProgressActivity(activity, date, val);
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('إضافة'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  IconData _getIconData(String name) {
-    switch (name) {
-      case 'wb_sunny': return Icons.wb_sunny;
-      case 'nights_stay': return Icons.nights_stay;
-      case 'bedtime': return Icons.bedtime;
-      case 'light_mode': return Icons.light_mode;
-      case 'star': return Icons.star;
-      case 'menu_book': return Icons.menu_book;
-      case 'book': return Icons.book;
-      case 'translate': return Icons.translate;
-      case 'fitness_center': return Icons.fitness_center;
-      case 'directions_walk': return Icons.directions_walk;
-      case 'water_drop': return Icons.water_drop;
-      case 'family_restroom': return Icons.family_restroom;
-      case 'group': return Icons.group;
-      default: return Icons.task_alt;
-    }
-  }
-
-  Color _getColorData(String hex) {
-    final buffer = StringBuffer();
-    if (hex.length == 6 || hex.length == 7) buffer.write('ff');
-    buffer.write(hex.replaceFirst('#', ''));
-    return Color(int.parse(buffer.toString(), radix: 16));
-  }
+  Widget build(BuildContext context) => _buildPrayerCard(context);
 }

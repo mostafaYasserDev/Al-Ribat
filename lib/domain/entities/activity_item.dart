@@ -84,7 +84,6 @@ class ActivityItem {
 
   final DateTime createdAt;
   final List<ActivityRecord> history;
-
   final Set<String> historyDates;
   final Set<String> skippedDates;
 
@@ -92,6 +91,7 @@ class ActivityItem {
   final String? colorHex;
   final String? iconName;
 
+  // Query helpers
   bool isDoneOn(String date) {
     return historyDates.contains(date);
   }

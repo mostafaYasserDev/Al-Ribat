@@ -13,7 +13,9 @@ Future<bool> confirmDestructiveAction(
       title: Text(title),
       content: Text(message),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(cancelLabel)),
+        TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(cancelLabel)),
         FilledButton(
           onPressed: () => Navigator.pop(ctx, true),
           style: FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -27,7 +29,8 @@ Future<bool> confirmDestructiveAction(
 
 enum ActivityDeleteOption { skipToday, endFuture, deleteCompletely }
 
-Future<ActivityDeleteOption?> showActivityDeleteOptions(BuildContext context, String title) {
+Future<ActivityDeleteOption?> showActivityDeleteOptions(
+    BuildContext context, String title) {
   return showDialog<ActivityDeleteOption>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -35,7 +38,8 @@ Future<ActivityDeleteOption?> showActivityDeleteOptions(BuildContext context, St
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('كيف تريد التعامل مع نشاط «$title»؟', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text('كيف تريد التعامل مع نشاط «$title»؟',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           ListTile(
             leading: const Icon(Icons.today, color: Colors.orange),
@@ -53,7 +57,8 @@ Future<ActivityDeleteOption?> showActivityDeleteOptions(BuildContext context, St
             leading: const Icon(Icons.delete_forever, color: Colors.red),
             title: const Text('حذف نهائي'),
             subtitle: const Text('حذف النشاط تماماً ومسح كل السجلات الخاصة به'),
-            onTap: () => Navigator.pop(ctx, ActivityDeleteOption.deleteCompletely),
+            onTap: () =>
+                Navigator.pop(ctx, ActivityDeleteOption.deleteCompletely),
           ),
         ],
       ),

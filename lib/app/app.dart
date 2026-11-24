@@ -13,7 +13,8 @@ class AlRibatApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(settingsProvider).valueOrNull ?? AppSettings.defaults;
+    final settings =
+        ref.watch(settingsProvider).valueOrNull ?? AppSettings.defaults;
     final mode = switch (settings.themeMode) {
       AppThemeMode.dark => ThemeMode.dark,
       AppThemeMode.light => ThemeMode.light,
