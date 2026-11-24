@@ -1,7 +1,10 @@
-part of 'focus_sessions_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
-class _FocusSessionTile extends StatelessWidget {
-  const _FocusSessionTile({required this.session});
+import '../../domain/work_session_item.dart';
+
+class FocusSessionTile extends StatelessWidget {
+  const FocusSessionTile({super.key, required this.session});
 
   final WorkSessionItem session;
 

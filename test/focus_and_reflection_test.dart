@@ -1,9 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:al_ribat/application/active_focus_provider.dart';
 import 'package:al_ribat/core/theme/app_moods.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
   group('AppMoods Tests', () {
     test('contains all expected Arabic moods', () {
       expect(AppMoods.options.length, 7);
