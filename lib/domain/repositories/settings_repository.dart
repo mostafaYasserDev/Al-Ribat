@@ -1,6 +1,1 @@
-import '../entities/app_settings.dart';
-
-abstract class SettingsRepository {
-  Future<AppSettings> load();
-  Future<void> saveSettings(AppSettings settings);
-}
+export 'package:al_ribat/features/settings/domain/settings_repository.dart';
