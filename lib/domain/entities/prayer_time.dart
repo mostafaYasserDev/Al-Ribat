@@ -1,11 +1,1 @@
-import '../../core/constants/prayer_phase.dart';
-
-class PrayerTime {
-  const PrayerTime({
-    required this.phase,
-    required this.time,
-  });
-
-  final PrayerPhase phase;
-  final DateTime time;
-}
+export 'package:al_ribat/features/prayer/domain/prayer_time.dart';

@@ -8,20 +8,24 @@ import 'package:intl/intl.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  late Directory tempDir;
-  late Box<String> metaBox;
+  Directory? tempDir;
+  Box<String>? metaBox;
 
   setUp(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     tempDir = await Directory.systemTemp.createTemp('al_ribat_streak_test_');
-    Hive.init(tempDir.path);
+    Hive.init(tempDir!.path);
     metaBox = await Hive.openBox<String>('meta_box');
   });
 
   tearDown(() async {
-    await metaBox.close();
-    await Hive.deleteBoxFromDisk('meta_box');
-    await tempDir.delete(recursive: true);
+    if (metaBox != null && metaBox!.isOpen) {
+      await metaBox!.close();
+      await Hive.deleteBoxFromDisk('meta_box');
+    }
+    if (tempDir != null && tempDir!.existsSync()) {
+      await tempDir!.delete(recursive: true);
+    }
   });
 
   String dayOffset(int days) {
@@ -33,18 +37,20 @@ void main() {
   }
 
   test('streakProvider resets a streak broken more than a day ago', () async {
-    await metaBox.put('streak_count', '7');
-    await metaBox.put('streak_last_date', dayOffset(-3));
+    final box = metaBox!;
+    await box.put('streak_count', '7');
+    await box.put('streak_last_date', dayOffset(-3));
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
     expect(await container.read(streakProvider.future), 0);
-    expect(metaBox.get('streak_count'), '0');
+    expect(box.get('streak_count'), '0');
   });
 
   test('streakProvider keeps a streak from yesterday', () async {
-    await metaBox.put('streak_count', '5');
-    await metaBox.put('streak_last_date', dayOffset(-1));
+    final box = metaBox!;
+    await box.put('streak_count', '5');
+    await box.put('streak_last_date', dayOffset(-1));
     final container = ProviderContainer();
     addTearDown(container.dispose);
 
@@ -52,23 +58,25 @@ void main() {
   });
 
   test('updateStreakIfNeeded increments once per day', () async {
-    await metaBox.put('streak_count', '4');
-    await metaBox.put('streak_last_date', dayOffset(-1));
+    final box = metaBox!;
+    await box.put('streak_count', '4');
+    await box.put('streak_last_date', dayOffset(-1));
 
     await updateStreakIfNeeded(null, dayOffset(0));
-    expect(metaBox.get('streak_count'), '5');
+    expect(box.get('streak_count'), '5');
 
     await updateStreakIfNeeded(null, dayOffset(0));
-    expect(metaBox.get('streak_count'), '5');
+    expect(box.get('streak_count'), '5');
   });
 
   test('updateStreakIfNeeded starts a new streak after a gap', () async {
-    await metaBox.put('streak_count', '9');
-    await metaBox.put('streak_last_date', dayOffset(-4));
+    final box = metaBox!;
+    await box.put('streak_count', '9');
+    await box.put('streak_last_date', dayOffset(-4));
 
     await updateStreakIfNeeded(null, dayOffset(0));
-    expect(metaBox.get('streak_count'), '1');
-    expect(metaBox.get('streak_last_date'), dayOffset(0));
+    expect(box.get('streak_count'), '1');
+    expect(box.get('streak_last_date'), dayOffset(0));
   });
 
   test('weekStartSaturday returns Saturday for the whole week', () {
