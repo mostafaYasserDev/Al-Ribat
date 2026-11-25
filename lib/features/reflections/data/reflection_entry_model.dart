@@ -32,6 +32,8 @@ class ReflectionEntryModel extends ReflectionEntry {
     required super.text,
     required super.createdAt,
     super.mood,
+    super.prayerPhaseName,
+    super.linkedContextTitle,
     super.editHistory,
   });
 
@@ -41,6 +43,8 @@ class ReflectionEntryModel extends ReflectionEntry {
       text: entry.text,
       createdAt: entry.createdAt,
       mood: entry.mood,
+      prayerPhaseName: entry.prayerPhaseName,
+      linkedContextTitle: entry.linkedContextTitle,
       editHistory: entry.editHistory,
     );
   }
@@ -52,6 +56,8 @@ class ReflectionEntryModel extends ReflectionEntry {
       text: json['text'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       mood: json['mood'] as String?,
+      prayerPhaseName: json['prayerPhaseName'] as String?,
+      linkedContextTitle: json['linkedContextTitle'] as String?,
       editHistory: (json['editHistory'] as List<dynamic>?)
               ?.map((e) =>
                   ReflectionEditRecordModel.fromJson(e as Map<String, dynamic>))
@@ -66,6 +72,8 @@ class ReflectionEntryModel extends ReflectionEntry {
       'text': text,
       'createdAt': createdAt.toIso8601String(),
       'mood': mood,
+      if (prayerPhaseName != null) 'prayerPhaseName': prayerPhaseName,
+      if (linkedContextTitle != null) 'linkedContextTitle': linkedContextTitle,
       'editHistory': editHistory
           .map((e) => ReflectionEditRecordModel(
                 editedAt: e.editedAt,

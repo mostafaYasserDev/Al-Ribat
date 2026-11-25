@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/core/theme/app_moods.dart';
 import 'package:al_ribat/features/activities/domain/activity_item.dart';
+import 'package:al_ribat/features/prayer/domain/prayer_phase.dart';
 import '../../application/active_focus_notifier.dart';
 import '../../domain/focus_time_formatter.dart';
 import '../../domain/work_session_item.dart';
@@ -66,9 +67,13 @@ class _FocusCompletionSheetState extends ConsumerState<FocusCompletionSheet> {
 
     final text = _reflectionController.text.trim();
     if (text.isNotEmpty || _selectedMood != null) {
+      final prayerName =
+          ref.read(dayStateProvider).currentPrayerPhase.arabicName;
       await ref.read(reflectionsProvider.notifier).add(
             text.isEmpty ? 'تم إنجاز جلسة تركيز مباركة' : text,
             mood: _selectedMood,
+            prayerPhaseName: prayerName,
+            linkedContextTitle: 'تركيز: ${widget.session.name}',
           );
     }
     if (mounted) {

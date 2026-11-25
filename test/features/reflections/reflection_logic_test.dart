@@ -79,5 +79,38 @@ void main() {
       expect(restored.editHistory.first.oldText, 'نص سابق');
       expect(restored.editHistory.first.oldMood, 'متردد');
     });
+
+    test('copyWith clearMood removes mood and preserves context fields', () {
+      final entry = ReflectionEntry(
+        id: '2',
+        text: 'تأمل مرتبط',
+        createdAt: DateTime(2026, 11, 25, 14, 0),
+        mood: 'هادئ',
+        prayerPhaseName: 'العصر',
+        linkedContextTitle: 'تركيز: قراءة',
+      );
+
+      final cleared = entry.copyWith(clearMood: true);
+      expect(cleared.mood, isNull);
+      expect(cleared.prayerPhaseName, 'العصر');
+      expect(cleared.linkedContextTitle, 'تركيز: قراءة');
+    });
+
+    test('ReflectionEntryModel preserves prayerPhaseName & linkedContextTitle',
+        () {
+      final created = DateTime(2026, 11, 25, 16, 0);
+      final model = ReflectionEntryModel(
+        id: '200',
+        text: 'خاطرة',
+        createdAt: created,
+        mood: 'ممتن',
+        prayerPhaseName: 'المغرب',
+        linkedContextTitle: 'مشروع: حفظ القرآن',
+      );
+
+      final restored = ReflectionEntryModel.fromJson(model.toJson());
+      expect(restored.prayerPhaseName, 'المغرب');
+      expect(restored.linkedContextTitle, 'مشروع: حفظ القرآن');
+    });
   });
 }

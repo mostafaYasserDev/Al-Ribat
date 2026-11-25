@@ -13,13 +13,21 @@ class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
     return ref.watch(reflectionRepositoryProvider).loadAll();
   }
 
-  Future<void> add(String text, {String? mood, DateTime? createdAt}) async {
+  Future<void> add(
+    String text, {
+    String? mood,
+    String? prayerPhaseName,
+    String? linkedContextTitle,
+    DateTime? createdAt,
+  }) async {
     final at = createdAt ?? DateTime.now();
     final entry = ReflectionEntry(
       id: at.microsecondsSinceEpoch.toString(),
       text: text.trim(),
       createdAt: at,
       mood: mood,
+      prayerPhaseName: prayerPhaseName,
+      linkedContextTitle: linkedContextTitle,
     );
     await _repo.add(entry);
     state = AsyncData(await _repo.loadAll());
@@ -29,6 +37,8 @@ class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
     ReflectionEntry oldEntry,
     String newText, {
     String? newMood,
+    String? linkedContextTitle,
+    bool clearLinkedContext = false,
   }) async {
     final editRecord = ReflectionEditRecord(
       editedAt: DateTime.now(),
@@ -39,6 +49,9 @@ class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
     final updatedEntry = oldEntry.copyWith(
       text: newText.trim(),
       mood: newMood,
+      clearMood: newMood == null,
+      linkedContextTitle: linkedContextTitle,
+      clearLinkedContext: clearLinkedContext,
       editHistory: [...oldEntry.editHistory, editRecord],
     );
 

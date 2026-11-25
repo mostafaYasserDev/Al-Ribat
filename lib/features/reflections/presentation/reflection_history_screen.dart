@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../../application/providers.dart';
 import '../../../core/theme/app_moods.dart';
 import '../../../core/ui/error_view.dart';
 import '../../../core/ui_feedback.dart';
+import '../../prayer/domain/prayer_phase.dart';
 import '../domain/reflection_entry.dart';
 import 'widgets/add_reflection_sheet.dart';
+import 'widgets/reflection_dialogs.dart';
+import 'widgets/reflection_entry_card.dart';
+import 'widgets/reflection_mood_summary.dart';
 
 class ReflectionHistoryScreen extends ConsumerStatefulWidget {
   const ReflectionHistoryScreen({super.key});
@@ -37,11 +40,18 @@ class _ReflectionHistoryScreenState
       isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) => AddReflectionSheet(
-        onSave: (text, mood) async {
-          await ref.read(reflectionsProvider.notifier).add(text, mood: mood);
+        onSave: (text, mood, linkedContext) async {
+          final prayerName =
+              ref.read(dayStateProvider).currentPrayerPhase.arabicName;
+          await ref.read(reflectionsProvider.notifier).add(
+                text,
+                mood: mood,
+                prayerPhaseName: prayerName,
+                linkedContextTitle: linkedContext,
+              );
           if (ctx.mounted) {
             lightSuccessHaptic();
-            appSnack(ctx, 'حُفظ التأمل مع التاريخ والوقت.');
+            appSnack(ctx, 'حُفظ التأمل مع التاريخ والرباط.');
           }
         },
       ),
@@ -57,11 +67,14 @@ class _ReflectionHistoryScreenState
       builder: (ctx) => AddReflectionSheet(
         initialText: entry.text,
         initialMood: entry.mood,
-        onSave: (text, mood) async {
+        initialContextTitle: entry.linkedContextTitle,
+        onSave: (text, mood, linkedContext) async {
           await ref.read(reflectionsProvider.notifier).updateReflection(
                 entry,
                 text,
                 newMood: mood,
+                linkedContextTitle: linkedContext,
+                clearLinkedContext: linkedContext == null,
               );
           if (ctx.mounted) {
             lightSuccessHaptic();
@@ -72,157 +85,33 @@ class _ReflectionHistoryScreenState
     );
   }
 
-  void _confirmDelete(String id) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف التأمل'),
-        content: const Text(
-          'هل أنت متأكد من حذف هذا التأمل؟ لا يمكن التراجع عن هذا الإجراء.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              await ref.read(reflectionsProvider.notifier).delete(id);
-              if (ctx.mounted) {
-                Navigator.of(ctx).pop();
-                lightSuccessHaptic();
-              }
-              if (mounted) {
-                appSnack(context, 'تم حذف التأمل.');
-              }
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _handleDelete(String id) async {
+    final confirmed = await ReflectionDialogs.confirmDelete(context);
+    if (!confirmed || !mounted) return;
+    await ref.read(reflectionsProvider.notifier).delete(id);
+    lightSuccessHaptic();
+    if (mounted) {
+      appSnack(context, 'تم حذف التأمل.');
+    }
   }
 
-  void _showEditHistory(ReflectionEntry entry) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('سجل التعديلات',
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 16),
-              if (entry.editHistory.isEmpty)
-                const Text('لا توجد تعديلات سابقة لهذا التأمل.')
-              else
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: entry.editHistory.length,
-                    separatorBuilder: (_, __) => const Divider(),
-                    itemBuilder: (context, i) {
-                      final h = entry.editHistory.reversed.toList()[i];
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                DateFormat('d MMM yyyy · h:mm a', 'ar')
-                                    .format(h.editedAt),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(
-                                      color:
-                                          Theme.of(context).colorScheme.primary,
-                                    ),
-                              ),
-                              if (h.oldMood != null) ...[
-                                const SizedBox(width: 8),
-                                MoodDisplayChip(mood: h.oldMood!, dense: true),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(h.oldText),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
+  bool _matchesQuery(ReflectionEntry entry, String query) {
+    final q = query.toLowerCase();
+    return entry.text.toLowerCase().contains(q) ||
+        (entry.mood?.toLowerCase().contains(q) ?? false) ||
+        (entry.prayerPhaseName?.toLowerCase().contains(q) ?? false) ||
+        (entry.linkedContextTitle?.toLowerCase().contains(q) ?? false);
   }
 
-  void _showFullText(ReflectionEntry entry) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 16, right: 16, bottom: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('التأمل كاملاً',
-                      style: Theme.of(context).textTheme.titleLarge),
-                  if (entry.editHistory.isNotEmpty)
-                    TextButton.icon(
-                      onPressed: () {
-                        Navigator.of(ctx).pop();
-                        _showEditHistory(entry);
-                      },
-                      icon: const Icon(Icons.history, size: 18),
-                      label: const Text('السجل'),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              if (entry.mood != null) ...[
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: MoodDisplayChip(mood: entry.mood!),
-                ),
-                const SizedBox(height: 12),
-              ],
-              Flexible(
-                child: SingleChildScrollView(
-                  child: SelectableText(
-                    entry.text,
-                    textAlign: TextAlign.right,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          height: 1.6,
-                        ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  String _groupLabel(DateTime createdAt, DateTime now) {
+    final today = DateTime(now.year, now.month, now.day);
+    final entryDay = DateTime(createdAt.year, createdAt.month, createdAt.day);
+    final diffDays = today.difference(entryDay).inDays;
+
+    if (diffDays <= 0) return 'اليوم';
+    if (diffDays == 1) return 'أمس';
+    if (diffDays < 7) return 'هذا الأسبوع';
+    return 'سابقاً';
   }
 
   @override
@@ -289,7 +178,7 @@ class _ReflectionHistoryScreenState
     }
 
     final filtered = entries.where((e) {
-      if (_searchQuery.isNotEmpty && !e.text.contains(_searchQuery)) {
+      if (_searchQuery.isNotEmpty && !_matchesQuery(e, _searchQuery)) {
         return false;
       }
       if (_filterMood != null && e.mood != _filterMood) {
@@ -298,8 +187,21 @@ class _ReflectionHistoryScreenState
       return true;
     }).toList();
 
+    final now = DateTime.now();
+    final groupedItems = <Object>[];
+    String? lastGroup;
+    for (final entry in filtered) {
+      final group = _groupLabel(entry.createdAt, now);
+      if (group != lastGroup) {
+        groupedItems.add(group);
+        lastGroup = group;
+      }
+      groupedItems.add(entry);
+    }
+
     return Column(
       children: [
+        ReflectionMoodSummary(entries: entries),
         _buildFilters(),
         Expanded(
           child: filtered.isEmpty
@@ -311,13 +213,43 @@ class _ReflectionHistoryScreenState
                         ),
                   ),
                 )
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 88),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 88),
+                  itemCount: groupedItems.length,
                   itemBuilder: (context, index) {
-                    final item = filtered[index];
-                    return _buildEntryCard(item);
+                    final item = groupedItems[index];
+                    if (item is String) {
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 12, bottom: 6),
+                        child: Text(
+                          item,
+                          style:
+                              Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                        ),
+                      );
+                    }
+                    final entry = item as ReflectionEntry;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: ReflectionEntryCard(
+                        entry: entry,
+                        onEdit: () => _showEditSheet(entry),
+                        onDelete: () => _handleDelete(entry.id),
+                        onShowEditHistory: () =>
+                            ReflectionDialogs.showEditHistory(context, entry),
+                        onReadMore: () => ReflectionDialogs.showFullText(
+                          context,
+                          entry,
+                          onOpenHistory: () =>
+                              ReflectionDialogs.showEditHistory(context, entry),
+                        ),
+                      ),
+                    );
                   },
                 ),
         ),
@@ -329,11 +261,11 @@ class _ReflectionHistoryScreenState
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
           child: TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'بحث في التأملات والخواطر...',
+              hintText: 'بحث في التأملات، المزاج، أو المشاريع...',
               prefixIcon: const Icon(Icons.search, size: 20),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
@@ -385,143 +317,6 @@ class _ReflectionHistoryScreenState
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildEntryCard(ReflectionEntry entry) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        DateFormat('EEEE · d MMM yyyy · h:mm a', 'ar')
-                            .format(entry.createdAt),
-                        textAlign: TextAlign.right,
-                        style:
-                            Theme.of(context).textTheme.labelMedium?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                      ),
-                      if (entry.editHistory.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        InkWell(
-                          onTap: () => _showEditHistory(entry),
-                          child: Text(
-                            'تم التعديل (شاهد السجل)',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color:
-                                      Theme.of(context).colorScheme.secondary,
-                                  decoration: TextDecoration.underline,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-                if (entry.mood != null) MoodDisplayChip(mood: entry.mood!),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, size: 20),
-                  onSelected: (val) {
-                    if (val == 'edit') {
-                      _showEditSheet(entry);
-                    } else if (val == 'delete') {
-                      _confirmDelete(entry.id);
-                    }
-                  },
-                  itemBuilder: (ctx) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 20),
-                          SizedBox(width: 8),
-                          Text('تعديل'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.delete,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'حذف',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _buildEntryText(entry),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEntryText(ReflectionEntry entry) {
-    final isLong = entry.text.length > 150 || entry.text.split('\n').length > 4;
-
-    if (isLong) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            entry.text,
-            maxLines: 4,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
-            style:
-                Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
-          ),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton(
-              onPressed: () => _showFullText(entry),
-              child: const Text('قراءة المزيد'),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return Text(
-      entry.text,
-      textAlign: TextAlign.right,
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5),
     );
   }
 }
