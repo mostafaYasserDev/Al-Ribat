@@ -62,6 +62,10 @@ ThemeData _buildLightTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: const Color(0xFFE8EEEA),
+      hintStyle: const TextStyle(
+        color: Color(0x5C1A1F24),
+        fontWeight: FontWeight.w500,
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,

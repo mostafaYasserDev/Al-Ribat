@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/core/constants/prayer_phase.dart';
+import 'package:al_ribat/core/theme/app_icons.dart';
 import 'package:al_ribat/core/theme/app_theme.dart';
+import 'package:al_ribat/core/widgets/arabic_time_picker.dart';
 import 'package:al_ribat/domain/entities/activity_item.dart';
 import 'package:al_ribat/domain/entities/prayer_schedule.dart';
 import 'package:al_ribat/domain/entities/prayer_time.dart';
@@ -196,5 +198,20 @@ void main() {
     expect(find.text('تخطي لليوم فقط'), findsOneWidget);
     expect(find.text('إيقاف من اليوم والمستقبل'), findsOneWidget);
     expect(find.text('حذف نهائي'), findsOneWidget);
+  });
+
+  test(
+      'AppIcons has no duplicate icons, supports Arabic search, and Arabic time formats cleanly',
+      () {
+    final catalog = AppIcons.catalog;
+    expect(catalog.length, greaterThanOrEqualTo(60));
+    final uniqueCodePoints = catalog.map((e) => e.icon.codePoint).toSet();
+    expect(uniqueCodePoints.length, catalog.length);
+
+    final quranResults = AppIcons.search('قرآن');
+    expect(quranResults.any((e) => e.key == 'menu_book'), isTrue);
+
+    expect(formatArabicTime(const TimeOfDay(hour: 0, minute: 47)), '12:47 ص');
+    expect(formatArabicTime(const TimeOfDay(hour: 20, minute: 30)), '8:30 م');
   });
 }

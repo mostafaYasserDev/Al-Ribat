@@ -36,6 +36,10 @@ ThemeData _buildDarkTheme() {
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: const Color(0xFF17243A),
+      hintStyle: const TextStyle(
+        color: Color(0x5CE6EDF3),
+        fontWeight: FontWeight.w500,
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,

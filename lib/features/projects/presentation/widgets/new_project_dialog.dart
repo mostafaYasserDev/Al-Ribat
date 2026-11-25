@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:al_ribat/core/theme/app_icons.dart';
+import 'package:al_ribat/core/widgets/icon_color_picker.dart';
 import 'package:al_ribat/features/reflections/presentation/widgets/apple_morph_route.dart';
 
 class NewProjectDialog extends StatefulWidget {
@@ -210,8 +211,13 @@ class _NewProjectDialogState extends State<NewProjectDialog> {
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               hintText: 'اسم المشروع (مثال: ختم القرآن)…',
+                              hintStyle: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
+                                color: colorScheme.onSurface
+                                    .withValues(alpha: 0.36),
+                              ),
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
@@ -263,95 +269,14 @@ class _NewProjectDialogState extends State<NewProjectDialog> {
                 border: Border.all(color: dividerColor, width: 0.7),
               ),
               padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(
-                    height: 46,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _availableIcons.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (ctx, i) {
-                        final iconName = _availableIcons[i];
-                        final isSelected = iconName == _selectedIcon;
-                        return GestureDetector(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _selectedIcon = iconName);
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            width: 46,
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? activeColor.withValues(alpha: 0.16)
-                                  : colorScheme.surfaceContainerHighest
-                                      .withValues(alpha: 0.45),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isSelected
-                                    ? activeColor
-                                    : Colors.transparent,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Icon(
-                              AppIcons.getIconData(iconName),
-                              size: 21,
-                              color: isSelected
-                                  ? activeColor
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    height: 36,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _availableColors.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 10),
-                      itemBuilder: (ctx, i) {
-                        final hex = _availableColors[i];
-                        final color =
-                            AppIcons.parseColor(hex) ?? colorScheme.primary;
-                        final isSelected = hex == _selectedColor;
-                        return GestureDetector(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _selectedColor = hex);
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? colorScheme.onSurface
-                                    : Colors.transparent,
-                                width: 2.5,
-                              ),
-                            ),
-                            child: isSelected
-                                ? const Icon(
-                                    Icons.check_rounded,
-                                    size: 18,
-                                    color: Colors.white,
-                                  )
-                                : null,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+              child: IconColorPickerWidget(
+                selectedIcon: _selectedIcon,
+                selectedColor: _selectedColor,
+                colors: _availableColors,
+                quickIcons: _availableIcons,
+                fallbackColor: activeColor,
+                onIconSelected: (icon) => setState(() => _selectedIcon = icon),
+                onColorSelected: (hex) => setState(() => _selectedColor = hex),
               ),
             ),
           ],

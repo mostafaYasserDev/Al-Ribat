@@ -1,84 +1,474 @@
 part of 'app_icons.dart';
 
+/// Deduplicated, Arabic-searchable icon catalog (64 distinct icons).
+const List<AppIconEntry> _iconCatalog = [
+  // العبادات والروحانيات
+  AppIconEntry(
+    key: 'mosque',
+    icon: Icons.mosque_rounded,
+    labelAr: 'مسجد',
+    category: 'العبادات',
+    keywords: 'صلاة جماعة فرض سنة مسجد',
+  ),
+  AppIconEntry(
+    key: 'menu_book',
+    icon: Icons.menu_book_rounded,
+    labelAr: 'قرآن / مصحف',
+    category: 'العبادات',
+    keywords: 'قران تلاوة ورد حفظ قراءة مصحف',
+  ),
+  AppIconEntry(
+    key: 'auto_stories',
+    icon: Icons.auto_stories_rounded,
+    labelAr: 'أذكار / تدبر',
+    category: 'العبادات',
+    keywords: 'اذكار صباح مساء تدبر تفسير',
+  ),
+  AppIconEntry(
+    key: 'wb_sunny',
+    icon: Icons.wb_sunny_rounded,
+    labelAr: 'فجر / ضحى',
+    category: 'العبادات',
+    keywords: 'شروق شمس صباح ضحى نهار',
+  ),
+  AppIconEntry(
+    key: 'nights_stay',
+    icon: Icons.nights_stay_rounded,
+    labelAr: 'قيام الليل',
+    category: 'العبادات',
+    keywords: 'وتر تهجد ليل قمر نجوم',
+  ),
+  AppIconEntry(
+    key: 'bedtime',
+    icon: Icons.bedtime_rounded,
+    labelAr: 'أذكار النوم',
+    category: 'العبادات',
+    keywords: 'هلال ليل نوم راحة',
+  ),
+  AppIconEntry(
+    key: 'volunteer_activism',
+    icon: Icons.volunteer_activism_rounded,
+    labelAr: 'صدقة / إحسان',
+    category: 'العبادات',
+    keywords: 'صدقة زكاة خير عطاء مساعدة',
+  ),
+  AppIconEntry(
+    key: 'favorite',
+    icon: Icons.favorite_rounded,
+    labelAr: 'قلب / نية',
+    category: 'العبادات',
+    keywords: 'حب اخلاص دعاء قلب',
+  ),
+  AppIconEntry(
+    key: 'self_improvement',
+    icon: Icons.self_improvement_rounded,
+    labelAr: 'خشوع / تأمل',
+    category: 'العبادات',
+    keywords: 'تامل هدوء سكينة ذكر',
+  ),
+  AppIconEntry(
+    key: 'star',
+    icon: Icons.star_rounded,
+    labelAr: 'مميز / أولوية',
+    category: 'العبادات',
+    keywords: 'نجمة مهم هدف خاص',
+  ),
+  AppIconEntry(
+    key: 'wb_twilight',
+    icon: Icons.wb_twilight_rounded,
+    labelAr: 'غروب / مغرب',
+    category: 'العبادات',
+    keywords: 'مغرب غروب مساء شفق',
+  ),
+  AppIconEntry(
+    key: 'flare',
+    icon: Icons.flare_rounded,
+    labelAr: 'تسبيح / نور',
+    category: 'العبادات',
+    keywords: 'تسبيح استغفار ذكر نور',
+  ),
+
+  // العلم والعمل والمشاريع
+  AppIconEntry(
+    key: 'folder_special',
+    icon: Icons.folder_special_rounded,
+    labelAr: 'مشروع',
+    category: 'العلم والعمل',
+    keywords: 'مجلد مشروع خطة عمل',
+  ),
+  AppIconEntry(
+    key: 'book',
+    icon: Icons.book_rounded,
+    labelAr: 'كتاب',
+    category: 'العلم والعمل',
+    keywords: 'قراءة تلخيص كتب ثقافة',
+  ),
+  AppIconEntry(
+    key: 'school',
+    icon: Icons.school_rounded,
+    labelAr: 'دراسة / علم',
+    category: 'العلم والعمل',
+    keywords: 'جامعة تعلم درس محاضرة مذاكرة',
+  ),
+  AppIconEntry(
+    key: 'translate',
+    icon: Icons.translate_rounded,
+    labelAr: 'لغة / ترجمة',
+    category: 'العلم والعمل',
+    keywords: 'انجليزي عربي لغة مفردات',
+  ),
+  AppIconEntry(
+    key: 'edit',
+    icon: Icons.edit_rounded,
+    labelAr: 'كتابة / تدوين',
+    category: 'العلم والعمل',
+    keywords: 'قلم مقال يوميات ملاحظات',
+  ),
+  AppIconEntry(
+    key: 'code',
+    icon: Icons.code_rounded,
+    labelAr: 'برمجة',
+    category: 'العلم والعمل',
+    keywords: 'كود تطوير تطبيق موقع برمجيات',
+  ),
+  AppIconEntry(
+    key: 'terminal',
+    icon: Icons.terminal_rounded,
+    labelAr: 'تقنية / أوامر',
+    category: 'العلم والعمل',
+    keywords: 'سيرفر لينكس هندسة تقنية',
+  ),
+  AppIconEntry(
+    key: 'computer',
+    icon: Icons.computer_rounded,
+    labelAr: 'حاسوب',
+    category: 'العلم والعمل',
+    keywords: 'لابتوب كمبيوتر مكتب عمل',
+  ),
+  AppIconEntry(
+    key: 'work',
+    icon: Icons.work_rounded,
+    labelAr: 'وظيفة / عمل',
+    category: 'العلم والعمل',
+    keywords: 'شغل اجتماع وظيفة مكتب حقيبة',
+  ),
+  AppIconEntry(
+    key: 'rocket_launch',
+    icon: Icons.rocket_launch_rounded,
+    labelAr: 'إطلاق / انطلاق',
+    category: 'العلم والعمل',
+    keywords: 'صاروخ بداية طموح مشروع',
+  ),
+  AppIconEntry(
+    key: 'lightbulb',
+    icon: Icons.lightbulb_rounded,
+    labelAr: 'فكرة / إبداع',
+    category: 'العلم والعمل',
+    keywords: 'مصباح ابتكار تفكير ابداع',
+  ),
+  AppIconEntry(
+    key: 'analytics',
+    icon: Icons.analytics_rounded,
+    labelAr: 'تحليل / بيانات',
+    category: 'العلم والعمل',
+    keywords: 'احصائيات تخطيط تقارير',
+  ),
+  AppIconEntry(
+    key: 'brush',
+    icon: Icons.brush_rounded,
+    labelAr: 'تصميم / رسم',
+    category: 'العلم والعمل',
+    keywords: 'فن جرافيك الوان رسم',
+  ),
+  AppIconEntry(
+    key: 'headphones',
+    icon: Icons.headphones_rounded,
+    labelAr: 'صوتيات / بودكاست',
+    category: 'العلم والعمل',
+    keywords: 'استماع درس بودكاست سماعة',
+  ),
+  AppIconEntry(
+    key: 'play_circle',
+    icon: Icons.play_circle_rounded,
+    labelAr: 'فيديو / دورة',
+    category: 'العلم والعمل',
+    keywords: 'مشاهدة كورس درس مرئي',
+  ),
+  AppIconEntry(
+    key: 'calculate',
+    icon: Icons.calculate_rounded,
+    labelAr: 'حساب / مالية',
+    category: 'العلم والعمل',
+    keywords: 'رياضيات ميزانية محاسبة',
+  ),
+  AppIconEntry(
+    key: 'extension',
+    icon: Icons.extension_rounded,
+    labelAr: 'مهارة / لغز',
+    category: 'العلم والعمل',
+    keywords: 'تطوير مهارات تفكير ذكاء',
+  ),
+  AppIconEntry(
+    key: 'build',
+    icon: Icons.build_rounded,
+    labelAr: 'صيانة / بناء',
+    category: 'العلم والعمل',
+    keywords: 'ادوات اصلاح تركيب',
+  ),
+
+  // الصحة والرياضة
+  AppIconEntry(
+    key: 'fitness_center',
+    icon: Icons.fitness_center_rounded,
+    labelAr: 'رياضة / جيم',
+    category: 'الصحة والرياضة',
+    keywords: 'تمرين حديد قوة لياقة عضلات',
+  ),
+  AppIconEntry(
+    key: 'directions_walk',
+    icon: Icons.directions_walk_rounded,
+    labelAr: 'مشي',
+    category: 'الصحة والرياضة',
+    keywords: 'خطوات مشي حركة نشاط',
+  ),
+  AppIconEntry(
+    key: 'directions_run',
+    icon: Icons.directions_run_rounded,
+    labelAr: 'جري / ركض',
+    category: 'الصحة والرياضة',
+    keywords: 'جري كارديو سرعة',
+  ),
+  AppIconEntry(
+    key: 'directions_bike',
+    icon: Icons.directions_bike_rounded,
+    labelAr: 'دراجة',
+    category: 'الصحة والرياضة',
+    keywords: 'عجلة قيادة رياضة',
+  ),
+  AppIconEntry(
+    key: 'pool',
+    icon: Icons.pool_rounded,
+    labelAr: 'سباحة',
+    category: 'الصحة والرياضة',
+    keywords: 'ماء مسبح سباحة',
+  ),
+  AppIconEntry(
+    key: 'water_drop',
+    icon: Icons.water_drop_rounded,
+    labelAr: 'شرب الماء',
+    category: 'الصحة والرياضة',
+    keywords: 'ماء ترطيب صحة كوب',
+  ),
+  AppIconEntry(
+    key: 'local_dining',
+    icon: Icons.local_dining_rounded,
+    labelAr: 'طعام / تغذية',
+    category: 'الصحة والرياضة',
+    keywords: 'اكل وجبة دايت حمية صحية',
+  ),
+  AppIconEntry(
+    key: 'spa',
+    icon: Icons.spa_rounded,
+    labelAr: 'عناية / استرخاء',
+    category: 'الصحة والرياضة',
+    keywords: 'بشرة نظافة عناية راحة',
+  ),
+  AppIconEntry(
+    key: 'monitor_heart',
+    icon: Icons.monitor_heart_rounded,
+    labelAr: 'صحة / نبض',
+    category: 'الصحة والرياضة',
+    keywords: 'دواء علاج فحص طبي',
+  ),
+  AppIconEntry(
+    key: 'air',
+    icon: Icons.air_rounded,
+    labelAr: 'تنفس / هواء',
+    category: 'الصحة والرياضة',
+    keywords: 'تنفس عميق هواء نقي',
+  ),
+  AppIconEntry(
+    key: 'bed',
+    icon: Icons.bed_rounded,
+    labelAr: 'نوم مبكر',
+    category: 'الصحة والرياضة',
+    keywords: 'سرير نوم راحة قيلولة',
+  ),
+  AppIconEntry(
+    key: 'stairs',
+    icon: Icons.stairs_rounded,
+    labelAr: 'صعود / حركة',
+    category: 'الصحة والرياضة',
+    keywords: 'درج سلم صعود نشاط',
+  ),
+  AppIconEntry(
+    key: 'sports_soccer',
+    icon: Icons.sports_soccer_rounded,
+    labelAr: 'كرة / لعب',
+    category: 'الصحة والرياضة',
+    keywords: 'كرة قدم مباراة رياضة',
+  ),
+  AppIconEntry(
+    key: 'clean_hands',
+    icon: Icons.clean_hands_rounded,
+    labelAr: 'نظافة / وضوء',
+    category: 'الصحة والرياضة',
+    keywords: 'غسل وضوء طهارة نظافة',
+  ),
+
+  // الحياة والعادات
+  AppIconEntry(
+    key: 'family_restroom',
+    icon: Icons.family_restroom_rounded,
+    labelAr: 'أسرة / صلة رحم',
+    category: 'الحياة والعادات',
+    keywords: 'عائلة والدين اولاد بر',
+  ),
+  AppIconEntry(
+    key: 'group',
+    icon: Icons.group_rounded,
+    labelAr: 'أصدقاء / فريق',
+    category: 'الحياة والعادات',
+    keywords: 'صحبة جماعة تواصل اجتماع',
+  ),
+  AppIconEntry(
+    key: 'home',
+    icon: Icons.home_rounded,
+    labelAr: 'منزل / بيت',
+    category: 'الحياة والعادات',
+    keywords: 'ترتيب تنظيم بيت غرفة',
+  ),
+  AppIconEntry(
+    key: 'savings',
+    icon: Icons.savings_rounded,
+    labelAr: 'ادخار / مال',
+    category: 'الحياة والعادات',
+    keywords: 'توفير فلوس ميزانية استثمار',
+  ),
+  AppIconEntry(
+    key: 'shopping_cart',
+    icon: Icons.shopping_cart_rounded,
+    labelAr: 'مشتريات / مقاضي',
+    category: 'الحياة والعادات',
+    keywords: 'تسوق بقالة طلبات',
+  ),
+  AppIconEntry(
+    key: 'flight',
+    icon: Icons.flight_rounded,
+    labelAr: 'سفر / رحلة',
+    category: 'الحياة والعادات',
+    keywords: 'طيران سفر عمرة حج تنقل',
+  ),
+  AppIconEntry(
+    key: 'explore',
+    icon: Icons.explore_rounded,
+    labelAr: 'استكشاف / اتجاه',
+    category: 'الحياة والعادات',
+    keywords: 'بوصلة هدف مسار رحلة',
+  ),
+  AppIconEntry(
+    key: 'eco',
+    icon: Icons.eco_rounded,
+    labelAr: 'طبيعة / زراعة',
+    category: 'الحياة والعادات',
+    keywords: 'نبات شجر بيئة هدوء',
+  ),
+  AppIconEntry(
+    key: 'call',
+    icon: Icons.call_rounded,
+    labelAr: 'اتصال / اطمئنان',
+    category: 'الحياة والعادات',
+    keywords: 'مكالمة هاتف تواصل',
+  ),
+  AppIconEntry(
+    key: 'mail',
+    icon: Icons.mail_rounded,
+    labelAr: 'رسائل / بريد',
+    category: 'الحياة والعادات',
+    keywords: 'ايميل مراسلة رد',
+  ),
+  AppIconEntry(
+    key: 'event',
+    icon: Icons.event_rounded,
+    labelAr: 'موعد / تقويم',
+    category: 'الحياة والعادات',
+    keywords: 'تاريخ مناسبة جدول',
+  ),
+  AppIconEntry(
+    key: 'alarm',
+    icon: Icons.alarm_rounded,
+    labelAr: 'منبه / استيقاظ',
+    category: 'الحياة والعادات',
+    keywords: 'تنبيه وقت استيقاظ',
+  ),
+  AppIconEntry(
+    key: 'timer',
+    icon: Icons.timer_rounded,
+    labelAr: 'مؤقت / تركيز',
+    category: 'الحياة والعادات',
+    keywords: 'دقائق جلسة بومودورو',
+  ),
+  AppIconEntry(
+    key: 'flag',
+    icon: Icons.flag_rounded,
+    labelAr: 'هدف / علامة',
+    category: 'الحياة والعادات',
+    keywords: 'راية هدف غاية',
+  ),
+  AppIconEntry(
+    key: 'emoji_events',
+    icon: Icons.emoji_events_rounded,
+    labelAr: 'إنجاز / كأس',
+    category: 'الحياة والعادات',
+    keywords: 'نجاح فوز مكافأة',
+  ),
+  AppIconEntry(
+    key: 'shield',
+    icon: Icons.shield_rounded,
+    labelAr: 'حماية / ترك عادة',
+    category: 'الحياة والعادات',
+    keywords: 'وقاية التزام عزم',
+  ),
+  AppIconEntry(
+    key: 'diamond',
+    icon: Icons.diamond_rounded,
+    labelAr: 'قيمة / جودة',
+    category: 'الحياة والعادات',
+    keywords: 'جوهرة تميز عادة ذهبية',
+  ),
+  AppIconEntry(
+    key: 'palette',
+    icon: Icons.palette_rounded,
+    labelAr: 'هواية / فن',
+    category: 'الحياة والعادات',
+    keywords: 'الوان هواية متعة',
+  ),
+  AppIconEntry(
+    key: 'camera_alt',
+    icon: Icons.camera_alt_rounded,
+    labelAr: 'تصوير / ذكرى',
+    category: 'الحياة والعادات',
+    keywords: 'كاميرا صورة توثيق',
+  ),
+  AppIconEntry(
+    key: 'check_circle',
+    icon: Icons.check_circle_rounded,
+    labelAr: 'إتمام / مهمة',
+    category: 'الحياة والعادات',
+    keywords: 'صح انجاز يومي عادة',
+  ),
+];
+
+final Map<String, IconData> _iconMap = {
+  for (final e in _iconCatalog) e.key: e.icon,
+  // Legacy aliases kept for backward compatibility with stored records
+  'light_mode': Icons.light_mode_rounded,
+  'nightlight_round': Icons.nightlight_round,
+  'sports_gymnastics': Icons.sports_gymnastics_rounded,
+  'accessibility': Icons.accessibility_new_rounded,
+};
+
 IconData _iconForName(String? name) {
-  if (name == null || name.isEmpty) return Icons.task_alt;
-  switch (name) {
-    // Prayers & Times
-    case 'mosque':
-      return Icons.mosque;
-    case 'wb_sunny':
-      return Icons.wb_sunny;
-    case 'nights_stay':
-      return Icons.nights_stay;
-    case 'bedtime':
-      return Icons.bedtime;
-    case 'light_mode':
-      return Icons.light_mode;
-    case 'star':
-      return Icons.star;
-    case 'nightlight_round':
-      return Icons.nightlight_round;
-
-    // Knowledge & Reading
-    case 'menu_book':
-      return Icons.menu_book;
-    case 'book':
-      return Icons.book;
-    case 'translate':
-      return Icons.translate;
-    case 'edit':
-      return Icons.edit;
-    case 'computer':
-      return Icons.computer;
-    case 'extension':
-      return Icons.extension;
-    case 'lightbulb':
-      return Icons.lightbulb;
-    case 'headphones':
-      return Icons.headphones;
-    case 'play_circle':
-      return Icons.play_circle;
-
-    // Fitness & Health
-    case 'fitness_center':
-      return Icons.fitness_center;
-    case 'directions_walk':
-      return Icons.directions_walk;
-    case 'directions_run':
-      return Icons.directions_run;
-    case 'directions_bike':
-      return Icons.directions_bike;
-    case 'sports_gymnastics':
-      return Icons.sports_gymnastics;
-    case 'pool':
-      return Icons.pool;
-    case 'accessibility':
-      return Icons.accessibility;
-    case 'air':
-      return Icons.air;
-    case 'stairs':
-      return Icons.stairs;
-    case 'water_drop':
-      return Icons.water_drop;
-
-    // Social & Work & General
-    case 'family_restroom':
-      return Icons.family_restroom;
-    case 'group':
-      return Icons.group;
-    case 'work':
-      return Icons.work;
-    case 'favorite':
-      return Icons.favorite;
-    case 'flag':
-      return Icons.flag;
-    case 'event':
-      return Icons.event;
-    case 'local_dining':
-      return Icons.local_dining;
-    case 'check_circle':
-      return Icons.check_circle;
-    default:
-      return Icons.task_alt;
-  }
+  if (name == null || name.isEmpty) return Icons.task_alt_rounded;
+  return _iconMap[name] ?? Icons.task_alt_rounded;
 }

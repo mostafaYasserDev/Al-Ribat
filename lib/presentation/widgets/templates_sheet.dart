@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:al_ribat/features/reflections/presentation/widgets/apple_morph_route.dart';
 import '../../core/constants/prayer_phase.dart';
 import '../../domain/entities/activity_item.dart';
 
@@ -55,6 +56,24 @@ class ActivityTemplate {
 
 class TemplatesSheet extends StatefulWidget {
   const TemplatesSheet({super.key});
+
+  /// Opens [TemplatesSheet] with an Apple spatial morph from [sourceContext].
+  static Future<ActivityTemplate?> open(
+    BuildContext context, {
+    BuildContext? sourceContext,
+    Color? sourceColor,
+    double sourceRadius = 16,
+  }) {
+    final sourceRect = captureWidgetRect(sourceContext);
+    return Navigator.of(context).push<ActivityTemplate>(
+      AppleMorphRoute<ActivityTemplate>(
+        sourceRect: sourceRect,
+        sourceColor: sourceColor,
+        sourceRadius: sourceRadius,
+        builder: (_) => const TemplatesSheet(),
+      ),
+    );
+  }
 
   static const List<Map<String, dynamic>> _categories = [
     _worship,

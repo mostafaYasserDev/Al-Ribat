@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:al_ribat/core/theme/app_icons.dart';
 import 'package:al_ribat/core/ui_confirm.dart';
 import 'package:al_ribat/core/ui_feedback.dart';
+import 'package:al_ribat/core/widgets/arabic_time_picker.dart';
 import 'package:al_ribat/features/activities/domain/activity_item.dart';
 import 'package:al_ribat/features/prayer/domain/prayer_phase.dart';
 import 'package:al_ribat/features/projects/presentation/widgets/anchored_popover.dart';
@@ -275,9 +276,12 @@ class ActivityActionTile extends StatelessWidget {
     }
     if (activity.reminderHour != null && activity.reminderMinute != null) {
       parts.add(
-        TimeOfDay(
-                hour: activity.reminderHour!, minute: activity.reminderMinute!)
-            .format(context),
+        formatArabicTime(
+          TimeOfDay(
+            hour: activity.reminderHour!,
+            minute: activity.reminderMinute!,
+          ),
+        ),
       );
     }
     if (activity.description != null && activity.description!.isNotEmpty) {
@@ -374,13 +378,15 @@ class ActivityActionTile extends StatelessWidget {
                       decorationColor: isSkipped
                           ? Colors.orange
                           : (isDone
-                              ? colorScheme.onSurface.withValues(alpha: 0.65)
+                              ? (theme.brightness == Brightness.light
+                                  ? const Color(0xFF374151)
+                                  : const Color(0xFFD1D5DB))
                               : null),
-                      decorationThickness: 1.8,
+                      decorationThickness: 2.3,
                       color: isSkipped
                           ? Colors.orange
                           : (isDone
-                              ? colorScheme.onSurface.withValues(alpha: 0.5)
+                              ? colorScheme.onSurface.withValues(alpha: 0.52)
                               : (titleColor ?? colorScheme.onSurface)),
                     ),
                     child: Text(activity.title),

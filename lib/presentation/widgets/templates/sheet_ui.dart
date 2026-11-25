@@ -117,9 +117,9 @@ class _TemplatesSheetState extends State<TemplatesSheet> {
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: SafeArea(
-        child: SizedBox(
-          height: MediaQuery.of(context).size.height * 0.85,
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

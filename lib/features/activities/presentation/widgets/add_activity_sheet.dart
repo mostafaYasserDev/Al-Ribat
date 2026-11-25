@@ -5,6 +5,8 @@ import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/core/theme/app_icons.dart';
+import 'package:al_ribat/core/widgets/arabic_time_picker.dart';
+import 'package:al_ribat/core/widgets/icon_color_picker.dart';
 import 'package:al_ribat/features/activities/domain/activity_item.dart';
 import 'package:al_ribat/features/home/presentation/widgets/home_prayer_hero_card.dart';
 import 'package:al_ribat/features/prayer/domain/prayer_phase.dart';
@@ -285,19 +287,53 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
           ),
           actions: [
             if (widget.initialActivity == null)
-              TextButton.icon(
-                onPressed: () async {
-                  HapticFeedback.lightImpact();
-                  final t = await showModalBottomSheet<ActivityTemplate>(
-                    context: context,
-                    isScrollControlled: true,
-                    showDragHandle: true,
-                    builder: (_) => const TemplatesSheet(),
-                  );
-                  if (t != null) _applyTemplate(t);
-                },
-                icon: const Icon(Icons.auto_awesome_rounded, size: 17),
-                label: const Text('قوالب'),
+              Builder(
+                builder: (btnCtx) => Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 4),
+                  child: InkWell(
+                    onTap: () async {
+                      HapticFeedback.lightImpact();
+                      final t = await TemplatesSheet.open(
+                        context,
+                        sourceContext: btnCtx,
+                        sourceColor:
+                            colorScheme.primary.withValues(alpha: 0.14),
+                        sourceRadius: 18,
+                      );
+                      if (t != null) _applyTemplate(t);
+                    },
+                    borderRadius: BorderRadius.circular(18),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.11),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.auto_awesome_rounded,
+                            size: 16,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            'قوالب',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 12, start: 4),
@@ -367,8 +403,13 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             hintText: 'اسم النشاط أو المهمة…',
+                            hintStyle: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                              color:
+                                  colorScheme.onSurface.withValues(alpha: 0.36),
+                            ),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
                             focusedBorder: InputBorder.none,
@@ -462,7 +503,40 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                                   onChanged: (v) => setState(() => _type = v),
                                 ),
                               )
-                            : const SizedBox.shrink(),
+                            : Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: _IndependentTimeRow(
+                                  enabled: _notificationsEnabled,
+                                  time: _reminderTime,
+                                  onToggle: (v) async {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _notificationsEnabled = v);
+                                    if (v && context.mounted) {
+                                      final picked = await showArabicTimePicker(
+                                        context,
+                                        initialTime: _reminderTime,
+                                        title: 'وقت النشاط الحر',
+                                      );
+                                      if (picked != null) {
+                                        setState(() => _reminderTime = picked);
+                                      }
+                                    }
+                                  },
+                                  onPickTime: () async {
+                                    final picked = await showArabicTimePicker(
+                                      context,
+                                      initialTime: _reminderTime,
+                                      title: 'وقت النشاط الحر',
+                                    );
+                                    if (picked != null) {
+                                      setState(() {
+                                        _notificationsEnabled = true;
+                                        _reminderTime = picked;
+                                      });
+                                    }
+                                  },
+                                ),
+                              ),
                       ),
                     ],
                   ),
@@ -531,30 +605,10 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
                   child: _isMeasurable
-                      ? Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _targetGoalController,
-                                  keyboardType: TextInputType.number,
-                                  decoration: const InputDecoration(
-                                    labelText: 'الهدف (مثال: 20)',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: TextField(
-                                  controller: _goalUnitController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'الوحدة (صفحة، دقيقة)',
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                      ? _MeasurableGoalEditor(
+                          targetController: _targetGoalController,
+                          unitController: _goalUnitController,
+                          onChanged: () => setState(() {}),
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -579,12 +633,26 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                         TextStyle(fontWeight: FontWeight.w600, fontSize: 14.5),
                   ),
                   subtitle: _notificationsEnabled
-                      ? Text(
-                          'الساعة ${_reminderTime.format(context)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w600,
+                      ? InkWell(
+                          onTap: () async {
+                            final p = await showArabicTimePicker(
+                              context,
+                              initialTime: _reminderTime,
+                              title: 'وقت التذكير المخصص',
+                            );
+                            if (p != null) setState(() => _reminderTime = p);
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text(
+                              'الساعة ${formatArabicTime(_reminderTime)}  (تعديل)',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         )
                       : null,
@@ -597,9 +665,10 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                           .read(notificationServiceProvider)
                           .ensureNotificationPermission();
                       if (context.mounted) {
-                        final p = await showTimePicker(
-                          context: context,
+                        final p = await showArabicTimePicker(
+                          context,
                           initialTime: _reminderTime,
+                          title: 'وقت التذكير المخصص',
                         );
                         if (p != null) setState(() => _reminderTime = p);
                       }
@@ -628,10 +697,13 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                   ),
                   subtitle: _projectController.text.isNotEmpty
                       ? Text(
-                          _projectController.text,
+                          _groupController.text.isNotEmpty
+                              ? '${_projectController.text} • ${_groupController.text}'
+                              : _projectController.text,
                           style: TextStyle(
                             fontSize: 12,
                             color: colorScheme.primary,
+                            fontWeight: FontWeight.w600,
                           ),
                         )
                       : null,
@@ -647,30 +719,10 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
                   child: _showProjectFields
-                      ? Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _projectController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'اسم المشروع',
-                                  ),
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: TextField(
-                                  controller: _groupController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'الجانب / المجموعة',
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                      ? _ProjectLinkEditor(
+                          projectController: _projectController,
+                          groupController: _groupController,
+                          onChanged: () => setState(() {}),
                         )
                       : const SizedBox.shrink(),
                 ),
@@ -708,101 +760,16 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
                   child: _showAppearanceFields
                       ? Padding(
                           padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(
-                                height: 42,
-                                child: ListView.separated(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: _activityIcons.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(width: 8),
-                                  itemBuilder: (_, i) {
-                                    final iconName = _activityIcons[i];
-                                    final selected = _selectedIcon == iconName;
-                                    return GestureDetector(
-                                      onTap: () {
-                                        HapticFeedback.selectionClick();
-                                        setState(
-                                            () => _selectedIcon = iconName);
-                                      },
-                                      child: AnimatedContainer(
-                                        duration:
-                                            const Duration(milliseconds: 180),
-                                        width: 42,
-                                        decoration: BoxDecoration(
-                                          color: selected
-                                              ? previewColor.withValues(
-                                                  alpha: 0.16)
-                                              : colorScheme
-                                                  .surfaceContainerHighest
-                                                  .withValues(alpha: 0.45),
-                                          borderRadius:
-                                              BorderRadius.circular(11),
-                                          border: Border.all(
-                                            color: selected
-                                                ? previewColor
-                                                : Colors.transparent,
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          AppIcons.getIconData(iconName),
-                                          size: 20,
-                                          color: selected
-                                              ? previewColor
-                                              : colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              SizedBox(
-                                height: 34,
-                                child: ListView.separated(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: _activityColors.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(width: 8),
-                                  itemBuilder: (_, i) {
-                                    final hex = _activityColors[i];
-                                    final selected = _selectedColor == hex;
-                                    final c = AppIcons.parseColor(hex) ??
-                                        colorScheme.primary;
-                                    return GestureDetector(
-                                      onTap: () {
-                                        HapticFeedback.selectionClick();
-                                        setState(() => _selectedColor = hex);
-                                      },
-                                      child: Container(
-                                        width: 34,
-                                        height: 34,
-                                        decoration: BoxDecoration(
-                                          color: c,
-                                          shape: BoxShape.circle,
-                                          border: selected
-                                              ? Border.all(
-                                                  color: colorScheme.onSurface,
-                                                  width: 2.5,
-                                                )
-                                              : null,
-                                        ),
-                                        child: selected
-                                            ? const Icon(
-                                                Icons.check_rounded,
-                                                size: 16,
-                                                color: Colors.white,
-                                              )
-                                            : null,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
+                          child: IconColorPickerWidget(
+                            selectedIcon: _selectedIcon,
+                            selectedColor: _selectedColor,
+                            colors: _activityColors,
+                            quickIcons: _activityIcons,
+                            fallbackColor: previewColor,
+                            onIconSelected: (icon) =>
+                                setState(() => _selectedIcon = icon),
+                            onColorSelected: (hex) =>
+                                setState(() => _selectedColor = hex),
                           ),
                         )
                       : const SizedBox.shrink(),
@@ -1289,6 +1256,475 @@ class _RepetitionSegmentedBar extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _IndependentTimeRow extends StatelessWidget {
+  const _IndependentTimeRow({
+    required this.enabled,
+    required this.time,
+    required this.onToggle,
+    required this.onPickTime,
+  });
+
+  final bool enabled;
+  final TimeOfDay time;
+  final ValueChanged<bool> onToggle;
+  final VoidCallback onPickTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.schedule_rounded,
+            size: 18,
+            color: enabled
+                ? colorScheme.primary
+                : colorScheme.onSurface.withValues(alpha: 0.55),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'تحديد وقت بالساعة',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+                if (enabled)
+                  GestureDetector(
+                    onTap: onPickTime,
+                    child: Text(
+                      'الساعة ${formatArabicTime(time)}  (تغيير)',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Switch.adaptive(value: enabled, onChanged: onToggle),
+        ],
+      ),
+    );
+  }
+}
+
+class _MeasurableGoalEditor extends StatelessWidget {
+  const _MeasurableGoalEditor({
+    required this.targetController,
+    required this.unitController,
+    required this.onChanged,
+  });
+
+  final TextEditingController targetController;
+  final TextEditingController unitController;
+  final VoidCallback onChanged;
+
+  static const _quickGoals = [5, 10, 15, 20, 30, 60];
+  static const _quickUnits = [
+    'صفحة',
+    'دقيقة',
+    'مرة',
+    'ركعة',
+    'آية',
+    'جزء',
+    'كوب',
+  ];
+
+  void _step(int delta) {
+    final current = int.tryParse(targetController.text.trim()) ?? 0;
+    final next = (current + delta).clamp(1, 9999);
+    targetController.text = next.toString();
+    HapticFeedback.selectionClick();
+    onChanged();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final innerBg = colorScheme.surfaceContainerHighest.withValues(alpha: 0.42);
+    final currentGoal = int.tryParse(targetController.text.trim());
+    final currentUnit = unitController.text.trim();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Target stepper row
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: innerBg,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  'الهدف:',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface.withValues(alpha: 0.78),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _StepperBtn(
+                  icon: Icons.remove_rounded,
+                  onTap: () => _step(-1),
+                ),
+                Expanded(
+                  child: TextField(
+                    controller: targetController,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                    onChanged: (_) => onChanged(),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.primary,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '20',
+                      hintStyle: TextStyle(
+                        color: colorScheme.onSurface.withValues(alpha: 0.35),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+                _StepperBtn(
+                  icon: Icons.add_rounded,
+                  onTap: () => _step(1),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Quick numbers
+          SizedBox(
+            height: 30,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _quickGoals.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (_, idx) {
+                final val = _quickGoals[idx];
+                final isSel = currentGoal == val;
+                return InkWell(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    targetController.text = val.toString();
+                    onChanged();
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    padding: const EdgeInsets.symmetric(horizontal: 11),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSel ? colorScheme.primary : innerBg,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$val',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isSel
+                            ? colorScheme.onPrimary
+                            : colorScheme.onSurface.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Quick unit chips
+          SizedBox(
+            height: 32,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _quickUnits.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (_, idx) {
+                final u = _quickUnits[idx];
+                final isSel = currentUnit == u;
+                return InkWell(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    unitController.text = u;
+                    onChanged();
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    padding: const EdgeInsets.symmetric(horizontal: 11),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: isSel
+                          ? colorScheme.primary.withValues(alpha: 0.16)
+                          : innerBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: isSel
+                          ? Border.all(color: colorScheme.primary, width: 1.2)
+                          : null,
+                    ),
+                    child: Text(
+                      u,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isSel
+                            ? colorScheme.primary
+                            : colorScheme.onSurface.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: unitController,
+            onChanged: (_) => onChanged(),
+            decoration: InputDecoration(
+              hintText: 'أو اكتب وحدة مخصصة (مثال: ساعة، كيلومتر)...',
+              hintStyle: TextStyle(
+                fontSize: 12.5,
+                color: colorScheme.onSurface.withValues(alpha: 0.36),
+              ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperBtn extends StatelessWidget {
+  const _StepperBtn({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 18, color: colorScheme.primary),
+      ),
+    );
+  }
+}
+
+class _ProjectLinkEditor extends ConsumerWidget {
+  const _ProjectLinkEditor({
+    required this.projectController,
+    required this.groupController,
+    required this.onChanged,
+  });
+
+  final TextEditingController projectController;
+  final TextEditingController groupController;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final innerBg = colorScheme.surfaceContainerHighest.withValues(alpha: 0.42);
+    final activities =
+        ref.watch(activitiesProvider).valueOrNull ?? const <ActivityItem>[];
+
+    // Collect distinct project names & their groups
+    final projectNames = <String>{};
+    final groupsForSelected = <String>{};
+    final currentProject = projectController.text.trim();
+    for (final a in activities) {
+      final p = a.projectName?.trim();
+      if (p != null && p.isNotEmpty) {
+        projectNames.add(p);
+        if (p == currentProject) {
+          final g = a.groupName?.trim();
+          if (g != null && g.isNotEmpty) groupsForSelected.add(g);
+        }
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (projectNames.isNotEmpty) ...[
+            SizedBox(
+              height: 34,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: projectNames.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (_, idx) {
+                  final p = projectNames.elementAt(idx);
+                  final isSel = currentProject == p;
+                  return InkWell(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      projectController.text = isSel ? '' : p;
+                      if (isSel) groupController.clear();
+                      onChanged();
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      padding: const EdgeInsets.symmetric(horizontal: 11),
+                      decoration: BoxDecoration(
+                        color: isSel
+                            ? const Color(0xFFFF9500).withValues(alpha: 0.18)
+                            : innerBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: isSel
+                            ? Border.all(
+                                color: const Color(0xFFFF9500), width: 1.2)
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.folder_rounded,
+                            size: 14,
+                            color: isSel
+                                ? const Color(0xFFFF9500)
+                                : colorScheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            p,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isSel
+                                  ? const Color(0xFFFF9500)
+                                  : colorScheme.onSurface
+                                      .withValues(alpha: 0.78),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          TextField(
+            controller: projectController,
+            onChanged: (_) => onChanged(),
+            decoration: InputDecoration(
+              hintText: 'اسم المشروع (أو اكتب اسماً جديداً)...',
+              hintStyle: TextStyle(
+                fontSize: 12.5,
+                color: colorScheme.onSurface.withValues(alpha: 0.36),
+              ),
+              prefixIcon: const Icon(Icons.folder_outlined, size: 18),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+          if (groupsForSelected.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 30,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: groupsForSelected.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (_, idx) {
+                  final g = groupsForSelected.elementAt(idx);
+                  final isSel = groupController.text.trim() == g;
+                  return InkWell(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      groupController.text = isSel ? '' : g;
+                      onChanged();
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: isSel
+                            ? colorScheme.primary.withValues(alpha: 0.16)
+                            : innerBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        g,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: isSel
+                              ? colorScheme.primary
+                              : colorScheme.onSurface.withValues(alpha: 0.72),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          TextField(
+            controller: groupController,
+            onChanged: (_) => onChanged(),
+            decoration: InputDecoration(
+              hintText: 'الجانب / المجموعة داخل المشروع (اختياري)...',
+              hintStyle: TextStyle(
+                fontSize: 12.5,
+                color: colorScheme.onSurface.withValues(alpha: 0.36),
+              ),
+              prefixIcon: const Icon(Icons.layers_outlined, size: 18),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ),
+          ),
+        ],
       ),
     );
   }
