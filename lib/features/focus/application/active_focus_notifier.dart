@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import 'package:al_ribat/application/providers.dart';
+import 'package:al_ribat/features/activities/domain/activity_item.dart';
 import 'package:al_ribat/services/focus_foreground_service.dart';
 import 'package:al_ribat/services/motivation_quotes.dart';
 import '../domain/active_focus_state.dart';
@@ -120,6 +121,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
   Future<void> startSession({
     required String title,
     required int plannedMinutes,
+    int? plannedSeconds,
     FocusSessionMode mode = FocusSessionMode.customTimer,
     String? linkedActivityId,
     String? linkedActivityTitle,
@@ -127,11 +129,14 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
   }) async {
     _ticker?.cancel();
     final now = DateTime.now();
-    final totalSeconds = plannedMinutes * 60;
+    final totalSeconds =
+        (plannedSeconds ?? (plannedMinutes * 60)).clamp(1, 86400);
+    final effectiveMinutes = (totalSeconds / 60).ceil();
 
     state = ActiveFocusState(
       title: title.trim().isEmpty ? 'جلسة تركيز' : title.trim(),
-      plannedMinutes: plannedMinutes,
+      plannedMinutes: effectiveMinutes,
+      plannedSeconds: totalSeconds,
       startedAt: now,
       remainingSeconds: totalSeconds,
       elapsedSeconds: 0,
@@ -146,7 +151,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
         mode != FocusSessionMode.openStopwatch) {
       await FocusForegroundService.startCountdown(
         title: state!.title,
-        plannedMinutes: plannedMinutes,
+        plannedMinutes: effectiveMinutes,
       );
     }
 
@@ -283,21 +288,42 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     state = null;
   }
 
+  void linkActivity(String id, String title) {
+    final current = state;
+    if (current == null) return;
+    state = current.copyWith(
+      linkedActivityId: id,
+      linkedActivityTitle: title,
+    );
+  }
+
+  void clearLinkedActivity() {
+    final current = state;
+    if (current == null) return;
+    state = current.copyWith(clearLinkedActivity: true);
+  }
+
+  Future<void> linkActivityToCompletedSession(
+    WorkSessionItem session,
+    ActivityItem activity,
+  ) async {
+    final todayStr = DateFormat('yyyy-MM-dd').format(session.endedAt);
+    final elapsedMins = session.actualMinutes.clamp(1, 1440).toDouble();
+    await ref
+        .read(activitiesProvider.notifier)
+        .addProgress(activity, todayStr, elapsedMins);
+  }
+
   Future<bool> savePartial() async {
     final current = state;
     if (current == null) return false;
-
-    if (!current.canSavePartial &&
-        current.mode != FocusSessionMode.openStopwatch) {
-      return false;
-    }
 
     _ticker?.cancel();
     if (FocusForegroundService.isAndroidForegroundSupported) {
       await FocusForegroundService.cancelCompletely();
     }
 
-    await _saveSessionRecord(
+    final session = await _saveSessionRecord(
       title: current.title,
       plannedMinutes: current.plannedMinutes,
       startedAt: current.startedAt,
@@ -308,6 +334,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     );
 
     state = null;
+    ref.read(lastCompletedSessionProvider.notifier).state = session;
     return true;
   }
 

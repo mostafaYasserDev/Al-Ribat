@@ -43,7 +43,7 @@ class FocusSessionTile extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         subtitle: Text(
-          '${DateFormat('EEEE d MMM · HH:mm', 'ar').format(session.startedAt)} · '
+          '${DateFormat('EEEE d MMM · hh:mm a', 'ar').format(session.startedAt)} · '
           '$durationInfo · '
           '${session.completed ? 'مكتملة' : 'متوقفة'}',
           style: const TextStyle(fontSize: 12),

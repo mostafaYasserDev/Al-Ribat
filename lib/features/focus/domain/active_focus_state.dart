@@ -21,6 +21,7 @@ enum FocusSessionMode {
 class ActiveFocusState {
   final String title;
   final int plannedMinutes;
+  final int plannedSeconds;
   final DateTime startedAt;
   final int remainingSeconds;
   final int elapsedSeconds;
@@ -32,14 +33,13 @@ class ActiveFocusState {
   final bool isBreak;
   final int pomodoroCycle;
 
-  bool get canSavePartial {
-    final elapsedMs = DateTime.now().difference(startedAt).inMilliseconds;
-    return elapsedMs >= 600000; // 10 minutes
-  }
+  /// Any active session can be saved manually when the user chooses to finish.
+  bool get canSavePartial => true;
 
   const ActiveFocusState({
     required this.title,
     required this.plannedMinutes,
+    int? plannedSeconds,
     required this.startedAt,
     required this.remainingSeconds,
     this.elapsedSeconds = 0,
@@ -50,11 +50,12 @@ class ActiveFocusState {
     this.projectName,
     this.isBreak = false,
     this.pomodoroCycle = 1,
-  });
+  }) : plannedSeconds = plannedSeconds ?? (plannedMinutes * 60);
 
   ActiveFocusState copyWith({
     String? title,
     int? plannedMinutes,
+    int? plannedSeconds,
     DateTime? startedAt,
     int? remainingSeconds,
     int? elapsedSeconds,
@@ -62,6 +63,7 @@ class ActiveFocusState {
     FocusSessionMode? mode,
     String? linkedActivityId,
     String? linkedActivityTitle,
+    bool clearLinkedActivity = false,
     String? projectName,
     bool? isBreak,
     int? pomodoroCycle,
@@ -69,13 +71,18 @@ class ActiveFocusState {
     return ActiveFocusState(
       title: title ?? this.title,
       plannedMinutes: plannedMinutes ?? this.plannedMinutes,
+      plannedSeconds: plannedSeconds ?? this.plannedSeconds,
       startedAt: startedAt ?? this.startedAt,
       remainingSeconds: remainingSeconds ?? this.remainingSeconds,
       elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
       isPaused: isPaused ?? this.isPaused,
       mode: mode ?? this.mode,
-      linkedActivityId: linkedActivityId ?? this.linkedActivityId,
-      linkedActivityTitle: linkedActivityTitle ?? this.linkedActivityTitle,
+      linkedActivityId: clearLinkedActivity
+          ? null
+          : (linkedActivityId ?? this.linkedActivityId),
+      linkedActivityTitle: clearLinkedActivity
+          ? null
+          : (linkedActivityTitle ?? this.linkedActivityTitle),
       projectName: projectName ?? this.projectName,
       isBreak: isBreak ?? this.isBreak,
       pomodoroCycle: pomodoroCycle ?? this.pomodoroCycle,

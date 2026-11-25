@@ -17,7 +17,7 @@ class FocusMiniPlayer extends ConsumerWidget {
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final totalSec = (active.plannedMinutes * 60).clamp(1, double.infinity);
+    final totalSec = active.plannedSeconds.clamp(1, double.infinity);
     final progress = active.mode == FocusSessionMode.openStopwatch
         ? 1.0
         : (active.elapsedSeconds / totalSec).clamp(0.0, 1.0);

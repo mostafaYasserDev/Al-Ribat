@@ -2,7 +2,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/features/focus/focus.dart';
+
+class _FakeWorkSessionRepo implements WorkSessionRepository {
+  final List<WorkSessionItem> items = [];
+
+  @override
+  Future<List<WorkSessionItem>> loadAll() async => List.unmodifiable(items);
+
+  @override
+  Future<void> save(WorkSessionItem session) async => items.add(session);
+}
 
 void main() {
   setUp(() {
@@ -113,6 +124,63 @@ void main() {
       expect(state, isNotNull);
       expect(state!.mode, FocusSessionMode.openStopwatch);
       expect(state.elapsedSeconds, 0);
+    });
+
+    test('startSession supports exact plannedSeconds', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(activeFocusProvider.notifier);
+      await notifier.startSession(
+        title: 'جلسة دقيقة بالثواني',
+        plannedMinutes: 2,
+        plannedSeconds: 95,
+      );
+
+      final state = container.read(activeFocusProvider);
+      expect(state, isNotNull);
+      expect(state!.plannedSeconds, 95);
+      expect(state.remainingSeconds, 95);
+    });
+
+    test('linkActivity and clearLinkedActivity update active session',
+        () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(activeFocusProvider.notifier);
+      await notifier.startSession(title: 'قراءة', plannedMinutes: 25);
+
+      notifier.linkActivity('act_99', 'مراجعة القرآن');
+      expect(container.read(activeFocusProvider)?.linkedActivityId, 'act_99');
+      expect(container.read(activeFocusProvider)?.linkedActivityTitle,
+          'مراجعة القرآن');
+
+      notifier.clearLinkedActivity();
+      expect(container.read(activeFocusProvider)?.linkedActivityId, isNull);
+      expect(container.read(activeFocusProvider)?.linkedActivityTitle, isNull);
+    });
+
+    test('savePartial ends and saves session immediately without 10m gate',
+        () async {
+      final fakeRepo = _FakeWorkSessionRepo();
+      final container = ProviderContainer(
+        overrides: [
+          workSessionRepositoryProvider.overrideWithValue(fakeRepo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final notifier = container.read(activeFocusProvider.notifier);
+      await notifier.startSession(title: 'جلسة قصيرة', plannedMinutes: 25);
+      expect(container.read(activeFocusProvider), isNotNull);
+
+      final saved = await notifier.savePartial();
+      expect(saved, isTrue);
+      expect(container.read(activeFocusProvider), isNull);
+      expect(fakeRepo.items.length, 1);
+      expect(fakeRepo.items.first.name, 'جلسة قصيرة');
+      expect(container.read(lastCompletedSessionProvider)?.name, 'جلسة قصيرة');
     });
   });
 }

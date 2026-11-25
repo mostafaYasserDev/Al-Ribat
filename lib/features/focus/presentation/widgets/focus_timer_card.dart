@@ -9,14 +9,14 @@ class FocusTimerCard extends StatelessWidget {
   const FocusTimerCard({
     super.key,
     required this.selectedMode,
-    required this.selectedMinutes,
+    required this.selectedSeconds,
     required this.isPomodoroPreset,
     required this.displayTime,
     required this.isActive,
     required this.isPaused,
     required this.progress,
     required this.onSelectPreset,
-    required this.onDurationChanged,
+    required this.onDurationSecondsChanged,
     this.activeTitle,
     this.nextPrayerName,
     this.nextPrayerTime,
@@ -24,14 +24,14 @@ class FocusTimerCard extends StatelessWidget {
   });
 
   final FocusSessionMode selectedMode;
-  final int selectedMinutes;
+  final int selectedSeconds;
   final bool isPomodoroPreset;
   final String displayTime;
   final bool isActive;
   final bool isPaused;
   final double progress;
   final void Function(int minutes, {bool isPomodoro}) onSelectPreset;
-  final ValueChanged<int> onDurationChanged;
+  final ValueChanged<int> onDurationSecondsChanged;
   final String? activeTitle;
   final String? nextPrayerName;
   final DateTime? nextPrayerTime;
@@ -47,8 +47,9 @@ class FocusTimerCard extends StatelessWidget {
   ];
 
   void _openDurationPicker(BuildContext context) {
-    var hours = selectedMinutes ~/ 60;
-    var minutes = selectedMinutes % 60;
+    var hours = selectedSeconds ~/ 3600;
+    var minutes = (selectedSeconds % 3600) ~/ 60;
+    var seconds = selectedSeconds % 60;
 
     showModalBottomSheet<void>(
       context: context,
@@ -59,14 +60,15 @@ class FocusTimerCard extends StatelessWidget {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
-            final totalMinutes = (hours * 60 + minutes).clamp(5, 480);
+            final totalSec =
+                ((hours * 3600) + (minutes * 60) + seconds).clamp(1, 28800);
             final theme = Theme.of(ctx);
             final colorScheme = theme.colorScheme;
 
             return Directionality(
               textDirection: TextDirection.rtl,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -76,49 +78,51 @@ class FocusTimerCard extends StatelessWidget {
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      FocusTimeFormatter.formatDurationReadable(totalMinutes),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text(
+                        FocusTimeFormatter.formatCountdown(totalSec),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _UnitStepper(
-                          label: 'ساعات',
-                          value: hours,
-                          min: 0,
-                          max: 8,
-                          onChanged: (v) => setModalState(() {
-                            hours = v;
-                            if (hours == 0 && minutes < 5) minutes = 5;
-                          }),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          child: Text(
-                            ':',
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                    const SizedBox(height: 18),
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _UnitStepper(
+                            label: 'ساعات',
+                            value: hours,
+                            min: 0,
+                            max: 8,
+                            onChanged: (v) => setModalState(() => hours = v),
                           ),
-                        ),
-                        _UnitStepper(
-                          label: 'دقائق',
-                          value: minutes,
-                          min: hours == 0 ? 5 : 0,
-                          max: 55,
-                          step: 5,
-                          onChanged: (v) => setModalState(() => minutes = v),
-                        ),
-                      ],
+                          _colonSeparator(theme, colorScheme),
+                          _UnitStepper(
+                            label: 'دقائق',
+                            value: minutes,
+                            min: 0,
+                            max: 59,
+                            onChanged: (v) => setModalState(() => minutes = v),
+                          ),
+                          _colonSeparator(theme, colorScheme),
+                          _UnitStepper(
+                            label: 'ثوانٍ',
+                            value: seconds,
+                            min: (hours == 0 && minutes == 0) ? 1 : 0,
+                            max: 59,
+                            onChanged: (v) => setModalState(() => seconds = v),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 22),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton(
@@ -130,7 +134,7 @@ class FocusTimerCard extends StatelessWidget {
                         ),
                         onPressed: () {
                           HapticFeedback.selectionClick();
-                          onDurationChanged(totalMinutes);
+                          onDurationSecondsChanged(totalSec);
                           Navigator.pop(ctx);
                         },
                         child: const Text(
@@ -146,6 +150,19 @@ class FocusTimerCard extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  Widget _colonSeparator(ThemeData theme, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: Text(
+        ':',
+        style: theme.textTheme.headlineMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: colorScheme.onSurfaceVariant,
+        ),
+      ),
     );
   }
 
@@ -181,12 +198,8 @@ class FocusTimerCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // Top Status / Mode Label
           _buildHeaderBadge(context, accentColor),
-
           const SizedBox(height: 16),
-
-          // Wide Digital Timer Readout
           Directionality(
             textDirection: TextDirection.ltr,
             child: Text(
@@ -202,10 +215,7 @@ class FocusTimerCard extends StatelessWidget {
               ),
             ),
           ),
-
           const SizedBox(height: 8),
-
-          // Subtitle / Readable duration
           Text(
             _buildSubtitle(),
             style: TextStyle(
@@ -215,8 +225,6 @@ class FocusTimerCard extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-
-          // Active Progress Bar
           if (isActive) ...[
             const SizedBox(height: 18),
             ClipRRect(
@@ -232,8 +240,6 @@ class FocusTimerCard extends StatelessWidget {
               ),
             ),
           ],
-
-          // Presets & Custom Picker (Only in Custom Timer / Pomodoro before start)
           if (showCustomControls) ...[
             const SizedBox(height: 20),
             const Divider(height: 1),
@@ -243,7 +249,7 @@ class FocusTimerCard extends StatelessWidget {
               runSpacing: 8,
               alignment: WrapAlignment.center,
               children: _presets.map((preset) {
-                final isSelected = selectedMinutes == preset.minutes &&
+                final isSelected = selectedSeconds == preset.minutes * 60 &&
                     isPomodoroPreset == preset.isPomodoro;
                 return ChoiceChip(
                   label: Text(preset.label),
@@ -264,7 +270,7 @@ class FocusTimerCard extends StatelessWidget {
             TextButton.icon(
               onPressed: () => _openDurationPicker(context),
               icon: const Icon(Icons.schedule_rounded, size: 18),
-              label: const Text('تخصيص الساعات والدقائق'),
+              label: const Text('تخصيص الساعات والدقائق والثواني'),
             ),
           ],
         ],
@@ -334,10 +340,10 @@ class FocusTimerCard extends StatelessWidget {
     if (selectedMode == FocusSessionMode.untilPrayer) {
       if (nextPrayerTime != null && remainingPrayerMinutes != null) {
         final formattedAdhan =
-            DateFormat('HH:mm', 'ar').format(nextPrayerTime!);
+            DateFormat('hh:mm a', 'ar').format(nextPrayerTime!);
         final readable =
             FocusTimeFormatter.formatDurationReadable(remainingPrayerMinutes!);
-        return 'الأذان الساعة $formattedAdhan · المدة: $readable';
+        return 'الأذان $formattedAdhan · المدة: $readable';
       }
       return 'يضبط المؤقت تلقائياً حتى موعد الصلاة القادمة';
     }
@@ -346,7 +352,14 @@ class FocusTimerCard extends StatelessWidget {
       return 'يحسب الوقت المنقضي تصاعدياً بدون حد زمني';
     }
 
-    return 'المدة المحددة: ${FocusTimeFormatter.formatDurationReadable(selectedMinutes)}';
+    final h = selectedSeconds ~/ 3600;
+    final m = (selectedSeconds % 3600) ~/ 60;
+    final s = selectedSeconds % 60;
+    final parts = <String>[];
+    if (h > 0) parts.add('$h س');
+    if (m > 0) parts.add('$m د');
+    if (s > 0 || parts.isEmpty) parts.add('$s ث');
+    return 'المدة المحددة: ${parts.join(' ')}';
   }
 }
 
@@ -357,14 +370,12 @@ class _UnitStepper extends StatelessWidget {
     required this.min,
     required this.max,
     required this.onChanged,
-    this.step = 1,
   });
 
   final String label;
   final int value;
   final int min;
   final int max;
-  final int step;
   final ValueChanged<int> onChanged;
 
   @override
@@ -385,7 +396,7 @@ class _UnitStepper extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
             borderRadius: BorderRadius.circular(16),
@@ -393,26 +404,26 @@ class _UnitStepper extends StatelessWidget {
           child: Column(
             children: [
               IconButton(
-                onPressed: value + step <= max
+                onPressed: value + 1 <= max
                     ? () {
                         HapticFeedback.selectionClick();
-                        onChanged(value + step);
+                        onChanged(value + 1);
                       }
                     : null,
                 icon: const Icon(Icons.keyboard_arrow_up_rounded),
               ),
               Text(
                 value.toString().padLeft(2, '0'),
-                style: theme.textTheme.headlineMedium?.copyWith(
+                style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
               IconButton(
-                onPressed: value - step >= min
+                onPressed: value - 1 >= min
                     ? () {
                         HapticFeedback.selectionClick();
-                        onChanged(value - step);
+                        onChanged(value - 1);
                       }
                     : null,
                 icon: const Icon(Icons.keyboard_arrow_down_rounded),

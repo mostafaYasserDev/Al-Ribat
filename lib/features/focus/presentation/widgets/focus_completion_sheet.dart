@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/core/theme/app_moods.dart';
+import 'package:al_ribat/features/activities/domain/activity_item.dart';
+import '../../application/active_focus_notifier.dart';
 import '../../domain/work_session_item.dart';
+import 'focus_linked_task_card.dart';
 
 class FocusCompletionSheet extends ConsumerStatefulWidget {
   const FocusCompletionSheet({super.key, required this.session});
@@ -32,6 +35,7 @@ class _FocusCompletionSheetState extends ConsumerState<FocusCompletionSheet> {
   late final ConfettiController _confettiController;
   final _reflectionController = TextEditingController();
   String? _selectedMood;
+  ActivityItem? _postLinkedActivity;
 
   @override
   void initState() {
@@ -49,6 +53,16 @@ class _FocusCompletionSheetState extends ConsumerState<FocusCompletionSheet> {
   }
 
   Future<void> _saveReflection() async {
+    if (_postLinkedActivity != null &&
+        widget.session.linkedActivityTitle == null) {
+      await ref
+          .read(activeFocusProvider.notifier)
+          .linkActivityToCompletedSession(
+            widget.session,
+            _postLinkedActivity!,
+          );
+    }
+
     final text = _reflectionController.text.trim();
     if (text.isNotEmpty || _selectedMood != null) {
       await ref.read(reflectionsProvider.notifier).add(
@@ -90,85 +104,96 @@ class _FocusCompletionSheetState extends ConsumerState<FocusCompletionSheet> {
               top: 12,
               bottom: MediaQuery.of(context).viewInsets.bottom + 24,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.green.withValues(alpha: 0.15),
-                      shape: BoxShape.circle,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check_circle_rounded,
+                          color: Colors.green, size: 36),
                     ),
-                    child: const Icon(Icons.check_circle_rounded,
-                        color: Colors.green, size: 36),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'مبارك! اكتملت الجلسة بحمد الله',
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'أنجزت ${s.actualMinutes} دقيقة من التركيز في "${s.name}"',
-                  style: TextStyle(
-                      color: colorScheme.onSurfaceVariant, fontSize: 13),
-                  textAlign: TextAlign.center,
-                ),
-                if (s.linkedActivityTitle != null) ...[
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 12),
                   Text(
-                    '✓ أُضيفت الدقائق تلقائياً إلى: ${s.linkedActivityTitle!}',
-                    style: const TextStyle(
-                        color: Colors.green,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12),
+                    'مبارك! اكتملت الجلسة بحمد الله',
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
-                ],
-                const SizedBox(height: 20),
-                const Divider(),
-                const SizedBox(height: 10),
-                Text(
-                  'كيف كان شعورك خلال هذه الجلسة؟ (اختياري)',
-                  style: theme.textTheme.labelMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  children: AppMoods.options.take(5).map((m) {
-                    final selected = _selectedMood == m.label;
-                    return ChoiceChip(
-                      avatar: Icon(m.icon, size: 16, color: m.color),
-                      label: Text(m.label),
-                      selected: selected,
-                      onSelected: (_) =>
-                          setState(() => _selectedMood = m.label),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _reflectionController,
-                  decoration: const InputDecoration(
-                    hintText: 'سجل خاطرة أو فكرة خطرت ببالك أثناء التركيز...',
-                    prefixIcon: Icon(Icons.edit_note_rounded),
+                  const SizedBox(height: 4),
+                  Text(
+                    'أنجزت ${s.actualMinutes} دقيقة من التركيز في "${s.name}"',
+                    style: TextStyle(
+                        color: colorScheme.onSurfaceVariant, fontSize: 13),
+                    textAlign: TextAlign.center,
                   ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: _saveReflection,
-                  icon: const Icon(Icons.done_all_rounded, size: 18),
-                  label: const Text('حفظ واكتمال'),
-                ),
-              ],
+                  if (s.linkedActivityTitle != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      '✓ أُضيفت الدقائق تلقائياً إلى: ${s.linkedActivityTitle!}',
+                      style: const TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 14),
+                    FocusLinkedTaskCard(
+                      selectedActivity: _postLinkedActivity,
+                      onSelectActivity: (act) =>
+                          setState(() => _postLinkedActivity = act),
+                      onClearActivity: () =>
+                          setState(() => _postLinkedActivity = null),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  const Divider(),
+                  const SizedBox(height: 10),
+                  Text(
+                    'كيف كان شعورك خلال هذه الجلسة؟ (اختياري)',
+                    style: theme.textTheme.labelMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    children: AppMoods.options.take(5).map((m) {
+                      final selected = _selectedMood == m.label;
+                      return ChoiceChip(
+                        avatar: Icon(m.icon, size: 16, color: m.color),
+                        label: Text(m.label),
+                        selected: selected,
+                        onSelected: (_) =>
+                            setState(() => _selectedMood = m.label),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _reflectionController,
+                    decoration: const InputDecoration(
+                      hintText: 'سجل خاطرة أو فكرة خطرت ببالك أثناء التركيز...',
+                      prefixIcon: Icon(Icons.edit_note_rounded),
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton.icon(
+                    onPressed: _saveReflection,
+                    icon: const Icon(Icons.done_all_rounded, size: 18),
+                    label: const Text('حفظ واكتمال'),
+                  ),
+                ],
+              ),
             ),
           ),
         ],

@@ -44,7 +44,7 @@ void main() {
       expect(state.plannedMinutes, 25);
       expect(state.remainingSeconds, 25 * 60);
       expect(state.isPaused, isFalse);
-      expect(state.canSavePartial, isFalse);
+      expect(state.canSavePartial, isTrue);
     });
 
     test('pauseSession and resumeSession toggle isPaused', () async {

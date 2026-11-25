@@ -29,7 +29,7 @@ class FocusSessionsScreen extends ConsumerStatefulWidget {
 
 class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
   FocusSessionMode _selectedMode = FocusSessionMode.untilPrayer;
-  int _selectedMinutes = 25;
+  int _selectedSeconds = 25 * 60;
   bool _isPomodoroPreset = false;
   ActivityItem? _linkedActivity;
   late final String _dailyQuote;
@@ -68,7 +68,8 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
         } else {
           notifier.startSession(
             title: taskTitle ?? 'جلسة تركيز',
-            plannedMinutes: _selectedMinutes,
+            plannedMinutes: (_selectedSeconds / 60).ceil(),
+            plannedSeconds: _selectedSeconds,
             mode: FocusSessionMode.customTimer,
             linkedActivityId: _linkedActivity?.id,
             linkedActivityTitle: taskTitle,
@@ -97,7 +98,8 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
         } else {
           notifier.startSession(
             title: taskTitle ?? 'جلسة تركيز',
-            plannedMinutes: _selectedMinutes,
+            plannedMinutes: (_selectedSeconds / 60).ceil(),
+            plannedSeconds: _selectedSeconds,
             mode: FocusSessionMode.customTimer,
             linkedActivityId: _linkedActivity?.id,
             linkedActivityTitle: taskTitle,
@@ -142,13 +144,12 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
     String displayTime;
     double progress;
     bool isPaused = false;
-    int timerMinutes;
+    int timerSeconds;
 
     if (isSessionActive) {
       isPaused = activeSession.isPaused;
-      timerMinutes = activeSession.plannedMinutes;
-      final totalSec =
-          (activeSession.plannedMinutes * 60).clamp(1, double.infinity);
+      timerSeconds = activeSession.plannedSeconds;
+      final totalSec = activeSession.plannedSeconds.clamp(1, double.infinity);
       final secondsToDisplay =
           activeSession.mode == FocusSessionMode.openStopwatch
               ? activeSession.elapsedSeconds
@@ -160,15 +161,15 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
     } else {
       if (_selectedMode == FocusSessionMode.untilPrayer &&
           remainingPrayerMin != null) {
-        timerMinutes = remainingPrayerMin;
+        timerSeconds = remainingPrayerMin * 60;
       } else if (_selectedMode == FocusSessionMode.openStopwatch) {
-        timerMinutes = 0;
+        timerSeconds = 0;
       } else {
-        timerMinutes = _selectedMinutes;
+        timerSeconds = _selectedSeconds;
       }
       displayTime = _selectedMode == FocusSessionMode.openStopwatch
           ? '00:00'
-          : FocusTimeFormatter.formatCountdown(timerMinutes * 60);
+          : FocusTimeFormatter.formatCountdown(timerSeconds);
       progress = 0.0;
     }
 
@@ -198,6 +199,9 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
           if (!isSessionActive) ...[
             FocusModeSelector(
               selectedMode: _selectedMode,
+              nextPrayerName: nextPrayer?.phase.arabicName,
+              nextPrayerTime: nextPrayer?.time,
+              remainingPrayerMinutes: remainingPrayerMin,
               onSelect: (mode) {
                 setState(() {
                   _selectedMode = mode;
@@ -207,10 +211,10 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
                 });
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
           ],
 
-          // Linked Task Card
+          // Linked Task Card (always interactive before and during session)
           FocusLinkedTaskCard(
             selectedActivity: isSessionActive
                 ? (activeSession.linkedActivityTitle != null
@@ -221,17 +225,30 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
                       )
                     : null)
                 : _linkedActivity,
-            onSelectActivity: (act) => setState(() => _linkedActivity = act),
-            onClearActivity: () => setState(() => _linkedActivity = null),
-            disabled: isSessionActive,
+            onSelectActivity: (act) {
+              if (isSessionActive) {
+                ref
+                    .read(activeFocusProvider.notifier)
+                    .linkActivity(act.id, act.title);
+              } else {
+                setState(() => _linkedActivity = act);
+              }
+            },
+            onClearActivity: () {
+              if (isSessionActive) {
+                ref.read(activeFocusProvider.notifier).clearLinkedActivity();
+              } else {
+                setState(() => _linkedActivity = null);
+              }
+            },
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           // Wide Digital Timer Card
           FocusTimerCard(
             selectedMode: isSessionActive ? activeSession.mode : _selectedMode,
-            selectedMinutes: timerMinutes,
+            selectedSeconds: timerSeconds,
             isPomodoroPreset: _isPomodoroPreset,
             displayTime: displayTime,
             isActive: isSessionActive,
@@ -243,16 +260,16 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
             remainingPrayerMinutes: remainingPrayerMin,
             onSelectPreset: (mins, {bool isPomodoro = false}) {
               setState(() {
-                _selectedMinutes = mins;
+                _selectedSeconds = mins * 60;
                 _isPomodoroPreset = isPomodoro;
                 _selectedMode = isPomodoro
                     ? FocusSessionMode.pomodoro
                     : FocusSessionMode.customTimer;
               });
             },
-            onDurationChanged: (mins) {
+            onDurationSecondsChanged: (secs) {
               setState(() {
-                _selectedMinutes = mins;
+                _selectedSeconds = secs;
                 _isPomodoroPreset = false;
                 _selectedMode = FocusSessionMode.customTimer;
               });
