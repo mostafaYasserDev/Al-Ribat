@@ -37,14 +37,16 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        floatingActionButton: FloatingActionButton.extended(
-          heroTag: 'projects_fab',
-          onPressed: () {
-            HapticFeedback.lightImpact();
-            _openNewProject(context);
-          },
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('مشروع جديد'),
+        floatingActionButton: Builder(
+          builder: (fabCtx) => FloatingActionButton.extended(
+            heroTag: 'projects_fab',
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _openNewProject(fabCtx);
+            },
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('مشروع جديد'),
+          ),
         ),
         body: CustomScrollView(
           physics: const BouncingScrollPhysics(
@@ -183,30 +185,27 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     );
   }
 
-  void _openNewProject(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => NewProjectDialog(
-        onCreate: ({
-          required projectName,
-          description,
-          iconName,
-          colorHex,
-        }) async {
-          await ProjectGroupsService.saveProjectInfo(
-            projectName,
-            description: description,
-            iconName: iconName,
-            colorHex: colorHex,
-          );
-          if (!mounted) return;
-          setState(() {});
-          appSnack(this.context, 'تم إنشاء مشروع "$projectName" بنجاح.');
-        },
-      ),
+  void _openNewProject(BuildContext sourceContext) {
+    NewProjectDialog.open(
+      context,
+      sourceContext: sourceContext,
+      sourceColor: Theme.of(context).colorScheme.primaryContainer,
+      onCreate: ({
+        required projectName,
+        description,
+        iconName,
+        colorHex,
+      }) async {
+        await ProjectGroupsService.saveProjectInfo(
+          projectName,
+          description: description,
+          iconName: iconName,
+          colorHex: colorHex,
+        );
+        if (!mounted) return;
+        setState(() {});
+        appSnack(context, 'تم إنشاء مشروع "$projectName" بنجاح.');
+      },
     );
   }
 }

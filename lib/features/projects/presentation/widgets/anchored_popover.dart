@@ -174,7 +174,10 @@ class _AnchoredPopoverOverlay extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Color.lerp(
                         Colors.transparent,
-                        closeRed.withValues(alpha: isDark ? 0.24 : 0.14),
+                        Color.alphaBlend(
+                          closeRed.withValues(alpha: isDark ? 0.24 : 0.14),
+                          cardBg,
+                        ),
                         t,
                       ),
                       borderRadius: BorderRadius.circular(anchorRadius),

@@ -6,8 +6,9 @@ import 'package:al_ribat/core/theme/app_icons.dart';
 import 'package:al_ribat/core/ui_confirm.dart';
 import 'package:al_ribat/core/ui_feedback.dart';
 import 'package:al_ribat/features/activities/domain/activity_item.dart';
+import 'package:al_ribat/features/prayer/domain/prayer_phase.dart';
+import 'package:al_ribat/features/projects/presentation/widgets/anchored_popover.dart';
 import 'package:al_ribat/presentation/widgets/activity_add_progress_sheet.dart';
-import 'package:al_ribat/presentation/widgets/activity_details_sheet.dart';
 import 'package:al_ribat/presentation/widgets/add_activity_sheet.dart';
 
 class ActivityActionTile extends StatelessWidget {
@@ -36,35 +37,170 @@ class ActivityActionTile extends StatelessWidget {
     return p == p.toInt() ? p.toInt().toString() : p.toStringAsFixed(1);
   }
 
-  void _showDetailsSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => ActivityDetailsSheet(
-        activity: activity,
-        dateStr: dateStr,
-        onToggleDone: () async {
-          Navigator.pop(ctx);
-          await _handleToggleDoneDirect(context);
-        },
-        onToggleSkip: () async {
-          Navigator.pop(ctx);
-          HapticFeedback.selectionClick();
-          await onToggleSkip(activity, dateStr);
-        },
-        onEdit: () async {
-          Navigator.pop(ctx);
-          await _handleEdit(context);
-        },
-        onDelete: () async {
-          Navigator.pop(ctx);
-          await _handleDelete(context);
-        },
-        onAddProgress: () {
-          Navigator.pop(ctx);
-          _showAddProgressDialog(context);
-        },
+  String _repetitionLabel(ActivityRepetition rep) {
+    switch (rep) {
+      case ActivityRepetition.daily:
+        return 'يومي';
+      case ActivityRepetition.weekly:
+        return 'أسبوعي';
+      case ActivityRepetition.monthly:
+        return 'شهري';
+      case ActivityRepetition.once:
+        return 'مرة واحدة';
+    }
+  }
+
+  void _showDetailsPopover(BuildContext anchorCtx, BuildContext hostCtx) {
+    HapticFeedback.lightImpact();
+    final isDone = activity.isDoneOn(dateStr);
+    final isSkipped = activity.isSkippedOn(dateStr);
+    final theme = Theme.of(hostCtx);
+    final colorScheme = theme.colorScheme;
+    final dividerColor = colorScheme.onSurface.withValues(alpha: 0.08);
+    final iconColor =
+        AppIcons.parseColor(activity.colorHex) ?? colorScheme.primary;
+    final metaParts = <String>[
+      _repetitionLabel(activity.repetition),
+      if (activity.linkedPrayer != null) activity.linkedPrayer!.arabicName,
+      if (activity.isMeasurable && activity.targetGoal != null)
+        '${formatProgress(activity.getProgressOn(dateStr))}/${formatProgress(activity.targetGoal!)} ${activity.goalUnit ?? ""}',
+    ];
+
+    showAnchoredPopover<void>(
+      anchorCtx,
+      width: 264,
+      preferAbove: true,
+      anchorRadius: 10,
+      builder: (popCtx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(13, 12, 13, 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: iconColor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    AppIcons.getIconData(activity.iconName),
+                    color: iconColor,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        activity.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        metaParts.join(' · '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 11,
+                          color: colorScheme.onSurface.withValues(alpha: 0.58),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 0.6, thickness: 0.6, color: dividerColor),
+          PopoverActionRow(
+            icon: isDone
+                ? Icons.undo_rounded
+                : Icons.check_circle_outline_rounded,
+            color: isDone ? const Color(0xFFFF9500) : const Color(0xFF34C759),
+            label: isDone ? 'التراجع عن الإنجاز' : 'تم الإنجاز',
+            onTap: () async {
+              Navigator.pop(popCtx);
+              await _handleToggleDoneDirect(hostCtx);
+            },
+          ),
+          if (activity.isMeasurable && activity.targetGoal != null) ...[
+            Divider(
+              height: 0.6,
+              thickness: 0.6,
+              indent: 52,
+              color: dividerColor,
+            ),
+            PopoverActionRow(
+              icon: Icons.add_chart_rounded,
+              color: const Color(0xFF007AFF),
+              label: 'إضافة تقدم',
+              onTap: () {
+                Navigator.pop(popCtx);
+                _showAddProgressDialog(hostCtx);
+              },
+            ),
+          ],
+          if (!isDone) ...[
+            Divider(
+              height: 0.6,
+              thickness: 0.6,
+              indent: 52,
+              color: dividerColor,
+            ),
+            PopoverActionRow(
+              icon: isSkipped ? Icons.undo_rounded : Icons.skip_next_rounded,
+              color: const Color(0xFFFF9500),
+              label: isSkipped ? 'إلغاء التخطي' : 'تخطي اليوم',
+              onTap: () async {
+                Navigator.pop(popCtx);
+                HapticFeedback.selectionClick();
+                await onToggleSkip(activity, dateStr);
+              },
+            ),
+          ],
+          Divider(
+            height: 0.6,
+            thickness: 0.6,
+            indent: 52,
+            color: dividerColor,
+          ),
+          PopoverActionRow(
+            icon: Icons.edit_outlined,
+            color: const Color(0xFF007AFF),
+            label: 'تعديل النشاط',
+            onTap: () async {
+              Navigator.pop(popCtx);
+              await _handleEdit(hostCtx);
+            },
+          ),
+          Divider(
+            height: 0.6,
+            thickness: 0.6,
+            indent: 52,
+            color: dividerColor,
+          ),
+          PopoverActionRow(
+            icon: Icons.delete_outline_rounded,
+            color: const Color(0xFFFF3B30),
+            label: 'حذف النشاط',
+            isDestructive: true,
+            onTap: () async {
+              Navigator.pop(popCtx);
+              await _handleDelete(hostCtx);
+            },
+          ),
+        ],
       ),
     );
   }
@@ -123,17 +259,10 @@ class ActivityActionTile extends StatelessWidget {
   }
 
   Future<void> _handleEdit(BuildContext context) async {
-    final updated = await showModalBottomSheet<ActivityItem>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => AddActivitySheet(
-        initialActivity: activity,
-        onSave: (edited) async {
-          Navigator.of(ctx).pop(edited);
-          return true;
-        },
-      ),
+    final updated = await AddActivitySheet.open(
+      context,
+      initialActivity: activity,
+      onSave: (edited) async => true,
     );
     if (updated != null) {
       await onUpdate(updated);
@@ -170,8 +299,13 @@ class ActivityActionTile extends StatelessWidget {
     final iconColor =
         AppIcons.parseColor(activity.colorHex) ?? colorScheme.primary;
 
+    final moreKey = GlobalKey();
+    void openPopover() {
+      _showDetailsPopover(moreKey.currentContext ?? context, context);
+    }
+
     return InkWell(
-      onTap: () => _showDetailsSheet(context),
+      onTap: openPopover,
       borderRadius: BorderRadius.circular(16),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -279,9 +413,23 @@ class ActivityActionTile extends StatelessWidget {
                 color: colorScheme.primary,
                 onPressed: () => _showAddProgressDialog(context),
               ),
-            IconButton(
-              icon: const Icon(Icons.more_vert, size: 18),
-              onPressed: () => _showDetailsSheet(context),
+            GestureDetector(
+              key: moreKey,
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _showDetailsPopover(moreKey.currentContext ?? context, context);
+              },
+              child: SizedBox(
+                width: 32,
+                height: 32,
+                child: Center(
+                  child: Icon(
+                    Icons.more_horiz_rounded,
+                    size: 19,
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
             ),
           ],
         ),

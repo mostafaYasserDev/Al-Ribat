@@ -87,23 +87,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void _showAddActivitySheet({
     PrayerPhase? initialPhase,
     bool isIndependent = false,
+    BuildContext? sourceContext,
+    Color? sourceColor,
   }) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) => AddActivitySheet(
-        initialPhase: isIndependent ? null : initialPhase,
-        isIndependentInitial: isIndependent,
-        onSave: (activity) async {
-          await ref.read(activitiesProvider.notifier).addActivity(activity);
-          lightSuccessHaptic();
-          if (ctx.mounted) {
-            appSnack(ctx, 'أُضِيف النشاط — ${MotivationQuotes.randomLine()}');
-          }
-          return true;
-        },
-      ),
+    AddActivitySheet.open(
+      context,
+      initialPhase: isIndependent ? null : initialPhase,
+      isIndependentInitial: isIndependent,
+      sourceContext: sourceContext,
+      sourceColor: sourceColor ?? Theme.of(context).scaffoldBackgroundColor,
+      onSave: (activity) async {
+        await ref.read(activitiesProvider.notifier).addActivity(activity);
+        lightSuccessHaptic();
+        if (mounted) {
+          appSnack(context, 'أُضِيف النشاط — ${MotivationQuotes.randomLine()}');
+        }
+        return true;
+      },
     );
   }
 
@@ -123,14 +123,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        floatingActionButton: FloatingActionButton.extended(
-          heroTag: 'home_fab',
-          onPressed: () {
-            HapticFeedback.lightImpact();
-            _showAddActivitySheet(initialPhase: activePhase);
-          },
-          label: const Text('إضافة نشاط'),
-          icon: const Icon(Icons.add_rounded),
+        floatingActionButton: Builder(
+          builder: (fabCtx) => FloatingActionButton.extended(
+            heroTag: 'home_fab',
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _showAddActivitySheet(
+                initialPhase: activePhase,
+                sourceContext: fabCtx,
+                sourceColor: theme.colorScheme.primaryContainer,
+              );
+            },
+            label: const Text('إضافة نشاط'),
+            icon: const Icon(Icons.add_rounded),
+          ),
         ),
         body: scheduleAsync.when(
           skipLoadingOnReload: true,

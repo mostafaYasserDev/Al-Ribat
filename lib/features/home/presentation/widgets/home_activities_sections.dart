@@ -195,14 +195,24 @@ class HomePhaseActivitiesSection extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 14),
-          FilledButton.tonalIcon(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_rounded, size: 17),
-            label: const Text('أضف نشاطاً الآن'),
+          FilledButton.icon(
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              onAdd();
+            },
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text(
+              'أضف نشاطاً الآن',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             style: FilledButton.styleFrom(
+              backgroundColor: visual.color,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),
+              elevation: 0,
             ),
           ),
         ],
