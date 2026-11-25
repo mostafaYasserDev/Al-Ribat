@@ -24,6 +24,7 @@ class _ReflectionHistoryScreenState
   final _searchController = TextEditingController();
   String _searchQuery = '';
   bool _isGridView = true;
+  bool _composePressed = false;
 
   @override
   void dispose() {
@@ -31,14 +32,33 @@ class _ReflectionHistoryScreenState
     super.dispose();
   }
 
-  void _openNewEditor() {
+  void _openNewEditor({
+    BuildContext? sourceContext,
+    Color? sourceColor,
+    double sourceRadius = 18,
+  }) {
     HapticFeedback.lightImpact();
-    ReflectionEditorScreen.open(context);
+    ReflectionEditorScreen.open(
+      context,
+      sourceContext: sourceContext,
+      sourceColor: sourceColor,
+      sourceRadius: sourceRadius,
+    );
   }
 
-  void _openEditEditor(ReflectionEntry entry) {
+  void _openEditEditor(
+    ReflectionEntry entry,
+    BuildContext cardContext,
+    Color bgColor,
+  ) {
     HapticFeedback.lightImpact();
-    ReflectionEditorScreen.open(context, entry: entry);
+    ReflectionEditorScreen.open(
+      context,
+      entry: entry,
+      sourceContext: cardContext,
+      sourceColor: bgColor,
+      sourceRadius: 16,
+    );
   }
 
   Future<void> _handleDelete(String id) async {
@@ -78,11 +98,17 @@ class _ReflectionHistoryScreenState
             ),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
-          heroTag: 'reflections_fab',
-          onPressed: _openNewEditor,
-          tooltip: 'خاطرة جديدة',
-          child: const Icon(Icons.add),
+        floatingActionButton: Builder(
+          builder: (fabCtx) => FloatingActionButton(
+            heroTag: 'reflections_fab',
+            onPressed: () => _openNewEditor(
+              sourceContext: fabCtx,
+              sourceColor: Theme.of(context).colorScheme.primaryContainer,
+              sourceRadius: 16,
+            ),
+            tooltip: 'خاطرة جديدة',
+            child: const Icon(Icons.add),
+          ),
         ),
         body: asyncReflections.when(
           data: (entries) => _buildBody(entries),
@@ -165,44 +191,58 @@ class _ReflectionHistoryScreenState
 
   Widget _buildQuickComposeBox(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: _openNewEditor,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
+    return Builder(
+      builder: (boxCtx) => AnimatedScale(
+        scale: _composePressed ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 110),
+        curve: Curves.easeOut,
+        child: Material(
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(18),
+          child: InkWell(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+            onHighlightChanged: (v) {
+              if (_composePressed != v) setState(() => _composePressed = v);
+            },
+            onTap: () => _openNewEditor(
+              sourceContext: boxCtx,
+              sourceColor: colorScheme.surfaceContainerLow,
+              sourceRadius: 18,
             ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.edit_note_rounded,
-                color: colorScheme.primary,
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'دوّن خاطرة أو تأملاً الآن…',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.6),
                 ),
               ),
-              Icon(
-                Icons.add_circle_outline_rounded,
-                color: colorScheme.primary.withValues(alpha: 0.8),
-                size: 22,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.edit_note_rounded,
+                    color: colorScheme.primary,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'دوّن خاطرة أو تأملاً الآن…',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.add_circle_outline_rounded,
+                    color: colorScheme.primary.withValues(alpha: 0.8),
+                    size: 22,
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -219,7 +259,7 @@ class _ReflectionHistoryScreenState
               child: ReflectionEntryCard(
                 entry: entry,
                 isGrid: false,
-                onTap: () => _openEditEditor(entry),
+                onTap: (ctx, bg) => _openEditEditor(entry, ctx, bg),
                 onTogglePin: () =>
                     ref.read(reflectionsProvider.notifier).togglePin(entry),
                 onDelete: () => _handleDelete(entry.id),
@@ -252,7 +292,7 @@ class _ReflectionHistoryScreenState
                   child: ReflectionEntryCard(
                     entry: entry,
                     isGrid: true,
-                    onTap: () => _openEditEditor(entry),
+                    onTap: (ctx, bg) => _openEditEditor(entry, ctx, bg),
                     onTogglePin: () =>
                         ref.read(reflectionsProvider.notifier).togglePin(entry),
                     onDelete: () => _handleDelete(entry.id),
@@ -271,7 +311,7 @@ class _ReflectionHistoryScreenState
                   child: ReflectionEntryCard(
                     entry: entry,
                     isGrid: true,
-                    onTap: () => _openEditEditor(entry),
+                    onTap: (ctx, bg) => _openEditEditor(entry, ctx, bg),
                     onTogglePin: () =>
                         ref.read(reflectionsProvider.notifier).togglePin(entry),
                     onDelete: () => _handleDelete(entry.id),

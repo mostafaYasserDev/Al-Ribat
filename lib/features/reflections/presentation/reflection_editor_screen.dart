@@ -9,6 +9,7 @@ import 'package:al_ribat/core/ui_feedback.dart';
 import 'package:al_ribat/features/prayer/domain/prayer_phase.dart';
 import '../domain/reflection_colors.dart';
 import '../domain/reflection_entry.dart';
+import 'widgets/apple_morph_route.dart';
 import 'widgets/reflection_dialogs.dart';
 
 enum _ToolbarPanel { none, colors, projects, moods }
@@ -18,9 +19,19 @@ class ReflectionEditorScreen extends ConsumerStatefulWidget {
 
   final ReflectionEntry? entry;
 
-  static Future<void> open(BuildContext context, {ReflectionEntry? entry}) {
+  static Future<void> open(
+    BuildContext context, {
+    ReflectionEntry? entry,
+    BuildContext? sourceContext,
+    Color? sourceColor,
+    double sourceRadius = 16,
+  }) {
+    final sourceRect = captureWidgetRect(sourceContext);
     return Navigator.of(context).push(
-      MaterialPageRoute<void>(
+      AppleMorphRoute<void>(
+        sourceRect: sourceRect,
+        sourceColor: sourceColor,
+        sourceRadius: sourceRadius,
         builder: (_) => ReflectionEditorScreen(entry: entry),
       ),
     );
