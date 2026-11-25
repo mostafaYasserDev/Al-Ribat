@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-import 'package:al_ribat/core/theme/app_icons.dart';
 import 'package:al_ribat/domain/entities/activity_item.dart';
+import 'project_task_tile.dart';
 
-class GeneralTasksBottomCard extends StatelessWidget {
+class GeneralTasksBottomCard extends StatefulWidget {
   const GeneralTasksBottomCard({
     super.key,
     required this.tasks,
@@ -16,148 +17,142 @@ class GeneralTasksBottomCard extends StatelessWidget {
   final ValueChanged<ActivityItem> onOpenDetails;
 
   @override
+  State<GeneralTasksBottomCard> createState() => _GeneralTasksBottomCardState();
+}
+
+class _GeneralTasksBottomCardState extends State<GeneralTasksBottomCard> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    if (tasks.isEmpty) return const SizedBox.shrink();
+    if (widget.tasks.isEmpty) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
+    final cardColor = theme.cardTheme.color ??
+        (isDark ? const Color(0xFF111B2E) : Colors.white);
     final now = DateTime.now();
     final todayStr =
         "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-    final doneCount = tasks.where((a) {
+    final doneCount = widget.tasks.where((a) {
       return a.repetition == ActivityRepetition.once
           ? a.historyDates.isNotEmpty
           : a.isDoneOn(todayStr);
     }).length;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+    return RepaintBoundary(
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color:
+                colorScheme.onSurface.withValues(alpha: isDark ? 0.08 : 0.07),
+            width: 0.7,
+          ),
         ),
-      ),
-      child: Theme(
-        data: theme.copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: false,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-          leading: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child:
-                Icon(Icons.inbox_rounded, size: 20, color: colorScheme.primary),
-          ),
-          title: Text(
-            'مهام عامة (غير مرتبطة بمشروع)',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              fontSize: 13.5,
-            ),
-          ),
-          subtitle: Text(
-            '$doneCount من ${tasks.length} مهام مكتملة',
-            style: TextStyle(
-              fontSize: 11,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          children: tasks.map((act) {
-            final isDone = act.repetition == ActivityRepetition.once
-                ? act.historyDates.isNotEmpty
-                : act.isDoneOn(todayStr);
-            final iconColor =
-                AppIcons.parseColor(act.colorHex) ?? colorScheme.primary;
-
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              margin: const EdgeInsets.only(bottom: 6),
-              decoration: BoxDecoration(
-                color: isDone
-                    ? Colors.green.withValues(alpha: 0.08)
-                    : colorScheme.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isDone
-                      ? Colors.green.withValues(alpha: 0.35)
-                      : colorScheme.outlineVariant.withValues(alpha: 0.35),
-                ),
-              ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Material(
+              color: Colors.transparent,
               child: InkWell(
-                onTap: () => onOpenDetails(act),
-                borderRadius: BorderRadius.circular(14),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _expanded = !_expanded);
+                },
                 child: Padding(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   child: Row(
                     children: [
-                      InkWell(
-                        onTap: () => onToggleDone(act),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 250),
-                            transitionBuilder: (child, anim) =>
-                                ScaleTransition(scale: anim, child: child),
-                            child: Icon(
-                              isDone
-                                  ? Icons.check_circle_rounded
-                                  : Icons.radio_button_unchecked,
-                              key: ValueKey<bool>(isDone),
-                              color: isDone
-                                  ? Colors.green
-                                  : colorScheme.outline.withValues(alpha: 0.7),
-                              size: 21,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                       Container(
-                        width: 28,
-                        height: 28,
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
-                          color: iconColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(8),
+                          color: colorScheme.primary.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
-                          AppIcons.getIconData(act.iconName),
-                          size: 15,
-                          color: iconColor,
+                          Icons.inbox_rounded,
+                          size: 19,
+                          color: colorScheme.primary,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: Text(
-                          act.title,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            decoration:
-                                isDone ? TextDecoration.lineThrough : null,
-                            color: isDone
-                                ? colorScheme.onSurfaceVariant
-                                : colorScheme.onSurface,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'مهام عامة (غير مرتبطة بمشروع)',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13.5,
+                              ),
+                            ),
+                            Text(
+                              '$doneCount من ${widget.tasks.length} مهام مكتملة',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontSize: 11.5,
+                                color: colorScheme.onSurface
+                                    .withValues(alpha: 0.58),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      Icon(Icons.more_vert_rounded,
-                          size: 18,
-                          color: colorScheme.onSurfaceVariant
-                              .withValues(alpha: 0.6)),
+                      AnimatedRotation(
+                        turns: _expanded ? 0.5 : 0.0,
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOutCubic,
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: colorScheme.onSurface.withValues(alpha: 0.5),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-            );
-          }).toList(),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: _expanded
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Divider(
+                          height: 0.6,
+                          thickness: 0.6,
+                          color: colorScheme.onSurface.withValues(alpha: 0.08),
+                        ),
+                        for (var i = 0; i < widget.tasks.length; i++) ...[
+                          ProjectTaskTile(
+                            task: widget.tasks[i],
+                            onToggleDone: () =>
+                                widget.onToggleDone(widget.tasks[i]),
+                            onOpenDetails: () =>
+                                widget.onOpenDetails(widget.tasks[i]),
+                          ),
+                          if (i < widget.tasks.length - 1)
+                            Divider(
+                              height: 0.6,
+                              thickness: 0.6,
+                              indent: 52,
+                              color:
+                                  colorScheme.onSurface.withValues(alpha: 0.07),
+                            ),
+                        ],
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
         ),
       ),
     );

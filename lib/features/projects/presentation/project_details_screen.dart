@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:al_ribat/application/providers.dart';
@@ -22,17 +23,96 @@ class ProjectDetailsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
+  void _showProjectActionsSheet(String projectName) {
+    HapticFeedback.lightImpact();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final sheetBg = theme.cardTheme.color ??
+        (isDark ? const Color(0xFF111B2E) : Colors.white);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      useSafeArea: true,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Material(
+            color: sheetBg,
+            borderRadius: BorderRadius.circular(20),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                ListTile(
+                  leading: Icon(
+                    Icons.edit_outlined,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: const Text('تعديل اسم المشروع'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    ProjectDetailsDialogs.showRename(context, ref, projectName);
+                  },
+                ),
+                Divider(
+                  height: 0.6,
+                  thickness: 0.6,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.delete_outline_rounded,
+                    color: theme.colorScheme.error,
+                  ),
+                  title: Text(
+                    'حذف المشروع',
+                    style: TextStyle(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    ProjectDetailsDialogs.showDelete(context, ref, projectName);
+                  },
+                ),
+                const SizedBox(height: 6),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final acts =
         ref.watch(activitiesProvider).valueOrNull ?? const <ActivityItem>[];
     final all = ProjectAggregate.fromActivities(acts, Theme.of(context));
     final proj = all.where((p) => p.name == widget.projectName).firstOrNull;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     if (proj == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(widget.projectName)),
-        body: const Center(child: Text('المشروع غير موجود أو تم حذفه.')),
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          appBar: AppBar(title: Text(widget.projectName)),
+          body: const Center(child: Text('المشروع غير موجود أو تم حذفه.')),
+        ),
       );
     }
 
@@ -48,118 +128,155 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(proj.name),
-          actions: [
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert_rounded),
-              onSelected: (val) {
-                if (val == 'rename') {
-                  ProjectDetailsDialogs.showRename(context, ref, proj.name);
-                }
-                if (val == 'delete') {
-                  ProjectDetailsDialogs.showDelete(context, ref, proj.name);
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(
-                    value: 'rename', child: Text('تعديل اسم المشروع')),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child:
-                      Text('حذف المشروع', style: TextStyle(color: Colors.red)),
+        body: CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              backgroundColor: theme.scaffoldBackgroundColor,
+              title: Text(
+                proj.name,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
-          ],
-        ),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-          children: [
-            ProjectDetailsHeader(
-              project: proj,
-              onRename: () =>
-                  ProjectDetailsDialogs.showRename(context, ref, proj.name),
-              onDelete: () =>
-                  ProjectDetailsDialogs.showDelete(context, ref, proj.name),
-            ),
-            const SizedBox(height: 16),
-            if (groupMap.isEmpty) ...[
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest
-                      .withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .outlineVariant
-                        .withValues(alpha: 0.35),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Icon(Icons.folder_open_rounded,
-                        size: 40, color: proj.color.withValues(alpha: 0.6)),
-                    const SizedBox(height: 8),
-                    Text(
-                      'لا توجد جوانب أو مجموعات بعد في هذا المشروع',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
-                          ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'أضف أول جانب لتنظيم مهام المشروع بداخله',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: Theme.of(context).colorScheme.outline,
+              ),
+              actions: [
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 12),
+                  child: Material(
+                    color: isDark
+                        ? const Color(0xFF152036)
+                        : theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.7),
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => _showProjectActionsSheet(proj.name),
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Icon(
+                          Icons.more_horiz_rounded,
+                          size: 20,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.8),
+                        ),
                       ),
                     ),
+                  ),
+                ),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(0.6),
+                child: Container(
+                  height: 0.6,
+                  color: theme.colorScheme.onSurface
+                      .withValues(alpha: isDark ? 0.08 : 0.06),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 40),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  ProjectDetailsHeader(
+                    project: proj,
+                    onRename: () => ProjectDetailsDialogs.showRename(
+                        context, ref, proj.name),
+                    onDelete: () => ProjectDetailsDialogs.showDelete(
+                        context, ref, proj.name),
+                  ),
+                  const SizedBox(height: 16),
+                  if (groupMap.isEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 26,
+                        horizontal: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.cardTheme.color ??
+                            (isDark ? const Color(0xFF111B2E) : Colors.white),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: isDark ? 0.08 : 0.07),
+                          width: 0.7,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              color: proj.color.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.folder_open_rounded,
+                              size: 28,
+                              color: proj.color,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'لا توجد جوانب أو مجموعات بعد في هذا المشروع',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'أضف أول جانب لتنظيم مهام المشروع بداخله',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                   ],
-                ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            ...groupMap.entries.map((e) {
-              final desc = savedGroups
-                  .where((g) => g.name == e.key)
-                  .firstOrNull
-                  ?.description;
+                  ...groupMap.entries.map((e) {
+                    final desc = savedGroups
+                        .where((g) => g.name == e.key)
+                        .firstOrNull
+                        ?.description;
 
-              return ProjectGroupAccordion(
-                groupName: e.key,
-                description: desc,
-                tasks: e.value,
-                color: proj.color,
-                onToggleDone: (t) =>
-                    ProjectTaskActions.toggleDone(context, ref, t),
-                onOpenDetails: (t) =>
-                    ProjectTaskActions.openDetails(context, ref, t),
-                onAddTask: () => _openAddTaskSheet(proj.name, e.key),
-              );
-            }),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: () => ProjectDetailsDialogs.showAddGroup(
-                context,
-                proj.name,
-                () => setState(() {}),
-              ),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('إضافة مجموعة / جانب جديد'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
+                    return ProjectGroupAccordion(
+                      groupName: e.key,
+                      description: desc,
+                      tasks: e.value,
+                      color: proj.color,
+                      onToggleDone: (t) =>
+                          ProjectTaskActions.toggleDone(context, ref, t),
+                      onOpenDetails: (t) =>
+                          ProjectTaskActions.openDetails(context, ref, t),
+                      onAddTask: () => _openAddTaskSheet(proj.name, e.key),
+                    );
+                  }),
+                  const SizedBox(height: 6),
+                  FilledButton.tonalIcon(
+                    onPressed: () => ProjectDetailsDialogs.showAddGroup(
+                      context,
+                      proj.name,
+                      () => setState(() {}),
+                    ),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('إضافة مجموعة / جانب جديد'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ]),
               ),
             ),
           ],

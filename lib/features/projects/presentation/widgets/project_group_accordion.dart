@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:al_ribat/domain/entities/activity_item.dart';
 import 'project_task_tile.dart';
 
-class ProjectGroupAccordion extends StatelessWidget {
+class ProjectGroupAccordion extends StatefulWidget {
   const ProjectGroupAccordion({
     super.key,
     required this.groupName,
@@ -24,109 +25,222 @@ class ProjectGroupAccordion extends StatelessWidget {
   final VoidCallback onAddTask;
 
   @override
+  State<ProjectGroupAccordion> createState() => _ProjectGroupAccordionState();
+}
+
+class _ProjectGroupAccordionState extends State<ProjectGroupAccordion> {
+  bool _expanded = true;
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
-    final doneCount = tasks.where((a) => a.historyDates.isNotEmpty).length;
-    final isAllDone = tasks.isNotEmpty && doneCount == tasks.length;
+    final cardColor = theme.cardTheme.color ??
+        (isDark ? const Color(0xFF111B2E) : Colors.white);
+    final doneCount =
+        widget.tasks.where((a) => a.historyDates.isNotEmpty).length;
+    final isAllDone =
+        widget.tasks.isNotEmpty && doneCount == widget.tasks.length;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.22), width: 1.1),
-      ),
-      child: Theme(
-        data: theme.copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          initiallyExpanded: true,
-          tilePadding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
-          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          leading: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.bookmark_rounded, size: 18, color: color),
+    return RepaintBoundary(
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color:
+                colorScheme.onSurface.withValues(alpha: isDark ? 0.08 : 0.07),
+            width: 0.7,
           ),
-          title: Text(
-            groupName,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              fontSize: 14.5,
-            ),
-          ),
-          subtitle: description != null && description!.isNotEmpty
-              ? Text(
-                  description!,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                )
-              : null,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isAllDone
-                      ? Colors.green.withValues(alpha: 0.12)
-                      : colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  tasks.isEmpty ? 'فارغة' : '$doneCount/${tasks.length}',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.bold,
-                    color: isAllDone
-                        ? Colors.green.shade700
-                        : colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
-                tooltip: 'إضافة مهمة',
-                onPressed: onAddTask,
-                color: color,
-              ),
-            ],
-          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (tasks.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: TextButton.icon(
-                  onPressed: onAddTask,
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('أضف أول مهمة في هذا الجانب'),
-                ),
-              )
-            else ...[
-              ...tasks.map(
-                (task) => ProjectTaskTile(
-                  task: task,
-                  onToggleDone: () => onToggleDone(task),
-                  onOpenDetails: () => onOpenDetails(task),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _expanded = !_expanded);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 12, 14, 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: widget.color.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Icon(
+                          Icons.bookmark_rounded,
+                          size: 17,
+                          color: widget.color,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.groupName,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14.5,
+                              ),
+                            ),
+                            if (widget.description != null &&
+                                widget.description!.isNotEmpty)
+                              Text(
+                                widget.description!,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 11.5,
+                                  color: colorScheme.onSurface
+                                      .withValues(alpha: 0.58),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isAllDone
+                              ? const Color(0xFF34C759).withValues(alpha: 0.14)
+                              : colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.65),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          widget.tasks.isEmpty
+                              ? 'فارغة'
+                              : '$doneCount/${widget.tasks.length}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: isAllDone
+                                ? const Color(0xFF34C759)
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.add_circle_outline_rounded,
+                          size: 20,
+                        ),
+                        tooltip: 'إضافة مهمة',
+                        onPressed: () {
+                          HapticFeedback.lightImpact();
+                          widget.onAddTask();
+                        },
+                        color: widget.color,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      AnimatedRotation(
+                        turns: _expanded ? 0.5 : 0.0,
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOutCubic,
+                        child: Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 20,
+                          color: colorScheme.onSurface.withValues(alpha: 0.45),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
-              OutlinedButton.icon(
-                onPressed: onAddTask,
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('إضافة مهمة جديدة'),
-                style: OutlinedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  side: BorderSide(color: color.withValues(alpha: 0.3)),
-                ),
-              ),
-            ],
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: _expanded
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Divider(
+                          height: 0.6,
+                          thickness: 0.6,
+                          color: colorScheme.onSurface.withValues(alpha: 0.08),
+                        ),
+                        if (widget.tasks.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: TextButton.icon(
+                              onPressed: widget.onAddTask,
+                              icon: const Icon(Icons.add_rounded, size: 17),
+                              label: const Text('أضف أول مهمة في هذا الجانب'),
+                            ),
+                          )
+                        else ...[
+                          for (var i = 0; i < widget.tasks.length; i++) ...[
+                            ProjectTaskTile(
+                              task: widget.tasks[i],
+                              onToggleDone: () =>
+                                  widget.onToggleDone(widget.tasks[i]),
+                              onOpenDetails: () =>
+                                  widget.onOpenDetails(widget.tasks[i]),
+                            ),
+                            if (i < widget.tasks.length - 1)
+                              Divider(
+                                height: 0.6,
+                                thickness: 0.6,
+                                indent: 52,
+                                color: colorScheme.onSurface
+                                    .withValues(alpha: 0.07),
+                              ),
+                          ],
+                          Divider(
+                            height: 0.6,
+                            thickness: 0.6,
+                            color:
+                                colorScheme.onSurface.withValues(alpha: 0.07),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              widget.onAddTask();
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.add_rounded,
+                                    size: 17,
+                                    color: widget.color,
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(
+                                    'إضافة مهمة جديدة',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: widget.color,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    )
+                  : const SizedBox.shrink(),
+            ),
           ],
         ),
       ),

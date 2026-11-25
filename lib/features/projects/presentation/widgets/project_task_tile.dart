@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:al_ribat/core/theme/app_icons.dart';
 import 'package:al_ribat/domain/entities/activity_item.dart';
@@ -27,45 +28,37 @@ class ProjectTaskTile extends StatelessWidget {
         : task.isDoneOn(todayStr);
     final iconColor = AppIcons.parseColor(task.colorHex) ?? colorScheme.primary;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      margin: const EdgeInsets.only(bottom: 6),
-      decoration: BoxDecoration(
-        color:
-            isDone ? Colors.green.withValues(alpha: 0.08) : colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDone
-              ? Colors.green.withValues(alpha: 0.35)
-              : colorScheme.outlineVariant.withValues(alpha: 0.35),
-        ),
-      ),
+    return Material(
+      color: isDone
+          ? const Color(0xFF34C759).withValues(alpha: 0.05)
+          : Colors.transparent,
       child: InkWell(
         onTap: onOpenDetails,
-        borderRadius: BorderRadius.circular(14),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               InkWell(
-                onTap: onToggleDone,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onToggleDone();
+                },
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
                   padding: const EdgeInsets.all(4),
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
+                    duration: const Duration(milliseconds: 220),
                     transitionBuilder: (child, anim) =>
                         ScaleTransition(scale: anim, child: child),
                     child: Icon(
                       isDone
                           ? Icons.check_circle_rounded
-                          : Icons.radio_button_unchecked,
+                          : Icons.radio_button_unchecked_rounded,
                       key: ValueKey<bool>(isDone),
                       color: isDone
-                          ? Colors.green
+                          ? const Color(0xFF34C759)
                           : colorScheme.outline.withValues(alpha: 0.7),
-                      size: 21,
+                      size: 22,
                     ),
                   ),
                 ),
@@ -87,14 +80,14 @@ class ProjectTaskTile extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 250),
+                  duration: const Duration(milliseconds: 200),
                   style: TextStyle(
                     fontFamily: theme.textTheme.bodyMedium?.fontFamily,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
                     decoration: isDone ? TextDecoration.lineThrough : null,
                     color: isDone
-                        ? colorScheme.onSurfaceVariant
+                        ? colorScheme.onSurface.withValues(alpha: 0.5)
                         : colorScheme.onSurface,
                   ),
                   child: Text(task.title),
@@ -106,22 +99,24 @@ class ProjectTaskTile extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
                     color: colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     '${task.getProgressOn(todayStr).toInt()}/${task.targetGoal?.toInt() ?? 1} ${task.goalUnit ?? ""}',
                     style: TextStyle(
                       fontSize: 10.5,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
                       color: colorScheme.primary,
                     ),
                   ),
                 ),
                 const SizedBox(width: 4),
               ],
-              Icon(Icons.more_vert_rounded,
-                  size: 18,
-                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
+              Icon(
+                Icons.chevron_left_rounded,
+                size: 18,
+                color: colorScheme.onSurface.withValues(alpha: 0.35),
+              ),
             ],
           ),
         ),
