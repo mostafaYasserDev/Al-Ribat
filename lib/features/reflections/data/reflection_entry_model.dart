@@ -31,6 +31,9 @@ class ReflectionEntryModel extends ReflectionEntry {
     required super.id,
     required super.text,
     required super.createdAt,
+    super.title,
+    super.isPinned,
+    super.colorKey,
     super.mood,
     super.prayerPhaseName,
     super.linkedContextTitle,
@@ -40,8 +43,11 @@ class ReflectionEntryModel extends ReflectionEntry {
   factory ReflectionEntryModel.fromEntity(ReflectionEntry entry) {
     return ReflectionEntryModel(
       id: entry.id,
+      title: entry.title,
       text: entry.text,
       createdAt: entry.createdAt,
+      isPinned: entry.isPinned,
+      colorKey: entry.colorKey,
       mood: entry.mood,
       prayerPhaseName: entry.prayerPhaseName,
       linkedContextTitle: entry.linkedContextTitle,
@@ -53,8 +59,11 @@ class ReflectionEntryModel extends ReflectionEntry {
     final json = jsonDecode(source) as Map<String, dynamic>;
     return ReflectionEntryModel(
       id: json['id'] as String,
+      title: json['title'] as String?,
       text: json['text'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      isPinned: json['isPinned'] as bool? ?? false,
+      colorKey: json['colorKey'] as String?,
       mood: json['mood'] as String?,
       prayerPhaseName: json['prayerPhaseName'] as String?,
       linkedContextTitle: json['linkedContextTitle'] as String?,
@@ -69,8 +78,11 @@ class ReflectionEntryModel extends ReflectionEntry {
   String toJson() {
     return jsonEncode({
       'id': id,
+      if (title != null) 'title': title,
       'text': text,
       'createdAt': createdAt.toIso8601String(),
+      if (isPinned) 'isPinned': true,
+      if (colorKey != null) 'colorKey': colorKey,
       'mood': mood,
       if (prayerPhaseName != null) 'prayerPhaseName': prayerPhaseName,
       if (linkedContextTitle != null) 'linkedContextTitle': linkedContextTitle,

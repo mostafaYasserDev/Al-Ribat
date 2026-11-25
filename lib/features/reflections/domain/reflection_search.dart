@@ -40,6 +40,7 @@ abstract final class ReflectionSearch {
     } catch (_) {}
 
     final haystack = normalizeArabic([
+      entry.title ?? '',
       entry.text,
       entry.mood ?? '',
       entry.prayerPhaseName ?? '',

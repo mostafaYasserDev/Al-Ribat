@@ -133,5 +133,24 @@ void main() {
       // Non-matching word
       expect(ReflectionSearch.matches(entry, 'العصر الفجر'), isFalse);
     });
+
+    test('ReflectionEntryModel & Search support title, isPinned, and colorKey',
+        () {
+      final created = DateTime(2026, 11, 25, 17, 0);
+      final model = ReflectionEntryModel(
+        id: '400',
+        title: 'فائدة من سورة الكهف',
+        text: 'أهمية الصحبة الصالحة والثبات',
+        createdAt: created,
+        isPinned: true,
+        colorKey: 'sage',
+      );
+
+      final restored = ReflectionEntryModel.fromJson(model.toJson());
+      expect(restored.title, 'فائدة من سورة الكهف');
+      expect(restored.isPinned, isTrue);
+      expect(restored.colorKey, 'sage');
+      expect(ReflectionSearch.matches(restored, 'سوره الكهف'), isTrue);
+    });
   });
 }
