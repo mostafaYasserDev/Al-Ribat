@@ -3,15 +3,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../application/providers.dart';
-import '../../../core/theme/app_moods.dart';
 import '../../../core/ui/error_view.dart';
 import '../../../core/ui_feedback.dart';
 import '../../prayer/domain/prayer_phase.dart';
 import '../domain/reflection_entry.dart';
+import '../domain/reflection_search.dart';
 import 'widgets/add_reflection_sheet.dart';
 import 'widgets/reflection_dialogs.dart';
 import 'widgets/reflection_entry_card.dart';
-import 'widgets/reflection_mood_summary.dart';
 
 class ReflectionHistoryScreen extends ConsumerStatefulWidget {
   const ReflectionHistoryScreen({super.key});
@@ -25,7 +24,6 @@ class _ReflectionHistoryScreenState
     extends ConsumerState<ReflectionHistoryScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  String? _filterMood;
 
   @override
   void dispose() {
@@ -51,7 +49,7 @@ class _ReflectionHistoryScreenState
               );
           if (ctx.mounted) {
             lightSuccessHaptic();
-            appSnack(ctx, 'حُفظ التأمل مع التاريخ والرباط.');
+            appSnack(ctx, 'حُفظ التأمل بنجاح.');
           }
         },
       ),
@@ -95,14 +93,6 @@ class _ReflectionHistoryScreenState
     }
   }
 
-  bool _matchesQuery(ReflectionEntry entry, String query) {
-    final q = query.toLowerCase();
-    return entry.text.toLowerCase().contains(q) ||
-        (entry.mood?.toLowerCase().contains(q) ?? false) ||
-        (entry.prayerPhaseName?.toLowerCase().contains(q) ?? false) ||
-        (entry.linkedContextTitle?.toLowerCase().contains(q) ?? false);
-  }
-
   String _groupLabel(DateTime createdAt, DateTime now) {
     final today = DateTime(now.year, now.month, now.day);
     final entryDay = DateTime(createdAt.year, createdAt.month, createdAt.day);
@@ -121,7 +111,12 @@ class _ReflectionHistoryScreenState
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(title: const Text('الحالات المزاجية والتأملات')),
+        appBar: AppBar(
+          title: const Text(
+            'التأملات والخواطر',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
         floatingActionButton: FloatingActionButton.extended(
           heroTag: 'reflections_fab',
           onPressed: _showAddSheet,
@@ -177,15 +172,11 @@ class _ReflectionHistoryScreenState
       );
     }
 
-    final filtered = entries.where((e) {
-      if (_searchQuery.isNotEmpty && !_matchesQuery(e, _searchQuery)) {
-        return false;
-      }
-      if (_filterMood != null && e.mood != _filterMood) {
-        return false;
-      }
-      return true;
-    }).toList();
+    final filtered = _searchQuery.isEmpty
+        ? entries
+        : entries
+            .where((e) => ReflectionSearch.matches(e, _searchQuery))
+            .toList();
 
     final now = DateTime.now();
     final groupedItems = <Object>[];
@@ -201,8 +192,7 @@ class _ReflectionHistoryScreenState
 
     return Column(
       children: [
-        ReflectionMoodSummary(entries: entries),
-        _buildFilters(),
+        _buildSmartSearchBar(filtered.length),
         Expanded(
           child: filtered.isEmpty
               ? Center(
@@ -220,22 +210,38 @@ class _ReflectionHistoryScreenState
                     final item = groupedItems[index];
                     if (item is String) {
                       return Padding(
-                        padding: const EdgeInsets.only(top: 12, bottom: 6),
-                        child: Text(
-                          item,
-                          style:
-                              Theme.of(context).textTheme.labelLarge?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                        padding: const EdgeInsets.only(top: 14, bottom: 8),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .primary
+                                    .withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                item,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelMedium
+                                    ?.copyWith(
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                            ),
+                          ],
                         ),
                       );
                     }
                     final entry = item as ReflectionEntry;
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.only(bottom: 10),
                       child: ReflectionEntryCard(
                         entry: entry,
                         onEdit: () => _showEditSheet(entry),
@@ -257,66 +263,63 @@ class _ReflectionHistoryScreenState
     );
   }
 
-  Widget _buildFilters() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-          child: TextField(
+  Widget _buildSmartSearchBar(int matchCount) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
             controller: _searchController,
             decoration: InputDecoration(
-              hintText: 'بحث في التأملات، المزاج، أو المشاريع...',
-              prefixIcon: const Icon(Icons.search, size: 20),
+              hintText: 'ابحث في الخواطر، المشاريع، الصلاة، أو الشعور…',
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, size: 18),
+                      icon: const Icon(Icons.clear_rounded, size: 18),
                       onPressed: () {
                         _searchController.clear();
                         setState(() => _searchQuery = '');
                       },
                     )
                   : null,
+              filled: true,
+              fillColor: colorScheme.surfaceContainerLow,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+                ),
+              ),
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
+                horizontal: 14,
+                vertical: 12,
               ),
             ),
             onChanged: (value) => setState(() => _searchQuery = value.trim()),
           ),
-        ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          child: Row(
-            children: [
-              ChoiceChip(
-                label: const Text('الكل'),
-                selected: _filterMood == null,
-                onSelected: (sel) {
-                  if (sel) setState(() => _filterMood = null);
-                },
+          if (_searchQuery.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, right: 4),
+              child: Text(
+                'نتائج البحث: $matchCount',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              const SizedBox(width: 6),
-              ...AppMoods.options.map((opt) {
-                final isSel = _filterMood == opt.label;
-                return Padding(
-                  padding: const EdgeInsets.only(left: 6),
-                  child: ChoiceChip(
-                    avatar: Icon(opt.icon,
-                        size: 16, color: isSel ? null : opt.color),
-                    label: Text(opt.label),
-                    selected: isSel,
-                    onSelected: (sel) {
-                      setState(() => _filterMood = sel ? opt.label : null);
-                    },
-                  ),
-                );
-              }),
-            ],
-          ),
-        ),
-      ],
+            ),
+        ],
+      ),
     );
   }
 }

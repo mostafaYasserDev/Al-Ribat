@@ -112,5 +112,26 @@ void main() {
       expect(restored.prayerPhaseName, 'المغرب');
       expect(restored.linkedContextTitle, 'مشروع: حفظ القرآن');
     });
+
+    test('ReflectionSearch normalizes Arabic and matches multi-word queries',
+        () {
+      final entry = ReflectionEntry(
+        id: '300',
+        text: 'تأمل جميل في قراءة القرآن الكريم',
+        createdAt: DateTime(2026, 11, 25, 16, 0),
+        mood: 'هادئ',
+        prayerPhaseName: 'العصر',
+        linkedContextTitle: 'مشروع: ختمة القرآن',
+      );
+
+      // Alef & diacritic normalization
+      expect(ReflectionSearch.matches(entry, 'تامل'), isTrue);
+      expect(ReflectionSearch.matches(entry, 'قراءه'), isTrue);
+      // Multi-word AND across prayer + project + mood
+      expect(ReflectionSearch.matches(entry, 'العصر هادئ'), isTrue);
+      expect(ReflectionSearch.matches(entry, 'ختمه القران'), isTrue);
+      // Non-matching word
+      expect(ReflectionSearch.matches(entry, 'العصر الفجر'), isFalse);
+    });
   });
 }
