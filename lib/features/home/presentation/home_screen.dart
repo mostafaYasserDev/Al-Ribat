@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -230,18 +229,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 6),
-              child: _HomeHeaderPillButton(
-                icon: Icons.insights_rounded,
-                tooltip: 'الإحصائيات',
-                color: const Color(0xFF007AFF),
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).push(
-                    CupertinoPageRoute<void>(
-                      builder: (_) => const StatsScreen(),
-                    ),
-                  );
-                },
+              child: Builder(
+                builder: (statsBtnCtx) => _HomeHeaderPillButton(
+                  icon: Icons.insights_rounded,
+                  tooltip: 'الإحصائيات',
+                  color: const Color(0xFF007AFF),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    StatsScreen.open(
+                      context,
+                      sourceContext: statsBtnCtx,
+                      sourceColor: isDark
+                          ? const Color(0xFF152036)
+                          : const Color(0xFF007AFF).withValues(alpha: 0.14),
+                    );
+                  },
+                ),
               ),
             ),
             Padding(

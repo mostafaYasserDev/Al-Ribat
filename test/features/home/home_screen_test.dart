@@ -12,6 +12,7 @@ import 'package:al_ribat/domain/repositories/activity_repository.dart';
 import 'package:al_ribat/features/home/presentation/home_screen.dart';
 import 'package:al_ribat/features/home/presentation/widgets/home_date_pill.dart';
 import 'package:al_ribat/features/home/presentation/widgets/home_prayer_hero_card.dart';
+import 'package:al_ribat/presentation/stats/stats_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -213,5 +214,38 @@ void main() {
 
     expect(formatArabicTime(const TimeOfDay(hour: 0, minute: 47)), '12:47 ص');
     expect(formatArabicTime(const TimeOfDay(hour: 20, minute: 30)), '8:30 م');
+  });
+
+  testWidgets(
+      'StatsScreen opens via AppleMorphRoute and ? button opens help popover',
+      (tester) async {
+    await tester.pumpWidget(buildTestApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.insights_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('الإحصائيات'), findsOneWidget);
+    expect(find.text('معدل الالتزام الأسبوعي'), findsOneWidget);
+    expect(find.text('نبض الأسبوع'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.help_outline_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('دليل قراءة الإحصائيات'), findsOneWidget);
+    expect(find.text('حلقة الالتزام الأسبوعي'), findsOneWidget);
+
+    // Close help popover and scroll down to Prayer Distribution
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('توزيع الإنجاز حسب الصلوات'),
+      200,
+      scrollable: find.descendant(
+        of: find.byType(StatsScreen),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    expect(find.text('توزيع الإنجاز حسب الصلوات'), findsOneWidget);
   });
 }

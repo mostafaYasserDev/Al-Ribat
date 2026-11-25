@@ -8,11 +8,15 @@ class StatsSnapshot {
     required this.reflectionsThisMonth,
     required this.workSessionsThisWeek,
     required this.focusMinutesThisWeek,
-    required this.habitsMarkedThisWeek,
+    this.habitsMarkedThisWeek = 0,
     required this.feedbackLine,
     this.mostProductivePhase,
     this.mostSkippedActivity,
     this.completionRateThisWeek = 0.0,
+    this.weeklyDailyCounts = const [0, 0, 0, 0, 0, 0, 0],
+    this.independentCompleted = 0,
+    this.totalDueThisWeek = 0,
+    this.totalDoneThisWeek = 0,
   });
 
   final int weeklyCompleted;
@@ -26,4 +30,10 @@ class StatsSnapshot {
   final PrayerPhase? mostProductivePhase;
   final String? mostSkippedActivity;
   final double completionRateThisWeek;
+
+  /// Completed activities per day from Saturday (index 0) to Friday (index 6).
+  final List<int> weeklyDailyCounts;
+  final int independentCompleted;
+  final int totalDueThisWeek;
+  final int totalDoneThisWeek;
 }

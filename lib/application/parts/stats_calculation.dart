@@ -9,22 +9,23 @@ StatsSnapshot _buildStatsSnapshot(Ref ref) {
       ref.watch(workSessionsProvider).valueOrNull ?? const <WorkSessionItem>[];
 
   final now = DateTime.now();
-  final weekStart = weekStartSaturday(now);
+  final today = DateTime(now.year, now.month, now.day);
+  final weekStart = weekStartSaturday(today);
   final monthStart = DateTime(now.year, now.month, 1);
 
-  // Count how many activities are done within the last week
   int weekly = 0;
   int monthly = 0;
+  int independentCompleted = 0;
   final byPhase = <PrayerPhase, int>{
     for (final p in PrayerPhase.values) p: 0,
   };
+  final weeklyDailyCounts = List<int>.filled(7, 0);
 
   final skipsByActivity = <String, int>{};
   int totalDueThisWeek = 0;
   int totalDoneThisWeek = 0;
 
   for (final act in activities) {
-    // Calculate skipped and done for this week
     int actSkips = 0;
     for (final history in act.history) {
       final historyDate = DateTime.tryParse(history.date);
@@ -35,13 +36,16 @@ StatsSnapshot _buildStatsSnapshot(Ref ref) {
         historyDate.day,
       );
 
-      if (!normalizedHistory.isBefore(weekStart)) {
-        totalDueThisWeek++;
+      if (!normalizedHistory.isBefore(weekStart) &&
+          !normalizedHistory.isAfter(today)) {
         if (history.isSkipped) {
           actSkips++;
         } else {
           weekly++;
-          totalDoneThisWeek++;
+          final dayIndex = normalizedHistory.difference(weekStart).inDays;
+          if (dayIndex >= 0 && dayIndex < 7) {
+            weeklyDailyCounts[dayIndex]++;
+          }
         }
       }
 
@@ -49,10 +53,28 @@ StatsSnapshot _buildStatsSnapshot(Ref ref) {
         monthly++;
       }
 
-      if (!history.isSkipped && act.linkedPrayer != null) {
-        byPhase[act.linkedPrayer!] = (byPhase[act.linkedPrayer!] ?? 0) + 1;
+      if (!history.isSkipped) {
+        if (act.linkedPrayer != null) {
+          byPhase[act.linkedPrayer!] = (byPhase[act.linkedPrayer!] ?? 0) + 1;
+        } else {
+          independentCompleted++;
+        }
       }
     }
+
+    // Accurate weekly commitment: compare due days from Saturday..today vs done
+    for (var d = weekStart;
+        !d.isAfter(today);
+        d = d.add(const Duration(days: 1))) {
+      if (!activityVisibleOnDate(act, d)) continue;
+      final dateStr = DateFormat('yyyy-MM-dd').format(d);
+      if (act.isSkippedOn(dateStr)) continue;
+      totalDueThisWeek++;
+      if (act.isDoneOn(dateStr)) {
+        totalDoneThisWeek++;
+      }
+    }
+
     if (actSkips > 0) {
       skipsByActivity[act.title] = actSkips;
     }
@@ -61,8 +83,9 @@ StatsSnapshot _buildStatsSnapshot(Ref ref) {
   final productivePhase = _mostProductivePhase(byPhase);
   final mostSkipped = _mostSkippedActivity(skipsByActivity);
 
-  final completionRateThisWeek =
-      totalDueThisWeek == 0 ? 0.0 : totalDoneThisWeek / totalDueThisWeek;
+  final completionRateThisWeek = totalDueThisWeek == 0
+      ? 0.0
+      : (totalDoneThisWeek / totalDueThisWeek).clamp(0.0, 1.0);
 
   final reflectionsThisMonth =
       reflections.where((e) => !e.createdAt.isBefore(monthStart)).length;
@@ -80,7 +103,7 @@ StatsSnapshot _buildStatsSnapshot(Ref ref) {
     reflectionsThisMonth: reflectionsThisMonth,
     workSessionsThisWeek: workSessionsThisWeek,
     focusMinutesThisWeek: focusMinutesThisWeek,
-    habitsMarkedThisWeek: weekly, // Merged
+    habitsMarkedThisWeek: weekly,
     feedbackLine: _statsFeedback(
       activitiesWeek: weekly,
       focusMin: focusMinutesThisWeek,
@@ -88,5 +111,9 @@ StatsSnapshot _buildStatsSnapshot(Ref ref) {
     mostProductivePhase: productivePhase,
     mostSkippedActivity: mostSkipped,
     completionRateThisWeek: completionRateThisWeek,
+    weeklyDailyCounts: weeklyDailyCounts,
+    independentCompleted: independentCompleted,
+    totalDueThisWeek: totalDueThisWeek,
+    totalDoneThisWeek: totalDoneThisWeek,
   );
 }
