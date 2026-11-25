@@ -113,9 +113,9 @@ class ProjectTaskTile extends StatelessWidget {
                 const SizedBox(width: 4),
               ],
               Icon(
-                Icons.chevron_left_rounded,
-                size: 18,
-                color: colorScheme.onSurface.withValues(alpha: 0.35),
+                Icons.more_horiz_rounded,
+                size: 19,
+                color: colorScheme.onSurface.withValues(alpha: 0.45),
               ),
             ],
           ),

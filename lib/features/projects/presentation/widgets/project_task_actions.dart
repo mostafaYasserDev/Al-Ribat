@@ -6,8 +6,8 @@ import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/core/ui_feedback.dart';
 import 'package:al_ribat/domain/entities/activity_item.dart';
 import 'package:al_ribat/presentation/widgets/activity_add_progress_sheet.dart';
-import 'package:al_ribat/presentation/widgets/activity_details_sheet.dart';
 import 'package:al_ribat/presentation/widgets/add_activity_sheet.dart';
+import 'project_task_details_dialog.dart';
 
 class ProjectTaskActions {
   static Future<void> toggleDone(
@@ -46,51 +46,42 @@ class ProjectTaskActions {
     final d =
         "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => ActivityDetailsSheet(
-        activity: act,
-        dateStr: d,
-        onToggleDone: () async {
-          Navigator.pop(ctx);
-          await toggleDone(context, ref, act);
-        },
-        onToggleSkip: () async {
-          Navigator.pop(ctx);
-          await ref.read(activitiesProvider.notifier).toggleSkip(act, d);
-        },
-        onEdit: () {
-          Navigator.pop(ctx);
-          editActivity(context, ref, act);
-        },
-        onDelete: () async {
-          Navigator.pop(ctx);
-          await ref.read(activitiesProvider.notifier).deleteActivity(act.id);
-          if (context.mounted) appSnack(context, 'تم حذف المهمة.');
-        },
-        onAddProgress: () {
-          Navigator.pop(ctx);
-          ActivityAddProgressSheet.show(
-            context,
-            activity: act,
-            dateStr: d,
-            onAdd: (val) async {
-              await ref
-                  .read(activitiesProvider.notifier)
-                  .addProgress(act, d, val);
-              if (context.mounted) {
-                appSnack(context,
-                    'تمت إضافة $val ${act.goalUnit ?? ""} إلى "${act.title}"');
-              }
-            },
-          );
-        },
-      ),
+    showProjectTaskDetailsDialog(
+      context,
+      activity: act,
+      dateStr: d,
+      onToggleDone: () async {
+        Navigator.pop(context);
+        await toggleDone(context, ref, act);
+      },
+      onEdit: () {
+        Navigator.pop(context);
+        editActivity(context, ref, act);
+      },
+      onDelete: () async {
+        Navigator.pop(context);
+        await ref.read(activitiesProvider.notifier).deleteActivity(act.id);
+        if (context.mounted) appSnack(context, 'تم حذف المهمة.');
+      },
+      onAddProgress: () {
+        Navigator.pop(context);
+        ActivityAddProgressSheet.show(
+          context,
+          activity: act,
+          dateStr: d,
+          onAdd: (val) async {
+            await ref
+                .read(activitiesProvider.notifier)
+                .addProgress(act, d, val);
+            if (context.mounted) {
+              appSnack(
+                context,
+                'تمت إضافة $val ${act.goalUnit ?? ""} إلى "${act.title}"',
+              );
+            }
+          },
+        );
+      },
     );
   }
 

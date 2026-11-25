@@ -23,80 +23,6 @@ class ProjectDetailsScreen extends ConsumerStatefulWidget {
 }
 
 class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
-  void _showProjectActionsSheet(String projectName) {
-    HapticFeedback.lightImpact();
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final sheetBg = theme.cardTheme.color ??
-        (isDark ? const Color(0xFF111B2E) : Colors.white);
-
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      useSafeArea: true,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: Material(
-            color: sheetBg,
-            borderRadius: BorderRadius.circular(20),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 10),
-                Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                ListTile(
-                  leading: Icon(
-                    Icons.edit_outlined,
-                    color: theme.colorScheme.primary,
-                  ),
-                  title: const Text('تعديل اسم المشروع'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    ProjectDetailsDialogs.showRename(context, ref, projectName);
-                  },
-                ),
-                Divider(
-                  height: 0.6,
-                  thickness: 0.6,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
-                ),
-                ListTile(
-                  leading: Icon(
-                    Icons.delete_outline_rounded,
-                    color: theme.colorScheme.error,
-                  ),
-                  title: Text(
-                    'حذف المشروع',
-                    style: TextStyle(
-                      color: theme.colorScheme.error,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    ProjectDetailsDialogs.showDelete(context, ref, projectName);
-                  },
-                ),
-                const SizedBox(height: 6),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final acts =
@@ -105,6 +31,8 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
     final proj = all.where((p) => p.name == widget.projectName).firstOrNull;
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final cardColor = theme.cardTheme.color ??
+        (isDark ? const Color(0xFF111B2E) : Colors.white);
 
     if (proj == null) {
       return Directionality(
@@ -147,23 +75,94 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
               actions: [
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: 12),
-                  child: Material(
-                    color: isDark
-                        ? const Color(0xFF152036)
-                        : theme.colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(12),
-                      onTap: () => _showProjectActionsSheet(proj.name),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Icon(
-                          Icons.more_horiz_rounded,
-                          size: 20,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.8),
+                  child: PopupMenuButton<String>(
+                    tooltip: 'خيارات المشروع',
+                    offset: const Offset(0, 44),
+                    elevation: 8,
+                    color: cardColor,
+                    surfaceTintColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: isDark ? 0.1 : 0.07),
+                        width: 0.7,
+                      ),
+                    ),
+                    onSelected: (val) {
+                      HapticFeedback.selectionClick();
+                      if (val == 'rename') {
+                        ProjectDetailsDialogs.showRename(
+                            context, ref, proj.name);
+                      } else if (val == 'delete') {
+                        ProjectDetailsDialogs.showDelete(
+                            context, ref, proj.name);
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      PopupMenuItem<String>(
+                        value: 'rename',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.edit_outlined,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            const Flexible(
+                              child: Text(
+                                'تعديل اسم المشروع',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      const PopupMenuDivider(height: 1),
+                      PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.delete_outline_rounded,
+                              size: 18,
+                              color: theme.colorScheme.error,
+                            ),
+                            const SizedBox(width: 10),
+                            Flexible(
+                              child: Text(
+                                'حذف المشروع',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: theme.colorScheme.error,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF152036)
+                            : theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.more_horiz_rounded,
+                        size: 20,
+                        color:
+                            theme.colorScheme.onSurface.withValues(alpha: 0.8),
                       ),
                     ),
                   ),
@@ -197,8 +196,7 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
                         horizontal: 16,
                       ),
                       decoration: BoxDecoration(
-                        color: theme.cardTheme.color ??
-                            (isDark ? const Color(0xFF111B2E) : Colors.white),
+                        color: cardColor,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
                           color: theme.colorScheme.onSurface
@@ -260,20 +258,13 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
                       onAddTask: () => _openAddTaskSheet(proj.name, e.key),
                     );
                   }),
-                  const SizedBox(height: 6),
-                  FilledButton.tonalIcon(
-                    onPressed: () => ProjectDetailsDialogs.showAddGroup(
+                  const SizedBox(height: 4),
+                  _AddGroupActionCard(
+                    accentColor: proj.color,
+                    onTap: () => ProjectDetailsDialogs.showAddGroup(
                       context,
                       proj.name,
                       () => setState(() {}),
-                    ),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('إضافة مجموعة / جانب جديد'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
                     ),
                   ),
                 ]),
@@ -306,6 +297,97 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
           if (mounted) appSnack(context, 'أُضيفت المهمة إلى $groupName بنجاح.');
           return true;
         },
+      ),
+    );
+  }
+}
+
+class _AddGroupActionCard extends StatefulWidget {
+  const _AddGroupActionCard({
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  State<_AddGroupActionCard> createState() => _AddGroupActionCardState();
+}
+
+class _AddGroupActionCardState extends State<_AddGroupActionCard> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final cardColor = theme.cardTheme.color ??
+        (isDark ? const Color(0xFF111B2E) : Colors.white);
+
+    return AnimatedScale(
+      scale: _pressed ? 0.98 : 1.0,
+      duration: const Duration(milliseconds: 90),
+      curve: Curves.easeOutCubic,
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: theme.colorScheme.onSurface
+                .withValues(alpha: isDark ? 0.08 : 0.07),
+            width: 0.7,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onHighlightChanged: (v) {
+              if (_pressed != v) setState(() => _pressed = v);
+            },
+            onTap: () {
+              HapticFeedback.lightImpact();
+              widget.onTap();
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              child: Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: widget.accentColor.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Icon(
+                      Icons.add_rounded,
+                      size: 20,
+                      color: widget.accentColor,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'إضافة جانب أو مجموعة جديدة',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                        color: widget.accentColor,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_left_rounded,
+                    size: 20,
+                    color: widget.accentColor.withValues(alpha: 0.7),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
