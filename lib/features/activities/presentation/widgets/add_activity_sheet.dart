@@ -10,6 +10,9 @@ import 'package:al_ribat/core/widgets/icon_color_picker.dart';
 import 'package:al_ribat/features/activities/domain/activity_item.dart';
 import 'package:al_ribat/features/home/presentation/widgets/home_prayer_hero_card.dart';
 import 'package:al_ribat/features/prayer/domain/prayer_phase.dart';
+import 'package:al_ribat/features/projects/domain/project_aggregate.dart';
+import 'package:al_ribat/features/projects/presentation/widgets/anchored_popover.dart';
+import 'package:al_ribat/features/projects/presentation/widgets/new_project_dialog.dart';
 import 'package:al_ribat/features/reflections/presentation/widgets/apple_morph_route.dart';
 import 'package:al_ribat/presentation/widgets/templates_sheet.dart';
 
@@ -1334,16 +1337,7 @@ class _MeasurableGoalEditor extends StatelessWidget {
   final TextEditingController unitController;
   final VoidCallback onChanged;
 
-  static const _quickGoals = [5, 10, 15, 20, 30, 60];
-  static const _quickUnits = [
-    'صفحة',
-    'دقيقة',
-    'مرة',
-    'ركعة',
-    'آية',
-    'جزء',
-    'كوب',
-  ];
+  static const _defaultUnits = ['صفحة', 'دقيقة', 'مرة'];
 
   void _step(int delta) {
     final current = int.tryParse(targetController.text.trim()) ?? 0;
@@ -1353,20 +1347,114 @@ class _MeasurableGoalEditor extends StatelessWidget {
     onChanged();
   }
 
+  void _openCustomUnitPopover(BuildContext anchorContext) {
+    HapticFeedback.selectionClick();
+    final current = unitController.text.trim();
+    final ctrl = TextEditingController(
+      text: _defaultUnits.contains(current) ? '' : current,
+    );
+
+    showAnchoredPopover(
+      anchorContext,
+      width: 248,
+      preferAbove: true,
+      anchorRadius: 10,
+      builder: (popCtx) {
+        final theme = Theme.of(popCtx);
+        final colorScheme = theme.colorScheme;
+        return Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'وحدة قياس مخصصة',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (val) {
+                  final trimmed = val.trim();
+                  if (trimmed.isNotEmpty) {
+                    unitController.text = trimmed;
+                    onChanged();
+                  }
+                  Navigator.pop(popCtx);
+                },
+                decoration: InputDecoration(
+                  hintText: 'مثال: ركعة، آية، كوب، ساعة…',
+                  hintStyle: TextStyle(
+                    fontSize: 12.5,
+                    color: colorScheme.onSurface.withValues(alpha: 0.36),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              FilledButton(
+                onPressed: () {
+                  final trimmed = ctrl.text.trim();
+                  if (trimmed.isNotEmpty) {
+                    unitController.text = trimmed;
+                    onChanged();
+                  }
+                  Navigator.pop(popCtx);
+                },
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'حفظ',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
     final innerBg = colorScheme.surfaceContainerHighest.withValues(alpha: 0.42);
-    final currentGoal = int.tryParse(targetController.text.trim());
+    final trackColor = isDark
+        ? const Color(0xFF0A101D)
+        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7);
+    final pillColor = isDark ? const Color(0xFF1D2C46) : Colors.white;
     final currentUnit = unitController.text.trim();
+    final isCustomActive =
+        currentUnit.isNotEmpty && !_defaultUnits.contains(currentUnit);
+    final selectedIdx =
+        isCustomActive ? 3 : _defaultUnits.indexOf(currentUnit).clamp(0, 2);
+    final customBtnKey = GlobalKey();
+
+    final unitLabels = [
+      ..._defaultUnits,
+      isCustomActive ? currentUnit : 'مخصصة',
+    ];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Target stepper row
+          // Target stepper row (supports +/- and direct number input)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
@@ -1400,7 +1488,7 @@ class _MeasurableGoalEditor extends StatelessWidget {
                       color: colorScheme.primary,
                     ),
                     decoration: InputDecoration(
-                      hintText: '20',
+                      hintText: '1',
                       hintStyle: TextStyle(
                         color: colorScheme.onSurface.withValues(alpha: 0.35),
                         fontWeight: FontWeight.w600,
@@ -1421,105 +1509,76 @@ class _MeasurableGoalEditor extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          // Quick numbers
-          SizedBox(
-            height: 30,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _quickGoals.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 6),
-              itemBuilder: (_, idx) {
-                final val = _quickGoals[idx];
-                final isSel = currentGoal == val;
-                return InkWell(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    targetController.text = val.toString();
-                    onChanged();
-                  },
-                  borderRadius: BorderRadius.circular(10),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    padding: const EdgeInsets.symmetric(horizontal: 11),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isSel ? colorScheme.primary : innerBg,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$val',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isSel
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurface.withValues(alpha: 0.75),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
           const SizedBox(height: 10),
-          // Quick unit chips
-          SizedBox(
-            height: 32,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _quickUnits.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 6),
-              itemBuilder: (_, idx) {
-                final u = _quickUnits[idx];
-                final isSel = currentUnit == u;
-                return InkWell(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    unitController.text = u;
-                    onChanged();
-                  },
-                  borderRadius: BorderRadius.circular(10),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    padding: const EdgeInsets.symmetric(horizontal: 11),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: isSel
-                          ? colorScheme.primary.withValues(alpha: 0.16)
-                          : innerBg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: isSel
-                          ? Border.all(color: colorScheme.primary, width: 1.2)
-                          : null,
-                    ),
-                    child: Text(
-                      u,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isSel
-                            ? colorScheme.primary
-                            : colorScheme.onSurface.withValues(alpha: 0.75),
+
+          // Segmented bar for top 3 units + 4th button launching AnchoredPopover
+          Container(
+            height: 40,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: trackColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth / 4;
+                return Stack(
+                  children: [
+                    AnimatedPositionedDirectional(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      start: selectedIdx * w,
+                      top: 0,
+                      bottom: 0,
+                      width: w,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: pillColor,
+                          borderRadius: BorderRadius.circular(9.5),
+                        ),
                       ),
                     ),
-                  ),
+                    Row(
+                      children: List.generate(4, (i) {
+                        final isCustomBtn = i == 3;
+                        final isSel = selectedIdx == i;
+                        return Expanded(
+                          child: GestureDetector(
+                            key: isCustomBtn ? customBtnKey : null,
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              if (isCustomBtn) {
+                                _openCustomUnitPopover(
+                                  customBtnKey.currentContext ?? context,
+                                );
+                              } else {
+                                HapticFeedback.selectionClick();
+                                unitController.text = _defaultUnits[i];
+                                onChanged();
+                              }
+                            },
+                            child: Center(
+                              child: Text(
+                                unitLabels[i],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight:
+                                      isSel ? FontWeight.w700 : FontWeight.w500,
+                                  color: isCustomBtn && isCustomActive
+                                      ? colorScheme.primary
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
                 );
               },
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: unitController,
-            onChanged: (_) => onChanged(),
-            decoration: InputDecoration(
-              hintText: 'أو اكتب وحدة مخصصة (مثال: ساعة، كيلومتر)...',
-              hintStyle: TextStyle(
-                fontSize: 12.5,
-                color: colorScheme.onSurface.withValues(alpha: 0.36),
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
           ),
         ],
@@ -1563,167 +1622,314 @@ class _ProjectLinkEditor extends ConsumerWidget {
   final TextEditingController groupController;
   final VoidCallback onChanged;
 
+  void _openAddGroupPopover(BuildContext anchorContext) {
+    HapticFeedback.selectionClick();
+    final ctrl = TextEditingController();
+    showAnchoredPopover(
+      anchorContext,
+      width: 248,
+      preferAbove: true,
+      anchorRadius: 12,
+      builder: (popCtx) {
+        final theme = Theme.of(popCtx);
+        final colorScheme = theme.colorScheme;
+        return Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'جانب / مجموعة جديدة',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (val) {
+                  final trimmed = val.trim();
+                  if (trimmed.isNotEmpty) {
+                    groupController.text = trimmed;
+                    onChanged();
+                  }
+                  Navigator.pop(popCtx);
+                },
+                decoration: InputDecoration(
+                  hintText: 'مثال: الحفظ، المراجعة، القراءة…',
+                  hintStyle: TextStyle(
+                    fontSize: 12.5,
+                    color: colorScheme.onSurface.withValues(alpha: 0.36),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              FilledButton(
+                onPressed: () {
+                  final trimmed = ctrl.text.trim();
+                  if (trimmed.isNotEmpty) {
+                    groupController.text = trimmed;
+                    onChanged();
+                  }
+                  Navigator.pop(popCtx);
+                },
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'حفظ',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final innerBg = colorScheme.surfaceContainerHighest.withValues(alpha: 0.42);
     final activities =
         ref.watch(activitiesProvider).valueOrNull ?? const <ActivityItem>[];
-
-    // Collect distinct project names & their groups
-    final projectNames = <String>{};
-    final groupsForSelected = <String>{};
+    final projects = ProjectAggregate.fromActivities(activities, theme);
     final currentProject = projectController.text.trim();
+    final currentGroup = groupController.text.trim();
+
+    final groupsForSelected = <String>{};
     for (final a in activities) {
-      final p = a.projectName?.trim();
-      if (p != null && p.isNotEmpty) {
-        projectNames.add(p);
-        if (p == currentProject) {
-          final g = a.groupName?.trim();
-          if (g != null && g.isNotEmpty) groupsForSelected.add(g);
-        }
+      if (a.projectName?.trim() == currentProject) {
+        final g = a.groupName?.trim();
+        if (g != null && g.isNotEmpty) groupsForSelected.add(g);
       }
     }
+    if (currentGroup.isNotEmpty) groupsForSelected.add(currentGroup);
+
+    final newGroupKey = GlobalKey();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (projectNames.isNotEmpty) ...[
-            SizedBox(
-              height: 34,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: projectNames.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (_, idx) {
-                  final p = projectNames.elementAt(idx);
-                  final isSel = currentProject == p;
-                  return InkWell(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      projectController.text = isSel ? '' : p;
-                      if (isSel) groupController.clear();
-                      onChanged();
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      padding: const EdgeInsets.symmetric(horizontal: 11),
-                      decoration: BoxDecoration(
-                        color: isSel
-                            ? const Color(0xFFFF9500).withValues(alpha: 0.18)
-                            : innerBg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: isSel
-                            ? Border.all(
-                                color: const Color(0xFFFF9500), width: 1.2)
-                            : null,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.folder_rounded,
-                            size: 14,
-                            color: isSel
-                                ? const Color(0xFFFF9500)
-                                : colorScheme.onSurface.withValues(alpha: 0.6),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            p,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: isSel
-                                  ? const Color(0xFFFF9500)
-                                  : colorScheme.onSurface
-                                      .withValues(alpha: 0.78),
-                            ),
-                          ),
-                        ],
-                      ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ...projects.map((proj) {
+                final isSel = currentProject == proj.name;
+                return InkWell(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    if (isSel) {
+                      projectController.clear();
+                      groupController.clear();
+                    } else {
+                      projectController.text = proj.name;
+                      groupController.clear();
+                    }
+                    onChanged();
+                  },
+                  borderRadius: BorderRadius.circular(13),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 8,
                     ),
-                  );
-                },
+                    decoration: BoxDecoration(
+                      color:
+                          isSel ? proj.color.withValues(alpha: 0.16) : innerBg,
+                      borderRadius: BorderRadius.circular(13),
+                      border: isSel
+                          ? Border.all(color: proj.color, width: 1.3)
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          proj.icon,
+                          size: 16,
+                          color: isSel
+                              ? proj.color
+                              : colorScheme.onSurface.withValues(alpha: 0.65),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          proj.name,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: isSel
+                                ? proj.color
+                                : colorScheme.onSurface.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              Builder(
+                builder: (newProjCtx) => InkWell(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    NewProjectDialog.open(
+                      context,
+                      sourceContext: newProjCtx,
+                      sourceColor: colorScheme.primary.withValues(alpha: 0.14),
+                      sourceRadius: 13,
+                      onCreate: ({
+                        required String projectName,
+                        String? description,
+                        String? iconName,
+                        String? colorHex,
+                      }) async {
+                        projectController.text = projectName;
+                        groupController.clear();
+                        onChanged();
+                      },
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(13),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.add_rounded,
+                          size: 16,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'مشروع جديد',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          TextField(
-            controller: projectController,
-            onChanged: (_) => onChanged(),
-            decoration: InputDecoration(
-              hintText: 'اسم المشروع (أو اكتب اسماً جديداً)...',
-              hintStyle: TextStyle(
-                fontSize: 12.5,
-                color: colorScheme.onSurface.withValues(alpha: 0.36),
-              ),
-              prefixIcon: const Icon(Icons.folder_outlined, size: 18),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ),
+            ],
           ),
-          if (groupsForSelected.isNotEmpty) ...[
+          if (currentProject.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Text(
+              'الجانب داخل «$currentProject»:',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
             const SizedBox(height: 8),
-            SizedBox(
-              height: 30,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: groupsForSelected.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (_, idx) {
-                  final g = groupsForSelected.elementAt(idx);
-                  final isSel = groupController.text.trim() == g;
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                ...groupsForSelected.map((g) {
+                  final isSel = currentGroup == g;
                   return InkWell(
                     onTap: () {
                       HapticFeedback.selectionClick();
                       groupController.text = isSel ? '' : g;
                       onChanged();
                     },
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      alignment: Alignment.center,
+                    borderRadius: BorderRadius.circular(11),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: isSel
                             ? colorScheme.primary.withValues(alpha: 0.16)
                             : innerBg,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(11),
+                        border: isSel
+                            ? Border.all(color: colorScheme.primary, width: 1.2)
+                            : null,
                       ),
                       child: Text(
                         g,
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: isSel
                               ? colorScheme.primary
-                              : colorScheme.onSurface.withValues(alpha: 0.72),
+                              : colorScheme.onSurface.withValues(alpha: 0.78),
                         ),
                       ),
                     ),
                   );
-                },
-              ),
+                }),
+                InkWell(
+                  key: newGroupKey,
+                  onTap: () => _openAddGroupPopover(
+                    newGroupKey.currentContext ?? context,
+                  ),
+                  borderRadius: BorderRadius.circular(11),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.add_rounded,
+                          size: 15,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'إضافة جانب',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
-          const SizedBox(height: 8),
-          TextField(
-            controller: groupController,
-            onChanged: (_) => onChanged(),
-            decoration: InputDecoration(
-              hintText: 'الجانب / المجموعة داخل المشروع (اختياري)...',
-              hintStyle: TextStyle(
-                fontSize: 12.5,
-                color: colorScheme.onSurface.withValues(alpha: 0.36),
-              ),
-              prefixIcon: const Icon(Icons.layers_outlined, size: 18),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ),
-          ),
         ],
       ),
     );

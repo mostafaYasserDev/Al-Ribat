@@ -1,8 +1,8 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Formats a [TimeOfDay] in Arabic using 12-hour display with `ص` / `م`
-/// or optional 24-hour clarity, never showing English AM/PM.
+/// Formats a [TimeOfDay] in 12-hour Arabic format with `ص` / `م`.
 String formatArabicTime(TimeOfDay time, {bool showPeriodWord = false}) {
   final isPm = time.hour >= 12;
   final hour12 = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
@@ -12,16 +12,8 @@ String formatArabicTime(TimeOfDay time, {bool showPeriodWord = false}) {
   return '$hour12:$minStr $period';
 }
 
-/// Formats a 24-hour string like `20:30` alongside Arabic `ص`/`م`.
-String formatArabic24WithPeriod(TimeOfDay time) {
-  final h24 = time.hour.toString().padLeft(2, '0');
-  final m = time.minute.toString().padLeft(2, '0');
-  final period = time.hour >= 12 ? 'م' : 'ص';
-  return '$h24:$m ($period)';
-}
-
-/// Opens an Apple-inspired wheel time picker supporting 24-hour selection
-/// with Arabic `ص` (صباحاً) / `م` (مساءً) indicators and quick presets.
+/// Opens a clean Apple-inspired 12-hour wheel time picker with Arabic `ص | م`
+/// switcher, smooth mouse/touch wheel scrolling, and step arrows.
 Future<TimeOfDay?> showArabicTimePicker(
   BuildContext context, {
   required TimeOfDay initialTime,
@@ -54,13 +46,6 @@ Future<TimeOfDay?> showArabicTimePicker(
   );
 }
 
-class _TimePreset {
-  const _TimePreset(this.label, this.hour, this.minute);
-  final String label;
-  final int hour;
-  final int minute;
-}
-
 class _ArabicTimePickerDialog extends StatefulWidget {
   const _ArabicTimePickerDialog({
     required this.initialTime,
@@ -76,26 +61,21 @@ class _ArabicTimePickerDialog extends StatefulWidget {
 }
 
 class _ArabicTimePickerDialogState extends State<_ArabicTimePickerDialog> {
-  late int _hour;
-  late int _minute;
+  late int _hour12; // 1..12
+  late int _minute; // 0..59
+  late bool _isPm;
   late FixedExtentScrollController _hourController;
   late FixedExtentScrollController _minuteController;
-
-  static const _presets = [
-    _TimePreset('فجراً', 5, 0),
-    _TimePreset('صباحاً', 9, 0),
-    _TimePreset('ظهراً', 13, 0),
-    _TimePreset('عصراً', 16, 0),
-    _TimePreset('مساءً', 20, 0),
-    _TimePreset('ليلاً', 22, 0),
-  ];
 
   @override
   void initState() {
     super.initState();
-    _hour = widget.initialTime.hour;
+    _isPm = widget.initialTime.hour >= 12;
+    _hour12 = widget.initialTime.hourOfPeriod == 0
+        ? 12
+        : widget.initialTime.hourOfPeriod;
     _minute = widget.initialTime.minute;
-    _hourController = FixedExtentScrollController(initialItem: _hour);
+    _hourController = FixedExtentScrollController(initialItem: _hour12 - 1);
     _minuteController = FixedExtentScrollController(initialItem: _minute);
   }
 
@@ -106,20 +86,26 @@ class _ArabicTimePickerDialogState extends State<_ArabicTimePickerDialog> {
     super.dispose();
   }
 
-  void _jumpTo(int hour, int minute) {
-    HapticFeedback.selectionClick();
-    setState(() {
-      _hour = hour;
-      _minute = minute;
-    });
+  TimeOfDay get _currentTimeOfDay {
+    var h24 = _hour12 % 12;
+    if (_isPm) h24 += 12;
+    return TimeOfDay(hour: h24, minute: _minute);
+  }
+
+  void _stepHour(int delta) {
+    final nextIdx = ((_hour12 - 1 + delta) % 12 + 12) % 12;
     _hourController.animateToItem(
-      hour,
-      duration: const Duration(milliseconds: 260),
+      nextIdx,
+      duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  void _stepMinute(int delta) {
+    final nextIdx = ((_minute + delta) % 60 + 60) % 60;
     _minuteController.animateToItem(
-      minute,
-      duration: const Duration(milliseconds: 260),
+      nextIdx,
+      duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
     );
   }
@@ -134,7 +120,7 @@ class _ArabicTimePickerDialogState extends State<_ArabicTimePickerDialog> {
     final innerBg = isDark
         ? const Color(0xFF0A101D)
         : colorScheme.surfaceContainerHighest.withValues(alpha: 0.45);
-    final selectedTime = TimeOfDay(hour: _hour, minute: _minute);
+    final selectedTime = _currentTimeOfDay;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -142,7 +128,7 @@ class _ArabicTimePickerDialogState extends State<_ArabicTimePickerDialog> {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
+            constraints: const BoxConstraints(maxWidth: 340),
             child: Material(
               color: cardBg,
               borderRadius: BorderRadius.circular(26),
@@ -182,10 +168,13 @@ class _ArabicTimePickerDialogState extends State<_ArabicTimePickerDialog> {
                                 ),
                               ),
                               Text(
-                                '${formatArabicTime(selectedTime, showPeriodWord: true)}  •  نظام 24 ساعة',
+                                formatArabicTime(
+                                  selectedTime,
+                                  showPeriodWord: true,
+                                ),
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
                                   color: colorScheme.primary,
                                 ),
                               ),
@@ -195,44 +184,44 @@ class _ArabicTimePickerDialogState extends State<_ArabicTimePickerDialog> {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    // Quick presets
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: _presets.map((p) {
-                        final isSel = _hour == p.hour && _minute == p.minute;
-                        return InkWell(
-                          onTap: () => _jumpTo(p.hour, p.minute),
-                          borderRadius: BorderRadius.circular(12),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSel ? colorScheme.primary : innerBg,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '${p.label} ${p.hour.toString().padLeft(2, '0')}:00',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w700,
-                                color: isSel
-                                    ? colorScheme.onPrimary
-                                    : colorScheme.onSurface
-                                        .withValues(alpha: 0.78),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 14),
-                    // Wheel picker (24h + Arabic period)
+
+                    // Sliding AM / PM (ص / م) toggle
                     Container(
-                      height: 168,
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: innerBg,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        children: [
+                          _PeriodTab(
+                            label: 'صباحاً (ص)',
+                            selected: !_isPm,
+                            activeBg: cardBg,
+                            activeColor: colorScheme.primary,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() => _isPm = false);
+                            },
+                          ),
+                          _PeriodTab(
+                            label: 'مساءً (م)',
+                            selected: _isPm,
+                            activeBg: cardBg,
+                            activeColor: colorScheme.primary,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() => _isPm = true);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // 12-hour Wheel Picker with mouse/touch support + step arrows
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
                       decoration: BoxDecoration(
                         color: innerBg,
                         borderRadius: BorderRadius.circular(18),
@@ -240,66 +229,60 @@ class _ArabicTimePickerDialogState extends State<_ArabicTimePickerDialog> {
                           color: colorScheme.onSurface.withValues(alpha: 0.06),
                         ),
                       ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            height: 44,
-                            margin: const EdgeInsets.symmetric(horizontal: 14),
-                            decoration: BoxDecoration(
-                              color: cardBg,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color:
-                                    colorScheme.primary.withValues(alpha: 0.25),
+                      child: Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: ScrollConfiguration(
+                          behavior: ScrollConfiguration.of(context).copyWith(
+                            dragDevices: const {
+                              PointerDeviceKind.touch,
+                              PointerDeviceKind.mouse,
+                              PointerDeviceKind.trackpad,
+                              PointerDeviceKind.stylus,
+                            },
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _WheelColumn(
+                                  controller: _hourController,
+                                  count: 12,
+                                  selectedIdx: _hour12 - 1,
+                                  labelBuilder: (i) =>
+                                      (i + 1).toString().padLeft(2, '0'),
+                                  onChanged: (i) {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _hour12 = i + 1);
+                                  },
+                                  onStepUp: () => _stepHour(-1),
+                                  onStepDown: () => _stepHour(1),
+                                ),
                               ),
-                            ),
+                              Text(
+                                ':',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w800,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                              Expanded(
+                                child: _WheelColumn(
+                                  controller: _minuteController,
+                                  count: 60,
+                                  selectedIdx: _minute,
+                                  labelBuilder: (i) =>
+                                      i.toString().padLeft(2, '0'),
+                                  onChanged: (i) {
+                                    HapticFeedback.selectionClick();
+                                    setState(() => _minute = i);
+                                  },
+                                  onStepUp: () => _stepMinute(-1),
+                                  onStepDown: () => _stepMinute(1),
+                                ),
+                              ),
+                            ],
                           ),
-                          // RTL: Minutes on start (right), Hours on end (left) or natural digital order LTR
-                          Directionality(
-                            textDirection: TextDirection.ltr,
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: _TimeWheel(
-                                    controller: _hourController,
-                                    count: 24,
-                                    selected: _hour,
-                                    labelBuilder: (v) {
-                                      final p = v >= 12 ? 'م' : 'ص';
-                                      return '${v.toString().padLeft(2, '0')} $p';
-                                    },
-                                    onChanged: (v) {
-                                      HapticFeedback.selectionClick();
-                                      setState(() => _hour = v);
-                                    },
-                                  ),
-                                ),
-                                Text(
-                                  ':',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w800,
-                                    color: colorScheme.primary,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: _TimeWheel(
-                                    controller: _minuteController,
-                                    count: 60,
-                                    selected: _minute,
-                                    labelBuilder: (v) =>
-                                        v.toString().padLeft(2, '0'),
-                                    onChanged: (v) {
-                                      HapticFeedback.selectionClick();
-                                      setState(() => _minute = v);
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -344,49 +327,156 @@ class _ArabicTimePickerDialogState extends State<_ArabicTimePickerDialog> {
   }
 }
 
-class _TimeWheel extends StatelessWidget {
-  const _TimeWheel({
-    required this.controller,
-    required this.count,
+class _PeriodTab extends StatelessWidget {
+  const _PeriodTab({
+    required this.label,
     required this.selected,
-    required this.labelBuilder,
-    required this.onChanged,
+    required this.activeBg,
+    required this.activeColor,
+    required this.onTap,
   });
 
-  final FixedExtentScrollController controller;
-  final int count;
-  final int selected;
-  final String Function(int) labelBuilder;
-  final ValueChanged<int> onChanged;
+  final String label;
+  final bool selected;
+  final Color activeBg;
+  final Color activeColor;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return ListWheelScrollView.useDelegate(
-      controller: controller,
-      itemExtent: 42,
-      perspective: 0.003,
-      diameterRatio: 1.4,
-      physics: const FixedExtentScrollPhysics(),
-      onSelectedItemChanged: onChanged,
-      childDelegate: ListWheelChildBuilderDelegate(
-        childCount: count,
-        builder: (context, index) {
-          final isSel = index == selected;
-          return Center(
-            child: Text(
-              labelBuilder(index),
-              style: TextStyle(
-                fontSize: isSel ? 19 : 15,
-                fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
-                color: isSel
-                    ? colorScheme.primary
-                    : colorScheme.onSurface.withValues(alpha: 0.42),
-              ),
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? activeBg : Colors.transparent,
+            borderRadius: BorderRadius.circular(11),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              color: selected
+                  ? activeColor
+                  : colorScheme.onSurface.withValues(alpha: 0.6),
             ),
-          );
-        },
+          ),
+        ),
       ),
+    );
+  }
+}
+
+class _WheelColumn extends StatelessWidget {
+  const _WheelColumn({
+    required this.controller,
+    required this.count,
+    required this.selectedIdx,
+    required this.labelBuilder,
+    required this.onChanged,
+    required this.onStepUp,
+    required this.onStepDown,
+  });
+
+  final FixedExtentScrollController controller;
+  final int count;
+  final int selectedIdx;
+  final String Function(int) labelBuilder;
+  final ValueChanged<int> onChanged;
+  final VoidCallback onStepUp;
+  final VoidCallback onStepDown;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onStepUp,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 2),
+            child: Icon(
+              Icons.keyboard_arrow_up_rounded,
+              size: 20,
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 124,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                height: 40,
+                margin: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardTheme.color ?? Colors.white,
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(
+                    color: colorScheme.primary.withValues(alpha: 0.25),
+                  ),
+                ),
+              ),
+              ListWheelScrollView.useDelegate(
+                controller: controller,
+                itemExtent: 40,
+                perspective: 0.0025,
+                diameterRatio: 1.5,
+                physics: const FixedExtentScrollPhysics(),
+                onSelectedItemChanged: onChanged,
+                childDelegate: ListWheelChildBuilderDelegate(
+                  childCount: count,
+                  builder: (context, index) {
+                    final isSel = index == selectedIdx;
+                    return Center(
+                      child: Text(
+                        labelBuilder(index),
+                        style: TextStyle(
+                          fontSize: isSel ? 21 : 15,
+                          fontWeight: isSel ? FontWeight.w800 : FontWeight.w500,
+                          color: isSel
+                              ? colorScheme.primary
+                              : colorScheme.onSurface.withValues(alpha: 0.4),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        InkWell(
+          onTap: onStepDown,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 2),
+            child: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 20,
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
