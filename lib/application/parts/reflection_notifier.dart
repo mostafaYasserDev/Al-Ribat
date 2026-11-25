@@ -19,6 +19,7 @@ class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
     bool isPinned = false,
     String? colorKey,
     String? mood,
+    List<String>? moods,
     String? prayerPhaseName,
     String? linkedContextTitle,
     DateTime? createdAt,
@@ -33,6 +34,7 @@ class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
       isPinned: isPinned,
       colorKey: colorKey,
       mood: mood,
+      moods: moods,
       prayerPhaseName: prayerPhaseName,
       linkedContextTitle: linkedContextTitle,
     );
@@ -49,16 +51,20 @@ class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
     String? colorKey,
     bool clearColor = false,
     String? newMood,
+    List<String>? newMoods,
     String? linkedContextTitle,
     bool clearLinkedContext = false,
   }) async {
-    final contentChanged =
-        oldEntry.text != newText.trim() || oldEntry.mood != newMood;
+    final resolvedMoods =
+        newMoods ?? (newMood != null ? [newMood] : const <String>[]);
+    final moodsChanged = oldEntry.moods.length != resolvedMoods.length ||
+        !oldEntry.moods.every(resolvedMoods.contains);
+    final contentChanged = oldEntry.text != newText.trim() || moodsChanged;
     final editRecord = contentChanged
         ? ReflectionEditRecord(
             editedAt: DateTime.now(),
             oldText: oldEntry.text,
-            oldMood: oldEntry.mood,
+            oldMood: oldEntry.moods.isEmpty ? null : oldEntry.moods.join('، '),
           )
         : null;
 
@@ -73,8 +79,8 @@ class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
       isPinned: isPinned,
       colorKey: colorKey,
       clearColor: clearColor,
-      mood: newMood,
-      clearMood: newMood == null,
+      moods: resolvedMoods,
+      clearMood: resolvedMoods.isEmpty,
       linkedContextTitle: linkedContextTitle,
       clearLinkedContext: clearLinkedContext,
       editHistory: editRecord != null

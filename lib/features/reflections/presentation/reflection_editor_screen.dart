@@ -7,12 +7,10 @@ import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/core/theme/app_moods.dart';
 import 'package:al_ribat/core/ui_feedback.dart';
 import 'package:al_ribat/features/prayer/domain/prayer_phase.dart';
-import '../domain/reflection_colors.dart';
 import '../domain/reflection_entry.dart';
 import 'widgets/apple_morph_route.dart';
 import 'widgets/reflection_dialogs.dart';
-
-enum _ToolbarPanel { none, colors, projects, moods }
+import 'widgets/reflection_picker_sheets.dart';
 
 class ReflectionEditorScreen extends ConsumerStatefulWidget {
   const ReflectionEditorScreen({super.key, this.entry, this.initialMood});
@@ -52,10 +50,8 @@ class _ReflectionEditorScreenState
   late final TextEditingController _titleController;
   late final TextEditingController _bodyController;
   late bool _isPinned;
-  String? _colorKey;
-  String? _mood;
+  late List<String> _selectedMoods;
   String? _linkedContextTitle;
-  _ToolbarPanel _activePanel = _ToolbarPanel.none;
   bool _isSaving = false;
   bool _didExit = false;
 
@@ -66,8 +62,9 @@ class _ReflectionEditorScreenState
     _titleController = TextEditingController(text: e?.title ?? '');
     _bodyController = TextEditingController(text: e?.text ?? '');
     _isPinned = e?.isPinned ?? false;
-    _colorKey = e?.colorKey;
-    _mood = e?.mood ?? widget.initialMood;
+    _selectedMoods = e != null
+        ? List<String>.from(e.moods)
+        : (widget.initialMood != null ? [widget.initialMood!] : <String>[]);
     _linkedContextTitle = e?.linkedContextTitle;
 
     _titleController.addListener(_onTextChanged);
@@ -90,7 +87,13 @@ class _ReflectionEditorScreenState
   bool get _hasContent {
     return _titleController.text.trim().isNotEmpty ||
         _bodyController.text.trim().isNotEmpty ||
-        _mood != null;
+        _selectedMoods.isNotEmpty;
+  }
+
+  bool get _moodsChanged {
+    final original = widget.entry?.moods ?? const <String>[];
+    if (original.length != _selectedMoods.length) return true;
+    return !original.every(_selectedMoods.contains);
   }
 
   bool get _hasChanges {
@@ -101,8 +104,7 @@ class _ReflectionEditorScreenState
     return (e.title ?? '') != title ||
         e.text != body ||
         e.isPinned != _isPinned ||
-        e.colorKey != _colorKey ||
-        e.mood != _mood ||
+        _moodsChanged ||
         e.linkedContextTitle != _linkedContextTitle;
   }
 
@@ -129,8 +131,7 @@ class _ReflectionEditorScreenState
           body,
           title: title,
           isPinned: _isPinned,
-          colorKey: _colorKey,
-          mood: _mood,
+          moods: _selectedMoods,
           prayerPhaseName: prayerName,
           linkedContextTitle: _linkedContextTitle,
         );
@@ -141,9 +142,7 @@ class _ReflectionEditorScreenState
           title: title,
           clearTitle: title.isEmpty,
           isPinned: _isPinned,
-          colorKey: _colorKey,
-          clearColor: _colorKey == null,
-          newMood: _mood,
+          newMoods: _selectedMoods,
           linkedContextTitle: _linkedContextTitle,
           clearLinkedContext: _linkedContextTitle == null,
         );
@@ -170,20 +169,34 @@ class _ReflectionEditorScreenState
     }
   }
 
-  void _togglePanel(_ToolbarPanel panel) {
-    HapticFeedback.selectionClick();
-    setState(() {
-      _activePanel = _activePanel == panel ? _ToolbarPanel.none : panel;
-    });
+  Future<void> _openMoodPicker() async {
+    HapticFeedback.lightImpact();
+    final picked = await showMoodPickerSheet(
+      context,
+      initialMoods: _selectedMoods,
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedMoods = picked);
+    }
+  }
+
+  Future<void> _openProjectPicker(List<String> projectNames) async {
+    HapticFeedback.lightImpact();
+    final res = await showProjectPickerSheet(
+      context,
+      projectNames: projectNames,
+      currentProjectTag: _linkedContextTitle,
+    );
+    if (res != null && mounted) {
+      setState(() => _linkedContextTitle = res.projectTag);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final bgColor =
-        ReflectionColors.resolveBackground(_colorKey, theme.brightness) ??
-            colorScheme.surface;
+    final bgColor = theme.scaffoldBackgroundColor;
     final existing = widget.entry;
 
     final activities = ref.watch(activitiesProvider).valueOrNull ?? const [];
@@ -218,9 +231,9 @@ class _ReflectionEditorScreenState
             scrolledUnderElevation: 0,
             titleSpacing: 0,
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(1),
+              preferredSize: const Size.fromHeight(0.6),
               child: Divider(
-                height: 1,
+                height: 0.6,
                 thickness: 0.6,
                 color: colorScheme.outlineVariant.withValues(alpha: 0.35),
               ),
@@ -239,7 +252,6 @@ class _ReflectionEditorScreenState
               overflow: TextOverflow.ellipsis,
             ),
             actions: [
-              // Circular Tonal Pin Button
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: AnimatedContainer(
@@ -268,8 +280,6 @@ class _ReflectionEditorScreenState
                   ),
                 ),
               ),
-
-              // Overflow menu for Edit History & Delete
               if (existing != null)
                 PopupMenuButton<String>(
                   icon: Icon(
@@ -300,18 +310,21 @@ class _ReflectionEditorScreenState
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_outline_rounded,
-                              size: 18, color: colorScheme.error),
+                          Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: colorScheme.error,
+                          ),
                           const SizedBox(width: 8),
-                          Text('حذف الخاطرة',
-                              style: TextStyle(color: colorScheme.error)),
+                          Text(
+                            'حذف الخاطرة',
+                            style: TextStyle(color: colorScheme.error),
+                          ),
                         ],
                       ),
                     ),
                   ],
                 ),
-
-              // Telegram-style Done / Save Pill
               Padding(
                 padding: const EdgeInsets.only(left: 10, right: 2),
                 child: AnimatedSwitcher(
@@ -327,7 +340,9 @@ class _ReflectionEditorScreenState
                           ? colorScheme.onPrimary
                           : colorScheme.onSurfaceVariant,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       minimumSize: const Size(0, 34),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
@@ -344,7 +359,9 @@ class _ReflectionEditorScreenState
                     label: const Text(
                       'تم',
                       style: TextStyle(
-                          fontSize: 12.5, fontWeight: FontWeight.bold),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
@@ -355,11 +372,11 @@ class _ReflectionEditorScreenState
             children: [
               Expanded(
                 child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Optional Title Field
                       TextField(
                         controller: _titleController,
                         style: theme.textTheme.headlineSmall?.copyWith(
@@ -381,10 +398,9 @@ class _ReflectionEditorScreenState
                         textInputAction: TextInputAction.next,
                         maxLines: 2,
                       ),
-
-                      // Active context badges (Project & Mood only; Prayer is in header)
-                      if (_mood != null || _linkedContextTitle != null) ...[
-                        const SizedBox(height: 8),
+                      if (_selectedMoods.isNotEmpty ||
+                          _linkedContextTitle != null) ...[
+                        const SizedBox(height: 10),
                         Wrap(
                           spacing: 6,
                           runSpacing: 6,
@@ -399,15 +415,19 @@ class _ReflectionEditorScreenState
                                 onRemove: () =>
                                     setState(() => _linkedContextTitle = null),
                               ),
-                            if (_mood != null)
-                              MoodDisplayChip(mood: _mood!, dense: true),
+                            for (final mood in _selectedMoods)
+                              MoodDisplayChip(
+                                mood: mood,
+                                dense: true,
+                                onRemove: () {
+                                  HapticFeedback.selectionClick();
+                                  setState(() => _selectedMoods.remove(mood));
+                                },
+                              ),
                           ],
                         ),
                       ],
-
                       const SizedBox(height: 12),
-
-                      // Pure Writing Area
                       TextField(
                         controller: _bodyController,
                         autofocus: existing == null,
@@ -435,79 +455,13 @@ class _ReflectionEditorScreenState
                   ),
                 ),
               ),
-
-              // Smooth Expandable Sub-Panel
-              AnimatedSize(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
-                child: _activePanel == _ToolbarPanel.none
-                    ? const SizedBox.shrink()
-                    : _buildSubPanel(context, projectNames, colorScheme),
-              ),
-
-              // Telegram-inspired Floating / Pill Bottom Bar
-              SafeArea(
-                top: false,
-                child: Container(
-                  margin: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface.withValues(alpha: 0.88),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(
-                      color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      _BottomToolPill(
-                        icon: Icons.palette_outlined,
-                        label: 'لون',
-                        isActive: _activePanel == _ToolbarPanel.colors ||
-                            _colorKey != null,
-                        onTap: () => _togglePanel(_ToolbarPanel.colors),
-                      ),
-                      if (projectNames.isNotEmpty) ...[
-                        const SizedBox(width: 6),
-                        _BottomToolPill(
-                          icon: Icons.folder_outlined,
-                          label: 'مشروع',
-                          isActive: _activePanel == _ToolbarPanel.projects ||
-                              _linkedContextTitle != null,
-                          onTap: () => _togglePanel(_ToolbarPanel.projects),
-                        ),
-                      ],
-                      const SizedBox(width: 6),
-                      _BottomToolPill(
-                        icon: Icons.mood_outlined,
-                        label: 'شعور',
-                        isActive: _activePanel == _ToolbarPanel.moods ||
-                            _mood != null,
-                        onTap: () => _togglePanel(_ToolbarPanel.moods),
-                      ),
-                      const Spacer(),
-                      Text(
-                        _hasChanges ? 'تعديل غير محفوظ' : 'محفوظ تلقائياً',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          fontSize: 10.5,
-                          color: _hasChanges
-                              ? colorScheme.primary
-                              : colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                  ),
-                ),
+              _TelegramBottomComposeBar(
+                moodCount: _selectedMoods.length,
+                hasProject: _linkedContextTitle != null,
+                showProjectAction: projectNames.isNotEmpty,
+                hasChanges: _hasChanges,
+                onPickMoods: _openMoodPicker,
+                onPickProject: () => _openProjectPicker(projectNames),
               ),
             ],
           ),
@@ -515,86 +469,74 @@ class _ReflectionEditorScreenState
       ),
     );
   }
+}
 
-  Widget _buildSubPanel(
-    BuildContext context,
-    List<String> projectNames,
-    ColorScheme colorScheme,
-  ) {
-    final brightness = Theme.of(context).brightness;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+class _TelegramBottomComposeBar extends StatelessWidget {
+  const _TelegramBottomComposeBar({
+    required this.moodCount,
+    required this.hasProject,
+    required this.showProjectAction,
+    required this.hasChanges,
+    required this.onPickMoods,
+    required this.onPickProject,
+  });
+
+  final int moodCount;
+  final bool hasProject;
+  final bool showProjectAction;
+  final bool hasChanges;
+  final VoidCallback onPickMoods;
+  final VoidCallback onPickProject;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final barBg = theme.cardTheme.color ??
+        (isDark ? const Color(0xFF111B2E) : Colors.white);
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: barBg,
+          border: Border(
+            top: BorderSide(
+              color: theme.colorScheme.onSurface
+                  .withValues(alpha: isDark ? 0.09 : 0.07),
+              width: 0.6,
+            ),
+          ),
         ),
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            if (_activePanel == _ToolbarPanel.colors) ...[
-              _ColorDot(
-                color: colorScheme.surface,
-                isSelected: _colorKey == null,
-                isDefault: true,
-                onTap: () => setState(() => _colorKey = null),
+            _BottomActionButton(
+              icon: Icons.mood_rounded,
+              label: moodCount > 0 ? 'المشاعر ($moodCount)' : 'إضافة شعور',
+              isActive: moodCount > 0,
+              onTap: onPickMoods,
+            ),
+            if (showProjectAction) ...[
+              const SizedBox(width: 8),
+              _BottomActionButton(
+                icon: Icons.folder_outlined,
+                label: hasProject ? 'المشروع ✓' : 'ربط بمشروع',
+                isActive: hasProject,
+                onTap: onPickProject,
               ),
-              const SizedBox(width: 10),
-              ...ReflectionColors.palette.map((opt) {
-                return Padding(
-                  padding: const EdgeInsets.only(left: 10),
-                  child: _ColorDot(
-                    color: opt.resolve(brightness),
-                    isSelected: _colorKey == opt.key,
-                    onTap: () => setState(() => _colorKey = opt.key),
-                  ),
-                );
-              }),
-            ] else if (_activePanel == _ToolbarPanel.projects) ...[
-              ...projectNames.map((proj) {
-                final tag = 'مشروع: $proj';
-                final isSelected = _linkedContextTitle == tag;
-                return Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: ChoiceChip(
-                    avatar: const Icon(Icons.folder_outlined, size: 15),
-                    label: Text(proj, style: const TextStyle(fontSize: 12)),
-                    selected: isSelected,
-                    visualDensity: VisualDensity.compact,
-                    onSelected: (sel) => setState(() {
-                      _linkedContextTitle = sel ? tag : null;
-                      _activePanel = _ToolbarPanel.none;
-                    }),
-                  ),
-                );
-              }),
-            ] else if (_activePanel == _ToolbarPanel.moods) ...[
-              ...AppMoods.options.map((opt) {
-                final isSelected = _mood == opt.label;
-                return Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: ChoiceChip(
-                    avatar: Icon(
-                      opt.icon,
-                      size: 16,
-                      color: isSelected ? null : opt.color,
-                    ),
-                    label:
-                        Text(opt.label, style: const TextStyle(fontSize: 12)),
-                    selected: isSelected,
-                    visualDensity: VisualDensity.compact,
-                    onSelected: (sel) => setState(() {
-                      _mood = sel ? opt.label : null;
-                      _activePanel = _ToolbarPanel.none;
-                    }),
-                  ),
-                );
-              }),
             ],
+            const Spacer(),
+            Text(
+              hasChanges ? 'غير محفوظ' : 'محفوظ تلقائياً',
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 11,
+                color: hasChanges
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -602,8 +544,8 @@ class _ReflectionEditorScreenState
   }
 }
 
-class _BottomToolPill extends StatelessWidget {
-  const _BottomToolPill({
+class _BottomActionButton extends StatelessWidget {
+  const _BottomActionButton({
     required this.icon,
     required this.label,
     required this.isActive,
@@ -621,13 +563,13 @@ class _BottomToolPill extends StatelessWidget {
     return Material(
       color: isActive
           ? colorScheme.primary.withValues(alpha: 0.12)
-          : Colors.transparent,
+          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -638,12 +580,12 @@ class _BottomToolPill extends StatelessWidget {
                     ? colorScheme.primary
                     : colorScheme.onSurfaceVariant,
               ),
-              const SizedBox(width: 5),
+              const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                  fontSize: 12.5,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
                   color: isActive
                       ? colorScheme.primary
                       : colorScheme.onSurfaceVariant,
@@ -652,48 +594,6 @@ class _BottomToolPill extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ColorDot extends StatelessWidget {
-  const _ColorDot({
-    required this.color,
-    required this.isSelected,
-    required this.onTap,
-    this.isDefault = false,
-  });
-
-  final Color color;
-  final bool isSelected;
-  final VoidCallback onTap;
-  final bool isDefault;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color:
-                isSelected ? colorScheme.primary : colorScheme.outlineVariant,
-            width: isSelected ? 2.5 : 1.2,
-          ),
-        ),
-        child: isSelected
-            ? Icon(Icons.check_rounded, size: 18, color: colorScheme.primary)
-            : (isDefault
-                ? Icon(Icons.format_color_reset_outlined,
-                    size: 16, color: colorScheme.onSurfaceVariant)
-                : null),
       ),
     );
   }
@@ -715,10 +615,10 @@ class _EditorBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -737,7 +637,7 @@ class _EditorBadge extends StatelessWidget {
             const SizedBox(width: 4),
             InkWell(
               onTap: onRemove,
-              child: Icon(Icons.close, size: 13, color: color),
+              child: Icon(Icons.close_rounded, size: 13, color: color),
             ),
           ],
         ],

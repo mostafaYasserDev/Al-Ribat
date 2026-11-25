@@ -42,7 +42,7 @@ abstract final class ReflectionSearch {
     final haystack = normalizeArabic([
       entry.title ?? '',
       entry.text,
-      entry.mood ?? '',
+      entry.moods.join(' '),
       entry.prayerPhaseName ?? '',
       entry.linkedContextTitle ?? '',
       dateText,

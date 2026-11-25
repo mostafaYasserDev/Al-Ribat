@@ -12,10 +12,12 @@ void main() {
   });
   group('AppMoods Tests', () {
     test('contains all expected Arabic moods', () {
-      expect(AppMoods.options.length, 7);
+      expect(AppMoods.options.length, 12);
       expect(AppMoods.find('سعيد')?.label, 'سعيد');
       expect(AppMoods.find('هادئ')?.label, 'هادئ');
       expect(AppMoods.find('ممتن')?.label, 'ممتن');
+      expect(AppMoods.find('مطمئن')?.label, 'مطمئن');
+      expect(AppMoods.find('خاشع')?.label, 'خاشع');
       expect(AppMoods.find('غير موجود'), isNull);
     });
   });

@@ -4,6 +4,7 @@ import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/core/theme/app_theme.dart';
 import 'package:al_ribat/domain/entities/reflection_entry.dart';
 import 'package:al_ribat/domain/repositories/reflection_repository.dart';
+import 'package:al_ribat/features/reflections/presentation/reflection_editor_screen.dart';
 import 'package:al_ribat/features/reflections/presentation/reflection_history_screen.dart';
 import 'package:al_ribat/features/reflections/presentation/widgets/reflection_quick_compose_card.dart';
 import 'package:flutter/material.dart';
@@ -122,5 +123,42 @@ void main() {
     expect(find.text('إلغاء التثبيت'), findsOneWidget);
     expect(find.text('نسخ النص'), findsOneWidget);
     expect(find.text('حذف'), findsOneWidget);
+  });
+
+  testWidgets('Editor has no color picker and supports multiple moods',
+      (tester) async {
+    final repo = _FakeReflectionRepository();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          reflectionRepositoryProvider.overrideWithValue(repo),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.lightTheme,
+          home: const ReflectionEditorScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('لون'), findsNothing);
+    expect(find.text('إضافة شعور'), findsOneWidget);
+
+    await tester.tap(find.text('إضافة شعور'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('اختر مشاعرك'), findsOneWidget);
+    await tester.tap(find.text('هادئ'));
+    await tester.tap(find.text('مطمئن'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('تم اختيار 2 من 12'), findsOneWidget);
+
+    await tester.tap(find.text('تم').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('المشاعر (2)'), findsOneWidget);
+    expect(find.text('هادئ'), findsOneWidget);
+    expect(find.text('مطمئن'), findsOneWidget);
   });
 }

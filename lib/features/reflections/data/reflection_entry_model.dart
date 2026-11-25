@@ -27,7 +27,7 @@ class ReflectionEditRecordModel extends ReflectionEditRecord {
 }
 
 class ReflectionEntryModel extends ReflectionEntry {
-  const ReflectionEntryModel({
+  ReflectionEntryModel({
     required super.id,
     required super.text,
     required super.createdAt,
@@ -35,6 +35,7 @@ class ReflectionEntryModel extends ReflectionEntry {
     super.isPinned,
     super.colorKey,
     super.mood,
+    super.moods,
     super.prayerPhaseName,
     super.linkedContextTitle,
     super.editHistory,
@@ -48,7 +49,7 @@ class ReflectionEntryModel extends ReflectionEntry {
       createdAt: entry.createdAt,
       isPinned: entry.isPinned,
       colorKey: entry.colorKey,
-      mood: entry.mood,
+      moods: entry.moods,
       prayerPhaseName: entry.prayerPhaseName,
       linkedContextTitle: entry.linkedContextTitle,
       editHistory: entry.editHistory,
@@ -57,6 +58,10 @@ class ReflectionEntryModel extends ReflectionEntry {
 
   factory ReflectionEntryModel.fromJson(String source) {
     final json = jsonDecode(source) as Map<String, dynamic>;
+    final rawMoods = (json['moods'] as List<dynamic>?)
+        ?.map((e) => e.toString())
+        .where((e) => e.trim().isNotEmpty)
+        .toList();
     return ReflectionEntryModel(
       id: json['id'] as String,
       title: json['title'] as String?,
@@ -65,6 +70,7 @@ class ReflectionEntryModel extends ReflectionEntry {
       isPinned: json['isPinned'] as bool? ?? false,
       colorKey: json['colorKey'] as String?,
       mood: json['mood'] as String?,
+      moods: rawMoods,
       prayerPhaseName: json['prayerPhaseName'] as String?,
       linkedContextTitle: json['linkedContextTitle'] as String?,
       editHistory: (json['editHistory'] as List<dynamic>?)
@@ -84,6 +90,7 @@ class ReflectionEntryModel extends ReflectionEntry {
       if (isPinned) 'isPinned': true,
       if (colorKey != null) 'colorKey': colorKey,
       'mood': mood,
+      if (moods.isNotEmpty) 'moods': moods,
       if (prayerPhaseName != null) 'prayerPhaseName': prayerPhaseName,
       if (linkedContextTitle != null) 'linkedContextTitle': linkedContextTitle,
       'editHistory': editHistory

@@ -38,6 +38,20 @@ abstract final class AppMoods {
         label: 'حزين',
         icon: Icons.sentiment_dissatisfied_rounded,
         color: Color(0xFF5C6BC0)),
+    MoodOption(
+        label: 'مطمئن', icon: Icons.spa_rounded, color: Color(0xFF009688)),
+    MoodOption(
+        label: 'خاشع', icon: Icons.mosque_rounded, color: Color(0xFF1F6F4A)),
+    MoodOption(
+        label: 'متفائل',
+        icon: Icons.wb_sunny_rounded,
+        color: Color(0xFFFFB300)),
+    MoodOption(
+        label: 'مشتت', icon: Icons.blur_on_rounded, color: Color(0xFF7E57C2)),
+    MoodOption(
+        label: 'نادم',
+        icon: Icons.water_drop_rounded,
+        color: Color(0xFF3F51B5)),
   ];
 
   static MoodOption? find(String? label) {
@@ -52,11 +66,13 @@ abstract final class AppMoods {
 class MoodDisplayChip extends StatelessWidget {
   final String mood;
   final bool dense;
+  final VoidCallback? onRemove;
 
   const MoodDisplayChip({
     super.key,
     required this.mood,
     this.dense = false,
+    this.onRemove,
   });
 
   @override
@@ -78,8 +94,8 @@ class MoodDisplayChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: dense ? 16 : 18, color: color),
-          const SizedBox(width: 6),
+          Icon(icon, size: dense ? 15 : 18, color: color),
+          const SizedBox(width: 5),
           Text(
             mood,
             style: TextStyle(
@@ -88,6 +104,13 @@ class MoodDisplayChip extends StatelessWidget {
               color: color,
             ),
           ),
+          if (onRemove != null) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: onRemove,
+              child: Icon(Icons.close_rounded, size: 14, color: color),
+            ),
+          ],
         ],
       ),
     );

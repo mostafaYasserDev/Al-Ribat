@@ -259,8 +259,8 @@ class _ReflectionEntryCardState extends State<ReflectionEntryCard> {
                             label: entry.linkedContextTitle!,
                             color: colorScheme.secondary,
                           ),
-                        if (entry.mood != null)
-                          MoodDisplayChip(mood: entry.mood!, dense: true),
+                        for (final m in entry.moods)
+                          MoodDisplayChip(mood: m, dense: true),
                       ],
                     ),
                     const SizedBox(height: 6),
