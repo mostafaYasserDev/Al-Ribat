@@ -5,6 +5,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import '../../domain/active_focus_state.dart';
 import '../../domain/focus_time_formatter.dart';
 
+/// Instant Apple-style sliding segmented control for switching focus modes.
 class FocusModeSelector extends StatelessWidget {
   const FocusModeSelector({
     super.key,
@@ -21,243 +22,169 @@ class FocusModeSelector extends StatelessWidget {
   final DateTime? nextPrayerTime;
   final int? remainingPrayerMinutes;
 
-  IconData _modeIcon(FocusSessionMode mode) {
-    switch (mode) {
-      case FocusSessionMode.untilPrayer:
-        return Icons.mosque_rounded;
-      case FocusSessionMode.pomodoro:
-      case FocusSessionMode.customTimer:
-        return Icons.timer_outlined;
-      case FocusSessionMode.openStopwatch:
-        return Icons.all_inclusive_rounded;
-    }
-  }
+  static const _modes = [
+    (
+      mode: FocusSessionMode.untilPrayer,
+      label: 'حتى الأذان',
+      icon: Icons.mosque_rounded,
+    ),
+    (
+      mode: FocusSessionMode.customTimer,
+      label: 'مؤقت',
+      icon: Icons.timer_outlined,
+    ),
+    (
+      mode: FocusSessionMode.openStopwatch,
+      label: 'مفتوح',
+      icon: Icons.all_inclusive_rounded,
+    ),
+  ];
 
-  String _modeTitle(FocusSessionMode mode) {
-    switch (mode) {
-      case FocusSessionMode.untilPrayer:
-        return nextPrayerName != null
-            ? 'الرباط حتى صلاة ${nextPrayerName!}'
-            : 'الرباط حتى الأذان';
-      case FocusSessionMode.pomodoro:
-      case FocusSessionMode.customTimer:
-        return 'مؤقت مخصص';
-      case FocusSessionMode.openStopwatch:
-        return 'ساعة إيقاف مفتوحة';
-    }
-  }
+  FocusSessionMode get _effectiveMode =>
+      selectedMode == FocusSessionMode.pomodoro
+          ? FocusSessionMode.customTimer
+          : selectedMode;
 
-  String _modeSubtitle(FocusSessionMode mode) {
-    switch (mode) {
+  String _subtitle() {
+    switch (_effectiveMode) {
       case FocusSessionMode.untilPrayer:
-        if (nextPrayerTime != null && remainingPrayerMinutes != null) {
+        if (nextPrayerName != null &&
+            nextPrayerTime != null &&
+            remainingPrayerMinutes != null) {
           final formatted = DateFormat('hh:mm a', 'ar').format(nextPrayerTime!);
           final readable = FocusTimeFormatter.formatDurationReadable(
               remainingPrayerMinutes!);
-          return 'الأذان $formatted · متبقي $readable';
+          return 'الرباط حتى $nextPrayerName ($formatted) · متبقي $readable';
         }
         return 'يضبط المؤقت تلقائياً حتى موعد الصلاة القادمة';
       case FocusSessionMode.pomodoro:
       case FocusSessionMode.customTimer:
-        return 'حدد الساعات والدقائق والثواني بدقة أو اختر مدة جاهزة';
+        return 'اختر مدة جاهزة أو خصّص الساعات والدقائق';
       case FocusSessionMode.openStopwatch:
         return 'عدّ تصاعدي حر بدون حد زمني';
     }
   }
 
-  void _openModePicker(BuildContext context) {
-    final effective = selectedMode == FocusSessionMode.pomodoro
-        ? FocusSessionMode.customTimer
-        : selectedMode;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final trackColor = isDark
+        ? const Color(0xFF0A101D)
+        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.72);
+    final pillColor = isDark ? const Color(0xFF1D2C46) : Colors.white;
+    final selectedIndex = _modes
+        .indexWhere((m) => m.mode == _effectiveMode)
+        .clamp(0, _modes.length - 1);
 
-    const modes = [
-      FocusSessionMode.untilPrayer,
-      FocusSessionMode.customTimer,
-      FocusSessionMode.openStopwatch,
-    ];
-
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        final colorScheme = theme.colorScheme;
-
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'اختر أسلوب الجلسة',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                ...modes.map((mode) {
-                  final isSelected = effective == mode;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        onSelect(mode);
-                        Navigator.pop(ctx);
-                      },
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 46,
+            padding: const EdgeInsets.all(3.5),
+            decoration: BoxDecoration(
+              color: trackColor,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final segmentWidth = constraints.maxWidth / _modes.length;
+                return Stack(
+                  children: [
+                    AnimatedPositionedDirectional(
+                      duration: const Duration(milliseconds: 240),
+                      curve: Curves.easeOutCubic,
+                      start: selectedIndex * segmentWidth,
+                      top: 0,
+                      bottom: 0,
+                      width: segmentWidth,
                       child: Container(
-                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: isSelected
-                              ? colorScheme.primaryContainer
-                                  .withValues(alpha: 0.45)
-                              : colorScheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isSelected
-                                ? colorScheme.primary
-                                : colorScheme.outlineVariant
-                                    .withValues(alpha: 0.4),
-                            width: isSelected ? 1.5 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 20,
-                              backgroundColor: isSelected
-                                  ? colorScheme.primary
-                                  : colorScheme.surfaceContainerHighest,
-                              child: Icon(
-                                _modeIcon(mode),
-                                size: 20,
-                                color: isSelected
-                                    ? Colors.white
-                                    : colorScheme.primary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _modeTitle(mode),
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                          color: pillColor,
+                          borderRadius: BorderRadius.circular(10.5),
+                          boxShadow: isDark
+                              ? null
+                              : [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.07),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _modeSubtitle(mode),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: colorScheme.onSurfaceVariant,
+                                ],
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: _modes.map((item) {
+                        final isSelected = item.mode == _effectiveMode;
+                        return Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              if (isSelected) return;
+                              HapticFeedback.selectionClick();
+                              onSelect(item.mode);
+                            },
+                            child: Center(
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    item.icon,
+                                    size: 16,
+                                    color: isSelected
+                                        ? theme.colorScheme.primary
+                                        : theme.colorScheme.onSurface
+                                            .withValues(alpha: 0.55),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      item.label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style:
+                                          theme.textTheme.bodyMedium?.copyWith(
+                                        fontSize: 13,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        color: isSelected
+                                            ? theme.colorScheme.onSurface
+                                            : theme.colorScheme.onSurface
+                                                .withValues(alpha: 0.62),
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            if (isSelected)
-                              Icon(Icons.check_circle_rounded,
-                                  color: colorScheme.primary),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          _openModePicker(context);
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(_modeIcon(selectedMode),
-                  color: colorScheme.primary, size: 22),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _modeTitle(selectedMode),
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      _modeSubtitle(selectedMode),
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'تغيير',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    Icon(Icons.keyboard_arrow_down_rounded,
-                        size: 16, color: colorScheme.primary),
-                  ],
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
-        ),
+          const SizedBox(height: 8),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: Text(
+              _subtitle(),
+              key: ValueKey(_subtitle()),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontSize: 12,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.58),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
