@@ -83,7 +83,7 @@ void main() {
 
   testWidgets('stats screen opens from app bar without errors', (tester) async {
     await pumpApp(tester);
-    await tester.tap(find.byIcon(Icons.bar_chart_rounded));
+    await tester.tap(find.byIcon(Icons.insights_rounded));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(tester.takeException(), isNull);
