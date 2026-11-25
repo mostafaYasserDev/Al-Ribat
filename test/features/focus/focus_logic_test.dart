@@ -58,23 +58,26 @@ void main() {
     });
   });
 
-  group('AmbientSoundNotifier Tests', () {
-    test('Changing soundscape updates isPlaying state', () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
+  group('FocusTimeFormatter Tests', () {
+    test('formatCountdown formats sub-hour as MM:SS and >=1h as HH:MM:SS', () {
+      expect(FocusTimeFormatter.formatCountdown(0), '00:00');
+      expect(FocusTimeFormatter.formatCountdown(59), '00:59');
+      expect(FocusTimeFormatter.formatCountdown(25 * 60), '25:00');
+      expect(FocusTimeFormatter.formatCountdown(3599), '59:59');
+      expect(FocusTimeFormatter.formatCountdown(3600), '01:00:00');
+      expect(FocusTimeFormatter.formatCountdown(3665), '01:01:05');
+      expect(FocusTimeFormatter.formatCountdown(649 * 60), '10:49:00');
+      expect(FocusTimeFormatter.formatCountdown(-10), '00:00');
+    });
 
-      final notifier = container.read(ambientSoundProvider.notifier);
-      expect(container.read(ambientSoundProvider).soundscape,
-          AmbientSoundscape.silent);
-      expect(container.read(ambientSoundProvider).isPlaying, isFalse);
-
-      notifier.setSoundscape(AmbientSoundscape.rain);
-      expect(container.read(ambientSoundProvider).soundscape,
-          AmbientSoundscape.rain);
-      expect(container.read(ambientSoundProvider).isPlaying, isTrue);
-
-      notifier.setVolume(0.5);
-      expect(container.read(ambientSoundProvider).volume, 0.5);
+    test('formatDurationReadable formats minutes and hours cleanly in Arabic',
+        () {
+      expect(FocusTimeFormatter.formatDurationReadable(0), '0د');
+      expect(FocusTimeFormatter.formatDurationReadable(25), '25د');
+      expect(FocusTimeFormatter.formatDurationReadable(60), '1س');
+      expect(FocusTimeFormatter.formatDurationReadable(90), '1س 30د');
+      expect(FocusTimeFormatter.formatDurationReadable(649), '10س 49د');
+      expect(FocusTimeFormatter.formatDurationReadable(-5), '0د');
     });
   });
 

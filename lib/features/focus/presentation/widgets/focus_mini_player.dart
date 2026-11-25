@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/active_focus_notifier.dart';
 import '../../domain/active_focus_state.dart';
+import '../../domain/focus_time_formatter.dart';
 import 'focus_full_screen_zen.dart';
 
 class FocusMiniPlayer extends ConsumerWidget {
@@ -21,14 +22,10 @@ class FocusMiniPlayer extends ConsumerWidget {
         ? 1.0
         : (active.elapsedSeconds / totalSec).clamp(0.0, 1.0);
 
-    final m = active.mode == FocusSessionMode.openStopwatch
-        ? active.elapsedSeconds ~/ 60
-        : active.remainingSeconds ~/ 60;
-    final s = active.mode == FocusSessionMode.openStopwatch
-        ? active.elapsedSeconds % 60
-        : active.remainingSeconds % 60;
-    final displayTime =
-        '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    final secondsToDisplay = active.mode == FocusSessionMode.openStopwatch
+        ? active.elapsedSeconds
+        : active.remainingSeconds;
+    final displayTime = FocusTimeFormatter.formatCountdown(secondsToDisplay);
 
     return Container(
       margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -102,24 +99,28 @@ class FocusMiniPlayer extends ConsumerWidget {
                       Text(
                         active.isPaused
                             ? 'موقوفة مؤقتاً · انقر للتكبير'
-                            : (active.linkedActivityTitle != null
-                                ? '${active.linkedActivityTitle!} · $displayTime'
-                                : 'جلسة تركيز · $displayTime'),
+                            : (active.linkedActivityTitle ?? 'جلسة تركيز نشطة'),
                         style: TextStyle(
                           fontSize: 11,
                           color: colorScheme.onSurfaceVariant,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
                 ),
-                Text(
-                  displayTime,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color:
-                        active.isPaused ? Colors.orange : colorScheme.primary,
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Text(
+                    displayTime,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color:
+                          active.isPaused ? Colors.orange : colorScheme.primary,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 6),

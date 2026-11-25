@@ -8,96 +8,54 @@ class FocusModeSelector extends StatelessWidget {
     super.key,
     required this.selectedMode,
     required this.onSelect,
-    this.remainingUntilPrayerMinutes,
-    this.nextPrayerName,
   });
 
   final FocusSessionMode selectedMode;
   final ValueChanged<FocusSessionMode> onSelect;
-  final int? remainingUntilPrayerMinutes;
-  final String? nextPrayerName;
 
   @override
   Widget build(BuildContext context) {
-    final untilPrayerText =
-        nextPrayerName != null && remainingUntilPrayerMinutes != null
-            ? 'الرباط حتى ${nextPrayerName!} (${remainingUntilPrayerMinutes!}د)'
-            : 'الرباط حتى الأذان';
+    final effectiveSelection = selectedMode == FocusSessionMode.pomodoro
+        ? FocusSessionMode.customTimer
+        : selectedMode;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          _buildChip(
-            context,
-            mode: FocusSessionMode.untilPrayer,
-            icon: Icons.mosque_rounded,
-            label: untilPrayerText,
+      child: SegmentedButton<FocusSessionMode>(
+        segments: const [
+          ButtonSegment<FocusSessionMode>(
+            value: FocusSessionMode.untilPrayer,
+            label: Text('حتى الأذان', overflow: TextOverflow.ellipsis),
+            icon: Icon(Icons.mosque_rounded, size: 18),
           ),
-          const SizedBox(width: 8),
-          _buildChip(
-            context,
-            mode: FocusSessionMode.pomodoro,
-            icon: Icons.timer_outlined,
-            label: 'بومودورو (25د)',
+          ButtonSegment<FocusSessionMode>(
+            value: FocusSessionMode.customTimer,
+            label: Text('مؤقت مخصص', overflow: TextOverflow.ellipsis),
+            icon: Icon(Icons.timer_outlined, size: 18),
           ),
-          const SizedBox(width: 8),
-          _buildChip(
-            context,
-            mode: FocusSessionMode.customTimer,
-            icon: Icons.tune_rounded,
-            label: 'مؤقت مخصص',
-          ),
-          const SizedBox(width: 8),
-          _buildChip(
-            context,
-            mode: FocusSessionMode.openStopwatch,
-            icon: Icons.all_inclusive_rounded,
-            label: 'تركيز مفتوح',
+          ButtonSegment<FocusSessionMode>(
+            value: FocusSessionMode.openStopwatch,
+            label: Text('ساعة إيقاف', overflow: TextOverflow.ellipsis),
+            icon: Icon(Icons.all_inclusive_rounded, size: 18),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildChip(
-    BuildContext context, {
-    required FocusSessionMode mode,
-    required IconData icon,
-    required String label,
-  }) {
-    final isSelected = selectedMode == mode;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return ActionChip(
-      avatar: Icon(
-        icon,
-        size: 16,
-        color: isSelected ? Colors.white : colorScheme.primary,
-      ),
-      label: Text(
-        label,
-        style: TextStyle(
-          fontSize: 12.5,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-          color: isSelected ? Colors.white : colorScheme.onSurface,
+        selected: {effectiveSelection},
+        showSelectedIcon: false,
+        style: ButtonStyle(
+          visualDensity: VisualDensity.comfortable,
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          textStyle: const WidgetStatePropertyAll(
+            TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
         ),
+        onSelectionChanged: (selection) {
+          if (selection.isEmpty) return;
+          HapticFeedback.selectionClick();
+          onSelect(selection.first);
+        },
       ),
-      backgroundColor: isSelected
-          ? colorScheme.primary
-          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-      side: BorderSide(
-        color: isSelected
-            ? colorScheme.primary
-            : colorScheme.outlineVariant.withValues(alpha: 0.35),
-      ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      onPressed: () {
-        HapticFeedback.selectionClick();
-        onSelect(mode);
-      },
     );
   }
 }

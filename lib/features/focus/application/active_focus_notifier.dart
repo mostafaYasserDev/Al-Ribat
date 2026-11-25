@@ -9,7 +9,6 @@ import 'package:al_ribat/services/focus_foreground_service.dart';
 import 'package:al_ribat/services/motivation_quotes.dart';
 import '../domain/active_focus_state.dart';
 import '../domain/work_session_item.dart';
-import 'ambient_sound_service.dart';
 
 final activeFocusProvider =
     NotifierProvider<ActiveFocusNotifier, ActiveFocusState?>(
@@ -236,7 +235,6 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
       if (current.remainingSeconds <= 1) {
         if (current.mode == FocusSessionMode.pomodoro && !current.isBreak) {
           // Switch to 5-minute break
-          ref.read(ambientSoundProvider.notifier).playCompletionChime();
           state = current.copyWith(
             title: 'استراحة قصيرة ☕',
             isBreak: true,
@@ -341,7 +339,6 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     );
 
     ref.read(lastCompletedSessionProvider.notifier).state = session;
-    ref.read(ambientSoundProvider.notifier).playCompletionChime();
 
     final quote = MotivationQuotes.randomLine();
     try {
