@@ -17,6 +17,7 @@ import 'widgets/focus_full_screen_zen.dart';
 import 'widgets/focus_history_sheet.dart';
 import 'widgets/focus_linked_task_card.dart';
 import 'widgets/focus_mode_selector.dart';
+import 'widgets/focus_session_controls.dart';
 import 'widgets/focus_timer_card.dart';
 
 class FocusSessionsScreen extends ConsumerStatefulWidget {
@@ -340,66 +341,21 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
                       duration: const Duration(milliseconds: 200),
                       switchInCurve: Curves.easeOutCubic,
                       child: isSessionActive
-                          ? Row(
+                          ? FocusActiveControls(
                               key: const ValueKey('active_controls'),
-                              children: [
-                                Expanded(
-                                  flex: 3,
-                                  child: FilledButton.icon(
-                                    style: FilledButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 15),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      HapticFeedback.lightImpact();
-                                      if (activeSession.isPaused) {
-                                        ref
-                                            .read(activeFocusProvider.notifier)
-                                            .resumeSession();
-                                      } else {
-                                        ref
-                                            .read(activeFocusProvider.notifier)
-                                            .pauseSession();
-                                      }
-                                    },
-                                    icon: Icon(
-                                      isPaused
-                                          ? Icons.play_arrow_rounded
-                                          : Icons.pause_rounded,
-                                    ),
-                                    label: Text(
-                                      isPaused ? 'استئناف' : 'إيقاف مؤقت',
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.w700),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  flex: 2,
-                                  child: OutlinedButton.icon(
-                                    style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 15),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    onPressed: () =>
-                                        _showFinishSessionDialog(context),
-                                    icon: const Icon(Icons.done_all_rounded,
-                                        size: 18),
-                                    label: const Text(
-                                      'إنهاء',
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.w700),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                              isPaused: isPaused,
+                              onTogglePause: () {
+                                if (activeSession.isPaused) {
+                                  ref
+                                      .read(activeFocusProvider.notifier)
+                                      .resumeSession();
+                                } else {
+                                  ref
+                                      .read(activeFocusProvider.notifier)
+                                      .pauseSession();
+                                }
+                              },
+                              onFinish: () => _showFinishSessionDialog(context),
                             )
                           : SizedBox(
                               key: const ValueKey('idle_controls'),
@@ -450,34 +406,14 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
   }
 
   Future<void> _showFinishSessionDialog(BuildContext context) async {
-    await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('إنهاء الجلسة'),
-        content: const Text(
-          'هل ترغب في حفظ الدقائق المنجزة حتى الآن أم إلغاء الجلسة؟',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx, false);
-              ref.read(activeFocusProvider.notifier).cancelSession();
-            },
-            child: const Text(
-              'إلغاء دون حفظ',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx, true);
-              ref.read(activeFocusProvider.notifier).savePartial();
-            },
-            child: const Text('حفظ واكتمال'),
-          ),
-        ],
-      ),
-    );
+    final action = await showFinishSessionSheet(context);
+    if (action == null || !mounted) return;
+    final notifier = ref.read(activeFocusProvider.notifier);
+    if (action == FinishSessionAction.saveAndFinish) {
+      notifier.savePartial();
+    } else {
+      notifier.cancelSession();
+    }
   }
 }
 

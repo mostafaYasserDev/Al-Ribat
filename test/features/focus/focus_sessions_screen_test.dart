@@ -98,9 +98,33 @@ void main() {
     expect(find.text('إيقاف مؤقت'), findsOneWidget);
     expect(find.text('إنهاء'), findsOneWidget);
 
+    await tester.tap(find.text('إيقاف مؤقت'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 220));
+    expect(find.text('استئناف'), findsOneWidget);
+    expect(find.text('موقوفة مؤقتاً'), findsOneWidget);
+
+    await tester.tap(find.text('استئناف'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 220));
+    expect(find.text('إيقاف مؤقت'), findsOneWidget);
+
     await tester.tap(find.text('إنهاء'));
     await tester.pumpAndSettle();
+    expect(find.text('حفظ واكتمال'), findsOneWidget);
+    expect(find.text('متابعة التركيز'), findsOneWidget);
     await tester.tap(find.text('إلغاء دون حفظ'));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('Opens FocusHistorySheet with grouped layout', (tester) async {
+    await tester.pumpWidget(buildTestApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.history_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('سجل جلسات التركيز'), findsOneWidget);
+    expect(find.text('لا توجد جلسات مسجلة بعد'), findsOneWidget);
   });
 }
