@@ -40,7 +40,7 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
     super.initState();
     _dailyQuote = MotivationQuotes.randomLine();
     _prayerRefreshTimer = Timer.periodic(
-      const Duration(seconds: 1),
+      const Duration(seconds: 30),
       (_) {
         if (mounted &&
             _selectedMode == FocusSessionMode.untilPrayer &&
@@ -145,8 +145,9 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
     final nextPrayer = schedule == null ? null : _nextPrayer(schedule);
     final remainingPrayerSec =
         nextPrayer?.time.difference(DateTime.now()).inSeconds.clamp(1, 86400);
-    final remainingPrayerMin =
-        remainingPrayerSec != null ? (remainingPrayerSec / 60).ceil() : null;
+    final remainingPrayerMin = remainingPrayerSec != null
+        ? FocusTimeFormatter.roundToNearestMinute(remainingPrayerSec)
+        : null;
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -171,8 +172,8 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
           : (activeSession.elapsedSeconds / totalSec).clamp(0.0, 1.0);
     } else {
       if (_selectedMode == FocusSessionMode.untilPrayer &&
-          remainingPrayerSec != null) {
-        timerSeconds = remainingPrayerSec;
+          remainingPrayerMin != null) {
+        timerSeconds = remainingPrayerMin * 60;
       } else if (_selectedMode == FocusSessionMode.openStopwatch) {
         timerSeconds = 0;
       } else {

@@ -54,4 +54,12 @@ abstract final class FocusTimeFormatter {
     }
     return '$minutesد';
   }
+
+  /// Rounds [totalSeconds] to the nearest minute using a 30-second threshold
+  /// (at least 1 minute) for calm idle countdown displays.
+  static int roundToNearestMinute(int totalSeconds) {
+    if (totalSeconds <= 0) return 1;
+    final rounded = (totalSeconds + 30) ~/ 60;
+    return rounded < 1 ? 1 : rounded;
+  }
 }

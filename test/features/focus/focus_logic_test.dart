@@ -107,6 +107,13 @@ void main() {
       expect(FocusTimeFormatter.formatSecondsReadable(25 * 60), '25د');
       expect(FocusTimeFormatter.formatSecondsReadable(90 * 60), '1س 30د');
     });
+
+    test('roundToNearestMinute rounds at 30-second threshold', () {
+      expect(FocusTimeFormatter.roundToNearestMinute(10), 1);
+      expect(FocusTimeFormatter.roundToNearestMinute(10 * 60 + 29), 10);
+      expect(FocusTimeFormatter.roundToNearestMinute(10 * 60 + 30), 11);
+      expect(FocusTimeFormatter.roundToNearestMinute(10 * 60 + 45), 11);
+    });
   });
 
   group('ActiveFocusNotifier Multi-Mode Tests', () {
