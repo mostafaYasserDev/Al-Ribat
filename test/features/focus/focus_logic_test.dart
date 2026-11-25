@@ -252,5 +252,24 @@ void main() {
       final remaining = await container.read(workSessionsProvider.future);
       expect(remaining, isEmpty);
     });
+
+    test('startUntilPrayer preserves exact remaining seconds until adhan',
+        () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final notifier = container.read(activeFocusProvider.notifier);
+      final target =
+          DateTime.now().add(const Duration(minutes: 10, seconds: 25));
+      await notifier.startUntilPrayer(
+        title: 'الرباط حتى المغرب',
+        nextPrayerTime: target,
+      );
+
+      final state = container.read(activeFocusProvider);
+      expect(state, isNotNull);
+      expect(state!.mode, FocusSessionMode.untilPrayer);
+      expect(state.remainingSeconds, inInclusiveRange(620, 626));
+    });
   });
 }

@@ -40,9 +40,11 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
     super.initState();
     _dailyQuote = MotivationQuotes.randomLine();
     _prayerRefreshTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 1),
       (_) {
-        if (mounted && ref.read(activeFocusProvider) == null) {
+        if (mounted &&
+            _selectedMode == FocusSessionMode.untilPrayer &&
+            ref.read(activeFocusProvider) == null) {
           setState(() {});
         }
       },
@@ -55,15 +57,17 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
     super.dispose();
   }
 
-  PrayerTime _nextPrayer(PrayerSchedule schedule, PrayerPhase currentPhase) {
-    final idx = schedule.today.indexWhere((p) => p.phase == currentPhase);
-    if (idx >= 0 && idx < schedule.today.length - 1) {
-      return schedule.today[idx + 1];
+  PrayerTime _nextPrayer(PrayerSchedule schedule) {
+    final now = DateTime.now();
+    for (final p in schedule.today) {
+      if (p.time.isAfter(now)) {
+        return p;
+      }
     }
     return schedule.tomorrowFajr;
   }
 
-  void _onStartFocus(PrayerSchedule? schedule, PrayerPhase currentPhase) {
+  void _onStartFocus(PrayerSchedule? schedule) {
     HapticFeedback.mediumImpact();
     final notifier = ref.read(activeFocusProvider.notifier);
     final taskTitle = _linkedActivity?.title;
@@ -71,7 +75,7 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
     switch (_selectedMode) {
       case FocusSessionMode.untilPrayer:
         if (schedule != null) {
-          final next = _nextPrayer(schedule, currentPhase);
+          final next = _nextPrayer(schedule);
           notifier.startUntilPrayer(
             title: taskTitle != null
                 ? 'رباط $taskTitle'
@@ -136,14 +140,13 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
   Widget build(BuildContext context) {
     final activeSession = ref.watch(activeFocusProvider);
     final scheduleAsync = ref.watch(prayerScheduleProvider);
-    final dayState = ref.watch(dayStateProvider);
     final schedule = scheduleAsync.valueOrNull;
 
-    final nextPrayer = schedule == null
-        ? null
-        : _nextPrayer(schedule, dayState.currentPrayerPhase);
+    final nextPrayer = schedule == null ? null : _nextPrayer(schedule);
+    final remainingPrayerSec =
+        nextPrayer?.time.difference(DateTime.now()).inSeconds.clamp(1, 86400);
     final remainingPrayerMin =
-        nextPrayer?.time.difference(DateTime.now()).inMinutes.clamp(1, 1440);
+        remainingPrayerSec != null ? (remainingPrayerSec / 60).ceil() : null;
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -168,8 +171,8 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
           : (activeSession.elapsedSeconds / totalSec).clamp(0.0, 1.0);
     } else {
       if (_selectedMode == FocusSessionMode.untilPrayer &&
-          remainingPrayerMin != null) {
-        timerSeconds = remainingPrayerMin * 60;
+          remainingPrayerSec != null) {
+        timerSeconds = remainingPrayerSec;
       } else if (_selectedMode == FocusSessionMode.openStopwatch) {
         timerSeconds = 0;
       } else {
@@ -368,8 +371,7 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
                           borderRadius: BorderRadius.circular(20)),
                       elevation: 2,
                     ),
-                    onPressed: () =>
-                        _onStartFocus(schedule, dayState.currentPrayerPhase),
+                    onPressed: () => _onStartFocus(schedule),
                     icon: const Icon(Icons.play_arrow_rounded, size: 24),
                     label: const Text(
                       'ابدأ التركيز الآن',

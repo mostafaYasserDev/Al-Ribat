@@ -174,6 +174,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     await startSession(
       title: title.isEmpty ? 'الرباط حتى الأذان' : title,
       plannedMinutes: plannedMin,
+      plannedSeconds: diffSeconds,
       mode: FocusSessionMode.untilPrayer,
       linkedActivityId: linkedActivityId,
       linkedActivityTitle: linkedActivityTitle,
