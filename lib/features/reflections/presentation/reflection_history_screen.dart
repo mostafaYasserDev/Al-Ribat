@@ -136,7 +136,13 @@ class _ReflectionHistoryScreenState
           if (pinned.isNotEmpty) ...[
             _sectionLabel(context, 'مثبتة'),
             const SizedBox(height: 8),
-            _buildNotesLayout(pinned),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: KeyedSubtree(
+                key: ValueKey('pinned_$_isGridView'),
+                child: _buildNotesLayout(pinned),
+              ),
+            ),
             if (others.isNotEmpty) const SizedBox(height: 18),
           ],
           if (others.isNotEmpty) ...[
@@ -144,7 +150,13 @@ class _ReflectionHistoryScreenState
               _sectionLabel(context, 'أخرى'),
               const SizedBox(height: 8),
             ],
-            _buildNotesLayout(others),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: KeyedSubtree(
+                key: ValueKey('others_$_isGridView'),
+                child: _buildNotesLayout(others),
+              ),
+            ),
           ],
         ],
       ],
