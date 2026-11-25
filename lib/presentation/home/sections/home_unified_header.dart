@@ -23,15 +23,6 @@ class _HomeUnifiedPrayerHeader extends StatelessWidget {
   final ValueChanged<PrayerPhase> onSelectPhase;
   final bool light;
 
-  int _countForPhase(PrayerPhase phase) {
-    return activitiesForPhase(activities, phase, selectedDate).length;
-  }
-
-  int _completedForPhase(PrayerPhase phase, String dateStr) {
-    final list = activitiesForPhase(activities, phase, selectedDate);
-    return list.where((a) => a.historyDates.contains(dateStr)).length;
-  }
-
   IconData _iconForPhase(PrayerPhase phase) {
     switch (phase) {
       case PrayerPhase.fajr:
@@ -60,7 +51,6 @@ class _HomeUnifiedPrayerHeader extends StatelessWidget {
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final dateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
     final remainingFormatted = ArabicTimeFormatter.formatRemaining(remaining);
 
     final gradientColors = light
@@ -186,8 +176,6 @@ class _HomeUnifiedPrayerHeader extends StatelessWidget {
                       prayer,
                       selectedPhase == prayer.phase,
                       currentPhase == prayer.phase,
-                      _countForPhase(prayer.phase),
-                      _completedForPhase(prayer.phase, dateStr),
                       colorScheme,
                     ),
                   ),
@@ -271,12 +259,8 @@ class _HomeUnifiedPrayerHeader extends StatelessWidget {
     PrayerTime prayer,
     bool isSelected,
     bool isNow,
-    int count,
-    int completed,
     ColorScheme colorScheme,
   ) {
-    final allDone = count > 0 && completed >= count;
-
     return InkWell(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -337,37 +321,6 @@ class _HomeUnifiedPrayerHeader extends StatelessWidget {
                     : colorScheme.onSurfaceVariant,
               ),
             ),
-            if (count > 0) ...[
-              const SizedBox(height: 3),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? colorScheme.onPrimary.withValues(alpha: 0.25)
-                      : (allDone
-                          ? Colors.green.withValues(alpha: 0.15)
-                          : colorScheme.surfaceContainerHighest),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: allDone
-                    ? Icon(
-                        Icons.check,
-                        size: 9,
-                        color:
-                            isSelected ? colorScheme.onPrimary : Colors.green,
-                      )
-                    : Text(
-                        '$completed/$count',
-                        style: TextStyle(
-                          fontSize: 8.5,
-                          fontWeight: FontWeight.bold,
-                          color: isSelected
-                              ? colorScheme.onPrimary
-                              : colorScheme.primary,
-                        ),
-                      ),
-              ),
-            ],
           ],
         ),
       ),
