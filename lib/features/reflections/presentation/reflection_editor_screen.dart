@@ -15,13 +15,15 @@ import 'widgets/reflection_dialogs.dart';
 enum _ToolbarPanel { none, colors, projects, moods }
 
 class ReflectionEditorScreen extends ConsumerStatefulWidget {
-  const ReflectionEditorScreen({super.key, this.entry});
+  const ReflectionEditorScreen({super.key, this.entry, this.initialMood});
 
   final ReflectionEntry? entry;
+  final String? initialMood;
 
   static Future<void> open(
     BuildContext context, {
     ReflectionEntry? entry,
+    String? initialMood,
     BuildContext? sourceContext,
     Color? sourceColor,
     double sourceRadius = 16,
@@ -32,7 +34,10 @@ class ReflectionEditorScreen extends ConsumerStatefulWidget {
         sourceRect: sourceRect,
         sourceColor: sourceColor,
         sourceRadius: sourceRadius,
-        builder: (_) => ReflectionEditorScreen(entry: entry),
+        builder: (_) => ReflectionEditorScreen(
+          entry: entry,
+          initialMood: initialMood,
+        ),
       ),
     );
   }
@@ -62,7 +67,7 @@ class _ReflectionEditorScreenState
     _bodyController = TextEditingController(text: e?.text ?? '');
     _isPinned = e?.isPinned ?? false;
     _colorKey = e?.colorKey;
-    _mood = e?.mood;
+    _mood = e?.mood ?? widget.initialMood;
     _linkedContextTitle = e?.linkedContextTitle;
 
     _titleController.addListener(_onTextChanged);

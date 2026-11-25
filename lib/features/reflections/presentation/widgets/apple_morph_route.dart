@@ -22,8 +22,8 @@ class AppleMorphRoute<T> extends PageRouteBuilder<T> {
   }) : super(
           opaque: false,
           barrierDismissible: false,
-          transitionDuration: const Duration(milliseconds: 440),
-          reverseTransitionDuration: const Duration(milliseconds: 360),
+          transitionDuration: const Duration(milliseconds: 350),
+          reverseTransitionDuration: const Duration(milliseconds: 270),
           pageBuilder: (context, animation, secondaryAnimation) =>
               builder(context),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -91,7 +91,7 @@ class AppleMorphRoute<T> extends PageRouteBuilder<T> {
                       height: rect.height,
                       child: Material(
                         color: resolvedBg,
-                        elevation: 10 * (1.0 - curved.value),
+                        elevation: 0,
                         borderRadius: BorderRadius.circular(radius),
                         clipBehavior: Clip.antiAlias,
                         child: OverflowBox(
