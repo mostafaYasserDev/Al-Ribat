@@ -18,7 +18,7 @@ import '../focus/focus_sessions_screen.dart';
 import '../history/reflection_history_screen.dart';
 import '../home/home_screen.dart';
 import '../projects/projects_screen.dart';
-import '../settings/settings_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../widgets/manual_location_dialog.dart';
 
 part 'app_shell_location_dialog.dart';

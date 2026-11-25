@@ -11,12 +11,9 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 
   Future<void> updateSettings(AppSettings settings) async {
-    state = const AsyncLoading();
-
     state = await AsyncValue.guard(() async {
       await ref.read(settingsRepositoryProvider).saveSettings(settings);
       return settings;
     });
-    ref.invalidate(prayerScheduleProvider);
   }
 }
