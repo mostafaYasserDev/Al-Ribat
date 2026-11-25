@@ -14,7 +14,8 @@ class GeneralTasksBottomCard extends StatefulWidget {
 
   final List<ActivityItem> tasks;
   final ValueChanged<ActivityItem> onToggleDone;
-  final ValueChanged<ActivityItem> onOpenDetails;
+  final void Function(ActivityItem task, BuildContext anchorContext)
+      onOpenDetails;
 
   @override
   State<GeneralTasksBottomCard> createState() => _GeneralTasksBottomCardState();
@@ -136,8 +137,8 @@ class _GeneralTasksBottomCardState extends State<GeneralTasksBottomCard> {
                             task: widget.tasks[i],
                             onToggleDone: () =>
                                 widget.onToggleDone(widget.tasks[i]),
-                            onOpenDetails: () =>
-                                widget.onOpenDetails(widget.tasks[i]),
+                            onOpenDetails: (anchorCtx) => widget.onOpenDetails(
+                                widget.tasks[i], anchorCtx),
                           ),
                           if (i < widget.tasks.length - 1)
                             Divider(

@@ -21,7 +21,8 @@ class ProjectGroupAccordion extends StatefulWidget {
   final List<ActivityItem> tasks;
   final Color color;
   final ValueChanged<ActivityItem> onToggleDone;
-  final ValueChanged<ActivityItem> onOpenDetails;
+  final void Function(ActivityItem task, BuildContext anchorContext)
+      onOpenDetails;
   final VoidCallback onAddTask;
 
   @override
@@ -190,8 +191,8 @@ class _ProjectGroupAccordionState extends State<ProjectGroupAccordion> {
                               task: widget.tasks[i],
                               onToggleDone: () =>
                                   widget.onToggleDone(widget.tasks[i]),
-                              onOpenDetails: () =>
-                                  widget.onOpenDetails(widget.tasks[i]),
+                              onOpenDetails: (anchorCtx) => widget
+                                  .onOpenDetails(widget.tasks[i], anchorCtx),
                             ),
                             if (i < widget.tasks.length - 1)
                               Divider(

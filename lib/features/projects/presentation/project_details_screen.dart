@@ -8,6 +8,7 @@ import 'package:al_ribat/domain/entities/activity_item.dart';
 import 'package:al_ribat/presentation/widgets/add_activity_sheet.dart';
 import '../data/project_metadata_service.dart';
 import '../domain/project_aggregate.dart';
+import 'widgets/anchored_popover.dart';
 import 'widgets/project_details_dialogs.dart';
 import 'widgets/project_details_header.dart';
 import 'widgets/project_group_accordion.dart';
@@ -75,94 +76,74 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
               actions: [
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: 12),
-                  child: PopupMenuButton<String>(
-                    tooltip: 'خيارات المشروع',
-                    offset: const Offset(0, 44),
-                    elevation: 8,
-                    color: cardColor,
-                    surfaceTintColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: theme.colorScheme.onSurface
-                            .withValues(alpha: isDark ? 0.1 : 0.07),
-                        width: 0.7,
-                      ),
-                    ),
-                    onSelected: (val) {
-                      HapticFeedback.selectionClick();
-                      if (val == 'rename') {
-                        ProjectDetailsDialogs.showRename(
-                            context, ref, proj.name);
-                      } else if (val == 'delete') {
-                        ProjectDetailsDialogs.showDelete(
-                            context, ref, proj.name);
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      PopupMenuItem<String>(
-                        value: 'rename',
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.edit_outlined,
-                              size: 18,
-                              color: theme.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 10),
-                            const Flexible(
-                              child: Text(
-                                'تعديل اسم المشروع',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontWeight: FontWeight.w600),
+                  child: Builder(
+                    builder: (btnCtx) => GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        showAnchoredPopover<void>(
+                          btnCtx,
+                          width: 215,
+                          preferAbove: false,
+                          anchorRadius: 12,
+                          builder: (popCtx) => Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              PopoverActionRow(
+                                icon: Icons.edit_outlined,
+                                color: const Color(0xFF007AFF),
+                                label: 'تعديل اسم المشروع',
+                                onTap: () {
+                                  Navigator.pop(popCtx);
+                                  ProjectDetailsDialogs.showRename(
+                                    context,
+                                    ref,
+                                    proj.name,
+                                  );
+                                },
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuDivider(height: 1),
-                      PopupMenuItem<String>(
-                        value: 'delete',
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.delete_outline_rounded,
-                              size: 18,
-                              color: theme.colorScheme.error,
-                            ),
-                            const SizedBox(width: 10),
-                            Flexible(
-                              child: Text(
-                                'حذف المشروع',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: theme.colorScheme.error,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              Divider(
+                                height: 0.6,
+                                thickness: 0.6,
+                                indent: 52,
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.08),
                               ),
-                            ),
-                          ],
+                              PopoverActionRow(
+                                icon: Icons.delete_outline_rounded,
+                                color: const Color(0xFFFF3B30),
+                                label: 'حذف المشروع',
+                                isDestructive: true,
+                                onTap: () {
+                                  Navigator.pop(popCtx);
+                                  ProjectDetailsDialogs.showDelete(
+                                    context,
+                                    ref,
+                                    proj.name,
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFF152036)
+                              : theme.colorScheme.surfaceContainerHighest
+                                  .withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ),
-                    ],
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF152036)
-                            : theme.colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.more_horiz_rounded,
-                        size: 20,
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.8),
+                        child: Icon(
+                          Icons.more_horiz_rounded,
+                          size: 20,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.8),
+                        ),
                       ),
                     ),
                   ),
@@ -253,8 +234,8 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
                       color: proj.color,
                       onToggleDone: (t) =>
                           ProjectTaskActions.toggleDone(context, ref, t),
-                      onOpenDetails: (t) =>
-                          ProjectTaskActions.openDetails(context, ref, t),
+                      onOpenDetails: (t, anchorCtx) =>
+                          ProjectTaskActions.openDetails(anchorCtx, ref, t),
                       onAddTask: () => _openAddTaskSheet(proj.name, e.key),
                     );
                   }),

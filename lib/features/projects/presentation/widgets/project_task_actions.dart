@@ -38,7 +38,7 @@ class ProjectTaskActions {
   }
 
   static void openDetails(
-    BuildContext context,
+    BuildContext anchorContext,
     WidgetRef ref,
     ActivityItem act,
   ) {
@@ -46,36 +46,36 @@ class ProjectTaskActions {
     final d =
         "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
-    showProjectTaskDetailsDialog(
-      context,
+    showProjectTaskPopover(
+      anchorContext,
       activity: act,
       dateStr: d,
       onToggleDone: () async {
-        Navigator.pop(context);
-        await toggleDone(context, ref, act);
+        Navigator.pop(anchorContext);
+        await toggleDone(anchorContext, ref, act);
       },
       onEdit: () {
-        Navigator.pop(context);
-        editActivity(context, ref, act);
+        Navigator.pop(anchorContext);
+        editActivity(anchorContext, ref, act);
       },
       onDelete: () async {
-        Navigator.pop(context);
+        Navigator.pop(anchorContext);
         await ref.read(activitiesProvider.notifier).deleteActivity(act.id);
-        if (context.mounted) appSnack(context, 'تم حذف المهمة.');
+        if (anchorContext.mounted) appSnack(anchorContext, 'تم حذف المهمة.');
       },
       onAddProgress: () {
-        Navigator.pop(context);
+        Navigator.pop(anchorContext);
         ActivityAddProgressSheet.show(
-          context,
+          anchorContext,
           activity: act,
           dateStr: d,
           onAdd: (val) async {
             await ref
                 .read(activitiesProvider.notifier)
                 .addProgress(act, d, val);
-            if (context.mounted) {
+            if (anchorContext.mounted) {
               appSnack(
-                context,
+                anchorContext,
                 'تمت إضافة $val ${act.goalUnit ?? ""} إلى "${act.title}"',
               );
             }

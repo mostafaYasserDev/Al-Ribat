@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:al_ribat/core/theme/app_icons.dart';
 import 'package:al_ribat/domain/entities/activity_item.dart';
 
-class ProjectTaskTile extends StatelessWidget {
+class ProjectTaskTile extends StatefulWidget {
   const ProjectTaskTile({
     super.key,
     required this.task,
@@ -14,10 +14,23 @@ class ProjectTaskTile extends StatelessWidget {
 
   final ActivityItem task;
   final VoidCallback onToggleDone;
-  final VoidCallback onOpenDetails;
+  final void Function(BuildContext anchorContext) onOpenDetails;
+
+  @override
+  State<ProjectTaskTile> createState() => _ProjectTaskTileState();
+}
+
+class _ProjectTaskTileState extends State<ProjectTaskTile> {
+  final _moreKey = GlobalKey();
+
+  void _openFromMore() {
+    final anchorCtx = _moreKey.currentContext ?? context;
+    widget.onOpenDetails(anchorCtx);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final task = widget.task;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final now = DateTime.now();
@@ -33,7 +46,7 @@ class ProjectTaskTile extends StatelessWidget {
           ? const Color(0xFF34C759).withValues(alpha: 0.05)
           : Colors.transparent,
       child: InkWell(
-        onTap: onOpenDetails,
+        onTap: _openFromMore,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
@@ -41,7 +54,7 @@ class ProjectTaskTile extends StatelessWidget {
               InkWell(
                 onTap: () {
                   HapticFeedback.selectionClick();
-                  onToggleDone();
+                  widget.onToggleDone();
                 },
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
@@ -112,10 +125,24 @@ class ProjectTaskTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
               ],
-              Icon(
-                Icons.more_horiz_rounded,
-                size: 19,
-                color: colorScheme.onSurface.withValues(alpha: 0.45),
+              GestureDetector(
+                key: _moreKey,
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _openFromMore();
+                },
+                child: SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Center(
+                    child: Icon(
+                      Icons.more_horiz_rounded,
+                      size: 19,
+                      color: colorScheme.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

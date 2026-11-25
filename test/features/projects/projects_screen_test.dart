@@ -98,13 +98,14 @@ void main() {
     expect(find.text('حفظ سورة الملك'), findsOneWidget);
     expect(find.byIcon(Icons.more_horiz_rounded), findsNWidgets(2));
 
-    // Open Apple-style task details popup
+    // Open anchored task popover from task three-dots
     await tester.tap(find.text('حفظ سورة الملك'));
     await tester.pumpAndSettle();
 
     expect(find.text('تم الإنجاز'), findsOneWidget);
-    expect(find.text('تعديل'), findsOneWidget);
-    expect(find.text('حذف'), findsOneWidget);
+    expect(find.text('تعديل المهمة'), findsOneWidget);
+    expect(find.text('حذف المهمة'), findsOneWidget);
+    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.pumpAndSettle();
@@ -115,6 +116,7 @@ void main() {
 
     expect(find.text('تعديل اسم المشروع'), findsOneWidget);
     expect(find.text('حذف المشروع'), findsOneWidget);
+    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
   });
 
   testWidgets('ProjectsScreen opens templates sheet', (tester) async {

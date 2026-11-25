@@ -140,8 +140,8 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
                       tasks: general,
                       onToggleDone: (act) =>
                           ProjectTaskActions.toggleDone(context, ref, act),
-                      onOpenDetails: (act) =>
-                          ProjectTaskActions.openDetails(context, ref, act),
+                      onOpenDetails: (act, anchorCtx) =>
+                          ProjectTaskActions.openDetails(anchorCtx, ref, act),
                     ),
                   ],
                 ]),
