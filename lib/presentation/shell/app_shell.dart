@@ -7,6 +7,9 @@ import '../../application/providers.dart';
 import '../../core/errors/error_reporter.dart';
 import '../../core/ui_feedback.dart';
 import '../../domain/entities/app_settings.dart';
+import '../../features/focus/application/active_focus_notifier.dart';
+import '../../features/focus/domain/work_session_item.dart';
+import '../../features/focus/presentation/widgets/focus_completion_sheet.dart';
 import '../../features/focus/presentation/widgets/focus_mini_player.dart';
 import '../focus/focus_sessions_screen.dart';
 import '../history/reflection_history_screen.dart';
@@ -58,6 +61,13 @@ class _AppShellState extends ConsumerState<AppShell>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<WorkSessionItem?>(lastCompletedSessionProvider, (prev, next) {
+      if (next != null) {
+        FocusCompletionSheet.show(context, next);
+        ref.read(lastCompletedSessionProvider.notifier).state = null;
+      }
+    });
+
     return Scaffold(
       body: IndexedStack(
         index: _index,

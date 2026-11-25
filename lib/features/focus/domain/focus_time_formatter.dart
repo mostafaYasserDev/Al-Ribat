@@ -34,4 +34,24 @@ abstract final class FocusTimeFormatter {
     }
     return '$minutesد';
   }
+
+  /// Formats [totalSeconds] into a readable Arabic duration string
+  /// preserving seconds for short sessions (e.g., `45ث`, `1د 20ث`, `1س 15د`).
+  static String formatSecondsReadable(int totalSeconds) {
+    final clamped = totalSeconds < 0 ? 0 : totalSeconds;
+    if (clamped < 60) {
+      return '$clampedث';
+    }
+    final hours = clamped ~/ 3600;
+    final minutes = (clamped % 3600) ~/ 60;
+    final seconds = clamped % 60;
+
+    if (hours > 0) {
+      return minutes > 0 ? '$hoursس $minutesد' : '$hoursس';
+    }
+    if (seconds > 0 && minutes < 10) {
+      return '$minutesد $secondsث';
+    }
+    return '$minutesد';
+  }
 }

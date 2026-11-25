@@ -239,14 +239,16 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
 
       if (current.remainingSeconds <= 1) {
         if (current.mode == FocusSessionMode.pomodoro && !current.isBreak) {
-          // Switch to 5-minute break
-          state = current.copyWith(
-            title: 'استراحة قصيرة ☕',
-            isBreak: true,
-            plannedMinutes: 5,
-            remainingSeconds: 5 * 60,
-            elapsedSeconds: 0,
+          // Save the completed work session first, then transition to 5-min break
+          final finishedWork = current.copyWith(
+            elapsedSeconds: current.elapsedSeconds + 1,
+            remainingSeconds: 0,
           );
+          _savePomodoroWorkAndStartBreak(finishedWork);
+        } else if (current.isBreak) {
+          // Break finished; end cleanly without logging break as work
+          timer.cancel();
+          state = null;
         } else {
           timer.cancel();
           _completeSession(current.title);
@@ -303,15 +305,110 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     state = current.copyWith(clearLinkedActivity: true);
   }
 
+  Future<void> _savePomodoroWorkAndStartBreak(ActiveFocusState work) async {
+    state = work.copyWith(
+      title: 'استراحة قصيرة ☕',
+      isBreak: true,
+      plannedMinutes: 5,
+      plannedSeconds: 5 * 60,
+      remainingSeconds: 5 * 60,
+      elapsedSeconds: 0,
+      clearLinkedActivity: true,
+    );
+
+    final session = await _saveSessionRecord(
+      title: work.title,
+      plannedMinutes: work.plannedMinutes,
+      startedAt: work.startedAt,
+      elapsedSeconds: work.elapsedSeconds,
+      completed: true,
+      linkedActivityId: work.linkedActivityId,
+      linkedActivityTitle: work.linkedActivityTitle,
+      mode: work.mode.name,
+    );
+
+    ref.read(lastCompletedSessionProvider.notifier).state = session;
+    try {
+      await ref.read(notificationServiceProvider).showFocusSessionComplete(
+            sessionTitle: work.title,
+            body: 'انتهى وقت التركيز! خذ استراحة 5 دقائق.',
+          );
+    } catch (_) {}
+  }
+
+  /// Returns true if [activity] is measured in time units (minutes/hours).
+  static bool isTimeMeasuredActivity(ActivityItem activity) {
+    if (!activity.isMeasurable) return false;
+    final unit = (activity.goalUnit ?? '').trim().toLowerCase();
+    return unit.isEmpty ||
+        unit.contains('دقيق') ||
+        unit.contains('دق') ||
+        unit.contains('min') ||
+        unit == 'د' ||
+        unit.contains('ساع') ||
+        unit.contains('hour') ||
+        unit == 'h' ||
+        unit == 'س';
+  }
+
+  Future<void> _applyProgressToActivity(
+    ActivityItem activity, {
+    required int elapsedSeconds,
+    required DateTime referenceDate,
+  }) async {
+    final todayStr = DateFormat('yyyy-MM-dd').format(referenceDate);
+
+    if (!activity.isMeasurable) {
+      final isDone = activity.repetition == ActivityRepetition.once
+          ? activity.historyDates.isNotEmpty
+          : activity.isDoneOn(todayStr);
+      if (!isDone) {
+        await ref
+            .read(activitiesProvider.notifier)
+            .toggleDone(activity, todayStr);
+      }
+      return;
+    }
+
+    if (!isTimeMeasuredActivity(activity)) {
+      // Non-time units (e.g. pages, parts) should not be corrupted with minutes.
+      return;
+    }
+
+    final unit = (activity.goalUnit ?? '').trim().toLowerCase();
+    final isHours = unit.contains('ساع') ||
+        unit.contains('hour') ||
+        unit == 'h' ||
+        unit == 'س';
+
+    final double addedValue;
+    if (isHours) {
+      addedValue = double.parse(
+        (elapsedSeconds / 3600.0).clamp(0.05, 24.0).toStringAsFixed(2),
+      );
+    } else {
+      addedValue = (elapsedSeconds / 60.0).ceilToDouble().clamp(1, 1440);
+    }
+
+    await ref
+        .read(activitiesProvider.notifier)
+        .addProgress(activity, todayStr, addedValue);
+  }
+
   Future<void> linkActivityToCompletedSession(
     WorkSessionItem session,
     ActivityItem activity,
   ) async {
-    final todayStr = DateFormat('yyyy-MM-dd').format(session.endedAt);
-    final elapsedMins = session.actualMinutes.clamp(1, 1440).toDouble();
-    await ref
-        .read(activitiesProvider.notifier)
-        .addProgress(activity, todayStr, elapsedMins);
+    final actualSeconds =
+        session.endedAt.difference(session.startedAt).inSeconds.clamp(1, 86400);
+    await _applyProgressToActivity(
+      activity,
+      elapsedSeconds: actualSeconds,
+      referenceDate: session.endedAt,
+    );
+
+    final updated = session.copyWith(linkedActivityTitle: activity.title);
+    await ref.read(workSessionsProvider.notifier).updateSession(updated);
   }
 
   Future<bool> savePartial() async {
@@ -323,10 +420,17 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
       await FocusForegroundService.cancelCompletely();
     }
 
+    // If user stops during a Pomodoro break, don't log the break as work.
+    if (current.isBreak) {
+      state = null;
+      return true;
+    }
+
     final session = await _saveSessionRecord(
       title: current.title,
       plannedMinutes: current.plannedMinutes,
       startedAt: current.startedAt,
+      elapsedSeconds: current.elapsedSeconds,
       completed: false,
       linkedActivityId: current.linkedActivityId,
       linkedActivityTitle: current.linkedActivityTitle,
@@ -343,6 +447,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     final title = current?.title ?? titleHint;
     final planned = current?.plannedMinutes ?? 25;
     final started = current?.startedAt ?? DateTime.now();
+    final elapsedSec = current?.elapsedSeconds ?? (planned * 60);
     final linkedActId = current?.linkedActivityId;
     final linkedActTitle = current?.linkedActivityTitle;
     final modeName = current?.mode.name ?? FocusSessionMode.customTimer.name;
@@ -359,6 +464,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
       title: title,
       plannedMinutes: planned,
       startedAt: started,
+      elapsedSeconds: elapsedSec,
       completed: true,
       linkedActivityId: linkedActId,
       linkedActivityTitle: linkedActTitle,
@@ -380,12 +486,17 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     required String title,
     required int plannedMinutes,
     required DateTime startedAt,
+    int? elapsedSeconds,
     required bool completed,
     String? linkedActivityId,
     String? linkedActivityTitle,
     String? mode,
   }) async {
-    final ended = DateTime.now();
+    final now = DateTime.now();
+    final actualSec = elapsedSeconds ?? now.difference(startedAt).inSeconds;
+    final ended =
+        actualSec > 0 ? startedAt.add(Duration(seconds: actualSec)) : now;
+
     final session = WorkSessionItem(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: title,
@@ -398,18 +509,16 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     );
     await ref.read(workSessionsProvider.notifier).addSession(session);
 
-    // Sync progress to linked activity if measurable
     if (linkedActivityId != null) {
       try {
         final acts = ref.read(activitiesProvider).valueOrNull ?? [];
         final act = acts.where((a) => a.id == linkedActivityId).firstOrNull;
         if (act != null) {
-          final todayStr = DateFormat('yyyy-MM-dd').format(ended);
-          final elapsedMins =
-              ended.difference(startedAt).inMinutes.clamp(1, 1440).toDouble();
-          await ref
-              .read(activitiesProvider.notifier)
-              .addProgress(act, todayStr, elapsedMins);
+          await _applyProgressToActivity(
+            act,
+            elapsedSeconds: actualSec.clamp(1, 86400),
+            referenceDate: ended,
+          );
         }
       } catch (_) {}
     }

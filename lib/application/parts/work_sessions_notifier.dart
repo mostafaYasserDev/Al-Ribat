@@ -17,4 +17,14 @@ class WorkSessionsNotifier extends AsyncNotifier<List<WorkSessionItem>> {
     await _repo.save(session);
     state = AsyncData(await _repo.loadAll());
   }
+
+  Future<void> updateSession(WorkSessionItem session) async {
+    await _repo.save(session);
+    state = AsyncData(await _repo.loadAll());
+  }
+
+  Future<void> deleteSession(String id) async {
+    await _repo.delete(id);
+    state = AsyncData(await _repo.loadAll());
+  }
 }

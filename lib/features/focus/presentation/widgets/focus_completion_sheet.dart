@@ -6,6 +6,7 @@ import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/core/theme/app_moods.dart';
 import 'package:al_ribat/features/activities/domain/activity_item.dart';
 import '../../application/active_focus_notifier.dart';
+import '../../domain/focus_time_formatter.dart';
 import '../../domain/work_session_item.dart';
 import 'focus_linked_task_card.dart';
 
@@ -80,6 +81,8 @@ class _FocusCompletionSheetState extends ConsumerState<FocusCompletionSheet> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final s = widget.session;
+    final actualSec = s.endedAt.difference(s.startedAt).inSeconds;
+    final durationLabel = FocusTimeFormatter.formatSecondsReadable(actualSec);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -123,14 +126,16 @@ class _FocusCompletionSheetState extends ConsumerState<FocusCompletionSheet> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'مبارك! اكتملت الجلسة بحمد الله',
+                    s.completed
+                        ? 'مبارك! اكتملت الجلسة بحمد الله'
+                        : 'تم حفظ الجلسة بنجاح',
                     style: theme.textTheme.titleLarge
                         ?.copyWith(fontWeight: FontWeight.bold),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'أنجزت ${s.actualMinutes} دقيقة من التركيز في "${s.name}"',
+                    'أنجزت $durationLabel من التركيز في "${s.name}"',
                     style: TextStyle(
                         color: colorScheme.onSurfaceVariant, fontSize: 13),
                     textAlign: TextAlign.center,
@@ -138,7 +143,7 @@ class _FocusCompletionSheetState extends ConsumerState<FocusCompletionSheet> {
                   if (s.linkedActivityTitle != null) ...[
                     const SizedBox(height: 6),
                     Text(
-                      '✓ أُضيفت الدقائق تلقائياً إلى: ${s.linkedActivityTitle!}',
+                      '✓ مرتبطة بالمهمة: ${s.linkedActivityTitle!}',
                       style: const TextStyle(
                           color: Colors.green,
                           fontWeight: FontWeight.bold,
@@ -149,11 +154,26 @@ class _FocusCompletionSheetState extends ConsumerState<FocusCompletionSheet> {
                     const SizedBox(height: 14),
                     FocusLinkedTaskCard(
                       selectedActivity: _postLinkedActivity,
+                      buttonLabel: 'ربط هذه الجلسة بمهمة من اليوم',
                       onSelectActivity: (act) =>
                           setState(() => _postLinkedActivity = act),
                       onClearActivity: () =>
                           setState(() => _postLinkedActivity = null),
                     ),
+                    if (_postLinkedActivity != null &&
+                        _postLinkedActivity!.isMeasurable &&
+                        !ActiveFocusNotifier.isTimeMeasuredActivity(
+                            _postLinkedActivity!)) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'ملاحظة: هذه المهمة تُقاس بـ (${_postLinkedActivity!.goalUnit ?? "وحدات"})؛ سيتم توثيق ارتباط الجلسة بها في السجل دون تعديل عداد وحداتها.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                   ],
                   const SizedBox(height: 18),
                   const Divider(),

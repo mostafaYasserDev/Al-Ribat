@@ -51,12 +51,20 @@ class FocusHistorySheet extends ConsumerWidget {
                     ),
                     sessionsAsync.maybeWhen(
                       data: (list) {
-                        final todayMinutes = list
+                        final todaySeconds = list
                             .where((s) =>
                                 s.startedAt.year == now.year &&
                                 s.startedAt.month == now.month &&
                                 s.startedAt.day == now.day)
-                            .fold<int>(0, (acc, s) => acc + s.actualMinutes);
+                            .fold<int>(
+                              0,
+                              (acc, s) =>
+                                  acc +
+                                  s.endedAt
+                                      .difference(s.startedAt)
+                                      .inSeconds
+                                      .clamp(0, 86400),
+                            );
                         return Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
@@ -65,7 +73,7 @@ class FocusHistorySheet extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            'اليوم: ${FocusTimeFormatter.formatDurationReadable(todayMinutes)}',
+                            'اليوم: ${FocusTimeFormatter.formatSecondsReadable(todaySeconds)}',
                             style: TextStyle(
                               fontSize: 12,
                               color: colorScheme.primary,
@@ -91,8 +99,15 @@ class FocusHistorySheet extends ConsumerWidget {
                         controller: scrollController,
                         itemCount: sessions.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (_, i) =>
-                            FocusSessionTile(session: sessions[i]),
+                        itemBuilder: (_, i) {
+                          final item = sessions[i];
+                          return FocusSessionTile(
+                            session: item,
+                            onDelete: () => ref
+                                .read(workSessionsProvider.notifier)
+                                .deleteSession(item.id),
+                          );
+                        },
                       );
                     },
                     loading: () =>

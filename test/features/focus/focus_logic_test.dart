@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:al_ribat/application/providers.dart';
+import 'package:al_ribat/features/activities/domain/activity_item.dart';
 import 'package:al_ribat/features/focus/focus.dart';
 
 class _FakeWorkSessionRepo implements WorkSessionRepository {
@@ -12,7 +13,15 @@ class _FakeWorkSessionRepo implements WorkSessionRepository {
   Future<List<WorkSessionItem>> loadAll() async => List.unmodifiable(items);
 
   @override
-  Future<void> save(WorkSessionItem session) async => items.add(session);
+  Future<void> save(WorkSessionItem session) async {
+    items.removeWhere((e) => e.id == session.id);
+    items.add(session);
+  }
+
+  @override
+  Future<void> delete(String id) async {
+    items.removeWhere((e) => e.id == id);
+  }
 }
 
 void main() {
@@ -89,6 +98,14 @@ void main() {
       expect(FocusTimeFormatter.formatDurationReadable(90), '1س 30د');
       expect(FocusTimeFormatter.formatDurationReadable(649), '10س 49د');
       expect(FocusTimeFormatter.formatDurationReadable(-5), '0د');
+    });
+
+    test('formatSecondsReadable preserves seconds for short sessions', () {
+      expect(FocusTimeFormatter.formatSecondsReadable(0), '0ث');
+      expect(FocusTimeFormatter.formatSecondsReadable(45), '45ث');
+      expect(FocusTimeFormatter.formatSecondsReadable(95), '1د 35ث');
+      expect(FocusTimeFormatter.formatSecondsReadable(25 * 60), '25د');
+      expect(FocusTimeFormatter.formatSecondsReadable(90 * 60), '1س 30د');
     });
   });
 
@@ -181,6 +198,59 @@ void main() {
       expect(fakeRepo.items.length, 1);
       expect(fakeRepo.items.first.name, 'جلسة قصيرة');
       expect(container.read(lastCompletedSessionProvider)?.name, 'جلسة قصيرة');
+    });
+
+    test('isTimeMeasuredActivity distinguishes time vs page units', () {
+      final now = DateTime.now();
+      final minTask = ActivityItem(
+        id: '1',
+        title: 'مذاكرة',
+        createdAt: now,
+        isMeasurable: true,
+        targetGoal: 30,
+        goalUnit: 'دقيقة',
+      );
+      final pageTask = ActivityItem(
+        id: '2',
+        title: 'قراءة',
+        createdAt: now,
+        isMeasurable: true,
+        targetGoal: 4,
+        goalUnit: 'صفحات',
+      );
+      final checkTask = ActivityItem(
+        id: '3',
+        title: 'أذكار',
+        createdAt: now,
+      );
+
+      expect(ActiveFocusNotifier.isTimeMeasuredActivity(minTask), isTrue);
+      expect(ActiveFocusNotifier.isTimeMeasuredActivity(pageTask), isFalse);
+      expect(ActiveFocusNotifier.isTimeMeasuredActivity(checkTask), isFalse);
+    });
+
+    test('WorkSessionsNotifier deleteSession removes session', () async {
+      final fakeRepo = _FakeWorkSessionRepo();
+      final now = DateTime.now();
+      await fakeRepo.save(WorkSessionItem(
+        id: 's1',
+        name: 'جلسة 1',
+        plannedMinutes: 25,
+        startedAt: now,
+        endedAt: now.add(const Duration(minutes: 25)),
+      ));
+
+      final container = ProviderContainer(
+        overrides: [
+          workSessionRepositoryProvider.overrideWithValue(fakeRepo),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await container.read(workSessionsProvider.future);
+      await container.read(workSessionsProvider.notifier).deleteSession('s1');
+      final remaining = await container.read(workSessionsProvider.future);
+      expect(remaining, isEmpty);
     });
   });
 }

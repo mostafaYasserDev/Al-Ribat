@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/features/activities/domain/activity_item.dart';
+import '../../application/active_focus_notifier.dart';
 
 class FocusLinkedTaskCard extends ConsumerWidget {
   const FocusLinkedTaskCard({
@@ -11,16 +13,27 @@ class FocusLinkedTaskCard extends ConsumerWidget {
     required this.onSelectActivity,
     required this.onClearActivity,
     this.disabled = false,
+    this.buttonLabel = 'ربط جلسة التركيز بمهمة من اليوم',
   });
 
   final ActivityItem? selectedActivity;
   final ValueChanged<ActivityItem> onSelectActivity;
   final VoidCallback onClearActivity;
   final bool disabled;
+  final String buttonLabel;
 
   void _showTaskPicker(BuildContext context, WidgetRef ref) {
     final activitiesAsync = ref.read(activitiesProvider);
-    final activities = activitiesAsync.valueOrNull ?? [];
+    final raw = activitiesAsync.valueOrNull ?? [];
+    final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    // Sort pending tasks first, completed tasks after
+    final activities = List<ActivityItem>.from(raw)
+      ..sort((a, b) {
+        final aDone = a.isDoneOn(todayStr) ? 1 : 0;
+        final bDone = b.isDoneOn(todayStr) ? 1 : 0;
+        return aDone.compareTo(bDone);
+      });
 
     showModalBottomSheet<void>(
       context: context,
@@ -52,7 +65,7 @@ class FocusLinkedTaskCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'سيتم إضافة دقائق التركيز تلقائياً إلى تقدم المهمة عند انتهائها.',
+                  'المهام اليومية تُنجز تلقائياً، والمهام الزمنية يُضاف إليها وقت التركيز الفعلي.',
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(ctx).colorScheme.onSurfaceVariant,
@@ -73,19 +86,42 @@ class FocusLinkedTaskCard extends ConsumerWidget {
                       separatorBuilder: (_, __) => const Divider(height: 1),
                       itemBuilder: (context, i) {
                         final act = activities[i];
+                        final isDone = act.isDoneOn(todayStr);
+                        final String subtitleText;
+                        if (act.isMeasurable) {
+                          final isTime =
+                              ActiveFocusNotifier.isTimeMeasuredActivity(act);
+                          final unit = act.goalUnit ?? '';
+                          subtitleText =
+                              'هدف: ${act.targetGoal?.toInt() ?? 0} $unit'
+                              '${isTime ? ' (تحديث زمني تلقائي)' : ' (توثيق في السجل)'}';
+                        } else {
+                          subtitleText = act.projectName ?? 'مهمة يومية';
+                        }
+
                         return ListTile(
-                          title: Text(act.title,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: act.isMeasurable
-                              ? Text(
-                                  'هدف قابل للقياس (${act.targetGoal?.toInt() ?? 0} ${act.goalUnit ?? ""})')
-                              : Text(act.projectName ?? 'نشاط حر'),
+                          title: Text(
+                            act.title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              decoration:
+                                  isDone ? TextDecoration.lineThrough : null,
+                              color: isDone
+                                  ? Theme.of(ctx).colorScheme.onSurfaceVariant
+                                  : null,
+                            ),
+                          ),
+                          subtitle: Text(subtitleText,
+                              style: const TextStyle(fontSize: 12)),
                           leading: Icon(
-                            act.isMeasurable
-                                ? Icons.track_changes_rounded
-                                : Icons.check_circle_outline,
-                            color: Theme.of(ctx).colorScheme.primary,
+                            isDone
+                                ? Icons.check_circle_rounded
+                                : (act.isMeasurable
+                                    ? Icons.track_changes_rounded
+                                    : Icons.radio_button_unchecked_rounded),
+                            color: isDone
+                                ? Colors.green
+                                : Theme.of(ctx).colorScheme.primary,
                           ),
                           onTap: () {
                             onSelectActivity(act);
@@ -143,12 +179,18 @@ class FocusLinkedTaskCard extends ConsumerWidget {
                 ],
               ),
             ),
-            if (!disabled)
+            if (!disabled) ...[
+              IconButton(
+                icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                onPressed: () => _showTaskPicker(context, ref),
+                tooltip: 'تغيير المهمة',
+              ),
               IconButton(
                 icon: const Icon(Icons.close_rounded, size: 18),
                 onPressed: onClearActivity,
                 tooltip: 'إلغاء الربط',
               ),
+            ],
           ],
         ),
       );
@@ -159,8 +201,7 @@ class FocusLinkedTaskCard extends ConsumerWidget {
       child: OutlinedButton.icon(
         onPressed: disabled ? null : () => _showTaskPicker(context, ref),
         icon: const Icon(Icons.add_link_rounded, size: 18),
-        label: const Text('ربط جلسة التركيز بمهمة من اليوم',
-            style: TextStyle(fontSize: 12.5)),
+        label: Text(buttonLabel, style: const TextStyle(fontSize: 12.5)),
         style: OutlinedButton.styleFrom(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

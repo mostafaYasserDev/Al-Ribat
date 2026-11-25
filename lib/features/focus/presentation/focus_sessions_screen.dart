@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,8 +13,6 @@ import 'package:al_ribat/services/motivation_quotes.dart';
 import '../application/active_focus_notifier.dart';
 import '../domain/active_focus_state.dart';
 import '../domain/focus_time_formatter.dart';
-import '../domain/work_session_item.dart';
-import 'widgets/focus_completion_sheet.dart';
 import 'widgets/focus_full_screen_zen.dart';
 import 'widgets/focus_history_sheet.dart';
 import 'widgets/focus_linked_task_card.dart';
@@ -33,11 +33,26 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
   bool _isPomodoroPreset = false;
   ActivityItem? _linkedActivity;
   late final String _dailyQuote;
+  Timer? _prayerRefreshTimer;
 
   @override
   void initState() {
     super.initState();
     _dailyQuote = MotivationQuotes.randomLine();
+    _prayerRefreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) {
+        if (mounted && ref.read(activeFocusProvider) == null) {
+          setState(() {});
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _prayerRefreshTimer?.cancel();
+    super.dispose();
   }
 
   PrayerTime _nextPrayer(PrayerSchedule schedule, PrayerPhase currentPhase) {
@@ -123,13 +138,6 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
     final scheduleAsync = ref.watch(prayerScheduleProvider);
     final dayState = ref.watch(dayStateProvider);
     final schedule = scheduleAsync.valueOrNull;
-
-    ref.listen<WorkSessionItem?>(lastCompletedSessionProvider, (prev, next) {
-      if (next != null) {
-        FocusCompletionSheet.show(context, next);
-        ref.read(lastCompletedSessionProvider.notifier).state = null;
-      }
-    });
 
     final nextPrayer = schedule == null
         ? null

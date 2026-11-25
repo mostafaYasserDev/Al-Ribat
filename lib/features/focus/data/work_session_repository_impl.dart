@@ -21,4 +21,9 @@ class WorkSessionRepositoryImpl implements WorkSessionRepository {
     await _box.put(
         session.id, WorkSessionItemModel.fromEntity(session).toJson());
   }
+
+  @override
+  Future<void> delete(String id) async {
+    await _box.delete(id);
+  }
 }
