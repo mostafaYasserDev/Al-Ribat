@@ -1,27 +1,40 @@
 part of '../settings_screen.dart';
 
 extension _SettingsLocationSearchWidgets on _SettingsScreenState {
-  Widget _buildLocationSearchField() {
+  Widget _buildLocationSearchField(AppSettings settings) {
     return TextField(
       controller: _searchController,
+      textInputAction: TextInputAction.search,
+      onSubmitted: (_) => _runSearch(settings),
       decoration: const InputDecoration(
-        labelText: 'بحث (مثال: الرباط، المغرب)',
+        labelText: 'بحث عن مدينة أو حي (مثال: أسيوط، مصر)',
         border: OutlineInputBorder(),
       ),
     );
   }
 
   Widget _buildLocationSearchButton(AppSettings settings) {
-    return FilledButton.icon(
-      onPressed: _searching ? null : () => _runSearch(settings),
-      icon: _searching
-          ? const SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.search),
-      label: Text(_searching ? 'جاري البحث…' : 'بحث عن نتائج'),
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        FilledButton.icon(
+          onPressed: _searching ? null : () => _runSearch(settings),
+          icon: _searching
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.search),
+          label: Text(_searching ? 'جاري البحث…' : 'بحث عن نتائج'),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => _pickFromPopularDialog(settings),
+          icon: const Icon(Icons.location_city_rounded, size: 18),
+          label: const Text('مدن شائعة'),
+        ),
+      ],
     );
   }
 
@@ -30,22 +43,25 @@ extension _SettingsLocationSearchWidgets on _SettingsScreenState {
     return [
       const SizedBox(height: 10),
       Text(
-        'اختر النتيجة الأدق (عدة اقتراحات من الخادم):',
+        'اختر المدينة المناسبة:',
         style: Theme.of(context).textTheme.bodySmall,
       ),
       const SizedBox(height: 6),
-      ..._addressResults.asMap().entries.map((e) {
-        final loc = e.value;
+      ..._addressResults.map((result) {
         return ListTile(
           dense: true,
           contentPadding: EdgeInsets.zero,
           leading: const Icon(Icons.place_outlined),
           title: Text(
-            '${loc.latitude.toStringAsFixed(4)}, ${loc.longitude.toStringAsFixed(4)}',
+            result.name,
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          subtitle: Text('اقتراح ${e.key + 1}'),
-          onTap: () =>
-              _applyLocation(loc, settings, _searchController.text.trim()),
+          subtitle: Text(
+            result.subtitle.isNotEmpty
+                ? result.subtitle
+                : '${result.latitude.toStringAsFixed(4)}, ${result.longitude.toStringAsFixed(4)}',
+          ),
+          onTap: () => _applyLocationResult(result, settings),
         );
       }),
     ];

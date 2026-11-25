@@ -2,44 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 
 import 'package:al_ribat/core/ui_feedback.dart';
-
-class CityPreset {
-  final String name;
-  final double latitude;
-  final double longitude;
-
-  const CityPreset({
-    required this.name,
-    required this.latitude,
-    required this.longitude,
-  });
-}
-
-const List<CityPreset> _kPopularCities = [
-  CityPreset(name: 'مكة المكرمة', latitude: 21.4225, longitude: 39.8262),
-  CityPreset(name: 'المدينة المنورة', latitude: 24.4672, longitude: 39.6111),
-  CityPreset(name: 'القدس الشريف', latitude: 31.7683, longitude: 35.2137),
-  CityPreset(name: 'القاهرة', latitude: 30.0444, longitude: 31.2357),
-  CityPreset(name: 'الإسكندرية', latitude: 31.2001, longitude: 29.9187),
-  CityPreset(name: 'الرياض', latitude: 24.7136, longitude: 46.6753),
-  CityPreset(name: 'جدة', latitude: 21.5433, longitude: 39.1728),
-  CityPreset(name: 'دبي', latitude: 25.2048, longitude: 55.2708),
-  CityPreset(name: 'أبو ظبي', latitude: 24.4539, longitude: 54.3773),
-  CityPreset(name: 'عمّان', latitude: 31.9454, longitude: 35.9284),
-  CityPreset(name: 'الكويت', latitude: 29.3759, longitude: 47.9774),
-  CityPreset(name: 'الدوحة', latitude: 25.2854, longitude: 51.5310),
-  CityPreset(name: 'المنامة', latitude: 26.2285, longitude: 50.5860),
-  CityPreset(name: 'مسقط', latitude: 23.5880, longitude: 58.3829),
-  CityPreset(name: 'بغداد', latitude: 33.3152, longitude: 44.3661),
-  CityPreset(name: 'دمشق', latitude: 33.5138, longitude: 36.2765),
-  CityPreset(name: 'بيروت', latitude: 33.8938, longitude: 35.5018),
-  CityPreset(name: 'طرابلس', latitude: 32.8872, longitude: 13.1913),
-  CityPreset(name: 'تونس', latitude: 36.8065, longitude: 10.1815),
-  CityPreset(name: 'الجزائر', latitude: 36.7538, longitude: 3.0588),
-  CityPreset(name: 'الرباط', latitude: 34.0209, longitude: -6.8416),
-  CityPreset(name: 'الخرطوم', latitude: 15.5007, longitude: 32.5599),
-  CityPreset(name: 'إسطنبول', latitude: 41.0082, longitude: 28.9784),
-];
+import '../../data/location_search_service.dart';
 
 Future<(Location, String)?> showManualLocationPickerDialog(
     BuildContext context) {
@@ -59,7 +22,8 @@ class _ManualLocationDialog extends StatefulWidget {
 class _ManualLocationDialogState extends State<_ManualLocationDialog> {
   late final TextEditingController _controller;
   bool _loading = false;
-  List<Location> _results = const [];
+  bool _searchedOnce = false;
+  List<LocationSearchResult> _results = const [];
 
   @override
   void initState() {
@@ -76,10 +40,13 @@ class _ManualLocationDialogState extends State<_ManualLocationDialog> {
   Future<void> _search() async {
     final q = _controller.text.trim();
     if (q.isEmpty) return;
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _searchedOnce = true;
+    });
     try {
-      final found = await locationFromAddress(q);
-      if (mounted) setState(() => _results = found.take(5).toList());
+      final found = await LocationSearchService.searchPlaces(q);
+      if (mounted) setState(() => _results = found);
     } catch (e) {
       if (mounted) {
         setState(() => _results = const []);
@@ -90,42 +57,44 @@ class _ManualLocationDialogState extends State<_ManualLocationDialog> {
     }
   }
 
-  Future<String> _resolveLocationLabel(
-      Location location, String fallback) async {
-    try {
-      final marks =
-          await placemarkFromCoordinates(location.latitude, location.longitude);
-      if (marks.isNotEmpty) {
-        final p = marks.first;
-        final parts = <String>[
-          if ((p.locality ?? '').trim().isNotEmpty) p.locality!,
-          if ((p.country ?? '').trim().isNotEmpty) p.country!,
-        ];
-        if (parts.isNotEmpty) return parts.join('، ');
-      }
-    } catch (_) {}
-    return fallback;
-  }
+  List<Widget> _buildResultTiles(BuildContext context) {
+    if (_results.isEmpty) {
+      if (!_searchedOnce || _loading) return const [];
+      return const [
+        SizedBox(height: 12),
+        Text(
+          'لم يُعثر على نتائج مطابقة. جرّب كتابة اسم المدينة أو الدولة.',
+          style: TextStyle(fontSize: 12.5, color: Colors.orange),
+        ),
+      ];
+    }
 
-  List<Widget> _buildResultTiles(
-    List<Location> results,
-    void Function(Location) onPick,
-  ) {
-    if (results.isEmpty) return const [];
     return [
       const SizedBox(height: 10),
-      ...results.asMap().entries.map(
-            (e) => ListTile(
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.place_outlined),
-              title: Text(
-                '${e.value.latitude.toStringAsFixed(4)}, ${e.value.longitude.toStringAsFixed(4)}',
-              ),
-              subtitle: Text('نتيجة ${e.key + 1}'),
-              onTap: () => onPick(e.value),
-            ),
+      ..._results.map(
+        (r) => ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.place_outlined),
+          title: Text(
+            r.name,
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
+          subtitle: Text(
+            r.subtitle.isNotEmpty
+                ? r.subtitle
+                : '${r.latitude.toStringAsFixed(4)}, ${r.longitude.toStringAsFixed(4)}',
+          ),
+          onTap: () {
+            final loc = Location(
+              latitude: r.latitude,
+              longitude: r.longitude,
+              timestamp: DateTime.now(),
+            );
+            Navigator.pop(context, (loc, r.fullLabel));
+          },
+        ),
+      ),
     ];
   }
 
@@ -148,7 +117,7 @@ class _ManualLocationDialogState extends State<_ManualLocationDialog> {
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: _kPopularCities.map((city) {
+              children: LocationSearchService.popularCities.map((city) {
                 return ActionChip(
                   avatar: const Icon(Icons.location_city, size: 16),
                   label: Text(city.name),
@@ -158,7 +127,8 @@ class _ManualLocationDialogState extends State<_ManualLocationDialog> {
                       longitude: city.longitude,
                       timestamp: DateTime.now(),
                     );
-                    Navigator.pop(context, (loc, city.name));
+                    Navigator.pop(
+                        context, (loc, '${city.name}، ${city.country}'));
                   },
                 );
               }).toList(),
@@ -168,14 +138,14 @@ class _ManualLocationDialogState extends State<_ManualLocationDialog> {
               child: Divider(),
             ),
             Text(
-              'أو ابحث عن أي مدينة أو عنوان:',
+              'أو ابحث عن أي مدينة أو حي:',
               style: Theme.of(context).textTheme.labelMedium,
             ),
             const SizedBox(height: 6),
             TextField(
               controller: _controller,
               decoration: InputDecoration(
-                hintText: 'مثال: أسيوط، مصر أو باريس',
+                hintText: 'مثال: أسيوط، مصر أو Paris',
                 suffixIcon: IconButton(
                   icon: _loading
                       ? const SizedBox(
@@ -189,12 +159,7 @@ class _ManualLocationDialogState extends State<_ManualLocationDialog> {
               ),
               onSubmitted: (_) => _search(),
             ),
-            ..._buildResultTiles(_results, (loc) async {
-              final navigator = Navigator.of(context);
-              final label =
-                  await _resolveLocationLabel(loc, _controller.text.trim());
-              if (mounted) navigator.pop((loc, label));
-            }),
+            ..._buildResultTiles(context),
           ],
         ),
       ),
@@ -204,7 +169,7 @@ class _ManualLocationDialogState extends State<_ManualLocationDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('اختيار الموقع'),
+      title: const Text('تحديد الموقع يدوياً'),
       content: _buildContent(context),
       actions: [
         TextButton(

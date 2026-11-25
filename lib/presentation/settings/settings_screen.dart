@@ -1,10 +1,15 @@
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+import '../../features/prayer/data/location_search_service.dart';
+import '../../features/prayer/presentation/widgets/manual_location_dialog.dart';
 
 import '../../application/providers.dart';
 import '../../core/app_startup.dart';

@@ -3,7 +3,7 @@ part of '../settings_screen.dart';
 abstract class _SettingsLocationBase extends ConsumerState<SettingsScreen> {
   final _searchController = TextEditingController();
   bool _searching = false;
-  List<Location> _addressResults = const [];
+  List<LocationSearchResult> _addressResults = const [];
 }
 
 class _SettingsScreenState extends _SettingsLocationBase

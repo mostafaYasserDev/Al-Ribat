@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:adhan/adhan.dart';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hive/hive.dart';
 
 import 'package:al_ribat/core/errors/error_reporter.dart';
 import 'package:al_ribat/domain/entities/app_settings.dart';
+import 'location_search_service.dart';
 import '../domain/prayer_phase.dart';
 import '../domain/prayer_repository.dart';
 import '../domain/prayer_schedule.dart';
@@ -76,29 +79,32 @@ class PrayerRepositoryImpl implements PrayerRepository {
     final box =
         Hive.isBoxOpen('meta_box') ? Hive.box<String>('meta_box') : null;
     final cached = _getCachedPrayerCoordinates(box);
+    final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
 
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        return cached;
+        return isMobile ? cached : await _desktopIpFallback(box, cached);
       }
 
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.deniedForever ||
           permission == LocationPermission.denied) {
-        return cached;
+        return isMobile ? cached : await _desktopIpFallback(box, cached);
       }
 
       // If we have lastKnown position, use it immediately and refresh in background
-      final lastKnown = await Geolocator.getLastKnownPosition();
-      if (lastKnown != null) {
-        _saveCachedPrayerCoordinates(
-          box,
-          lastKnown.latitude,
-          lastKnown.longitude,
-        );
-        unawaited(_fetchAndCacheCurrentPosition(box));
-        return Coordinates(lastKnown.latitude, lastKnown.longitude);
+      if (isMobile) {
+        final lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null) {
+          _saveCachedPrayerCoordinates(
+            box,
+            lastKnown.latitude,
+            lastKnown.longitude,
+          );
+          unawaited(_fetchAndCacheCurrentPosition(box));
+          return Coordinates(lastKnown.latitude, lastKnown.longitude);
+        }
       }
 
       // If we have cached coordinates from previous session, return immediately
@@ -107,23 +113,36 @@ class PrayerRepositoryImpl implements PrayerRepository {
         return cached;
       }
 
-      // First run with no cache: wait with a short timeout to prevent UI freezing
-      final position = await Geolocator.getCurrentPosition().timeout(
-        const Duration(seconds: 4),
-      );
+      // First run with no cache: medium accuracy locks reliably indoors
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      ).timeout(const Duration(seconds: 12));
       _saveCachedPrayerCoordinates(box, position.latitude, position.longitude);
       return Coordinates(position.latitude, position.longitude);
     } catch (e, st) {
       reportError('PrayerRepository', e, st);
-      return cached;
+      return isMobile ? cached : await _desktopIpFallback(box, cached);
     }
+  }
+
+  Future<Coordinates?> _desktopIpFallback(
+    Box<String>? box,
+    Coordinates? cached,
+  ) async {
+    if (cached != null) return cached;
+    final ipLoc = await LocationSearchService.detectApproximateLocationByIp();
+    if (ipLoc != null) {
+      _saveCachedPrayerCoordinates(box, ipLoc.latitude, ipLoc.longitude);
+      return Coordinates(ipLoc.latitude, ipLoc.longitude);
+    }
+    return null;
   }
 
   Future<void> _fetchAndCacheCurrentPosition(Box<String>? box) async {
     try {
-      final position = await Geolocator.getCurrentPosition().timeout(
-        const Duration(seconds: 6),
-      );
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+      ).timeout(const Duration(seconds: 12));
       _saveCachedPrayerCoordinates(box, position.latitude, position.longitude);
     } catch (e, st) {
       reportError('PrayerRepository', e, st);

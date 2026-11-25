@@ -19,7 +19,7 @@ extension _SettingsLocationCards on _SettingsScreenState {
             _buildManualLocationRadio(context, settings),
             if (settings.prayerLocationMode == PrayerLocationMode.manual) ...[
               const SizedBox(height: 8),
-              _buildLocationSearchField(),
+              _buildLocationSearchField(settings),
               const SizedBox(height: 8),
               _buildLocationSearchButton(settings),
               if (_addressResults.isNotEmpty)

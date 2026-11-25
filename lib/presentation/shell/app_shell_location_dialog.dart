@@ -11,13 +11,30 @@ Future<void> _showLocationModeDialog(
     builder: (ctx) => AlertDialog(
       title: const Text('ضبط الموقع لأوقات الصلاة'),
       content: const Text(
-        'هل تريد ضبط الموقع تلقائيًا (GPS) أم يدويًا بالبحث عن مدينتك أو حيّك؟',
+        'هل تريد ضبط الموقع تلقائياً أم يدوياً بالبحث عن مدينتك أو حيّك؟',
       ),
       actions: [
         TextButton(
           onPressed: () async {
             final cur =
                 ref.read(settingsProvider).valueOrNull ?? AppSettings.defaults;
+            final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+
+            if (isMobile) {
+              try {
+                final enabled = await Geolocator.isLocationServiceEnabled();
+                if (!enabled) {
+                  if (ctx.mounted) {
+                    appSnack(
+                      ctx,
+                      'خدمة الموقع (GPS) مغلقة في الجهاز. فعّلها أو اختر الوضع اليدوي.',
+                    );
+                  }
+                  return;
+                }
+              } catch (_) {}
+            }
+
             LocationPermission permission;
             try {
               permission = await Geolocator.checkPermission();
@@ -26,13 +43,24 @@ Future<void> _showLocationModeDialog(
               }
             } catch (e) {
               reportError('AppShell location permission', e);
+              if (!isMobile) {
+                await ref.read(settingsProvider.notifier).updateSettings(
+                      cur.copyWith(
+                          prayerLocationMode: PrayerLocationMode.automatic),
+                    );
+                await box.put('location_pref_v1', '1');
+                if (ctx.mounted) Navigator.pop(ctx);
+                return;
+              }
               if (ctx.mounted) {
                 appSnack(ctx, 'خدمة الموقع غير متاحة هنا، اختر الموقع يدويًا.');
               }
               return;
             }
-            if (permission == LocationPermission.denied ||
-                permission == LocationPermission.deniedForever) {
+
+            if (isMobile &&
+                (permission == LocationPermission.denied ||
+                    permission == LocationPermission.deniedForever)) {
               if (ctx.mounted) {
                 appSnack(
                   ctx,
@@ -41,6 +69,7 @@ Future<void> _showLocationModeDialog(
               }
               return;
             }
+
             await ref.read(settingsProvider.notifier).updateSettings(
                   cur.copyWith(
                       prayerLocationMode: PrayerLocationMode.automatic),
