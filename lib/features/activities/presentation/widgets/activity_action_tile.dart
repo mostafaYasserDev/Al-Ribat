@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 
 import 'package:al_ribat/core/theme/app_icons.dart';
 import 'package:al_ribat/core/ui_confirm.dart';
@@ -294,7 +293,6 @@ class ActivityActionTile extends StatelessWidget {
     bool isSkipped,
   ) {
     final theme = Theme.of(context);
-    final light = theme.brightness == Brightness.light;
     final colorScheme = theme.colorScheme;
     final iconColor =
         AppIcons.parseColor(activity.colorHex) ?? colorScheme.primary;
@@ -366,23 +364,24 @@ class ActivityActionTile extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeInOut,
+                    duration: const Duration(milliseconds: 200),
                     style: (theme.textTheme.titleMedium ?? const TextStyle())
                         .copyWith(
-                      color: titleColor,
                       fontWeight: FontWeight.w600,
                       decoration: (isDone || isSkipped)
                           ? TextDecoration.lineThrough
-                          : TextDecoration.none,
-                      decorationColor: (isDone || isSkipped)
-                          ? (isDone
-                              ? (light
-                                  ? const Color(0xFF4B5563)
-                                  : const Color(0xFF9CA3AF))
-                              : Colors.orange)
-                          : Colors.transparent,
-                      decorationThickness: 2.2,
+                          : null,
+                      decorationColor: isSkipped
+                          ? Colors.orange
+                          : (isDone
+                              ? colorScheme.onSurface.withValues(alpha: 0.65)
+                              : null),
+                      decorationThickness: 1.8,
+                      color: isSkipped
+                          ? Colors.orange
+                          : (isDone
+                              ? colorScheme.onSurface.withValues(alpha: 0.5)
+                              : (titleColor ?? colorScheme.onSurface)),
                     ),
                     child: Text(activity.title),
                   ),
@@ -503,7 +502,7 @@ class ActivityActionTile extends StatelessWidget {
       borderColor = colorScheme.outlineVariant.withValues(alpha: 0.35);
     }
 
-    final cardWidget = AnimatedContainer(
+    return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
@@ -512,57 +511,6 @@ class ActivityActionTile extends StatelessWidget {
         border: Border.all(color: borderColor),
       ),
       child: _buildCardContent(context, titleColor, isDone, isSkipped),
-    );
-
-    return Slidable(
-      key: ValueKey('${activity.id}_$dateStr'),
-      startActionPane: ActionPane(
-        motion: const ScrollMotion(),
-        children: [
-          SlidableAction(
-            onPressed: (_) => _handleToggleDoneDirect(context),
-            backgroundColor: isDone ? Colors.grey : Colors.green,
-            foregroundColor: Colors.white,
-            icon: isDone ? Icons.undo : Icons.done,
-            label: isDone ? 'تراجع' : 'إنجاز',
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ],
-      ),
-      endActionPane: ActionPane(
-        motion: const ScrollMotion(),
-        children: [
-          if (!isDone)
-            SlidableAction(
-              onPressed: (_) {
-                HapticFeedback.selectionClick();
-                onToggleSkip(activity, dateStr);
-              },
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-              icon: isSkipped ? Icons.undo : Icons.skip_next,
-              label: isSkipped ? 'إلغاء' : 'تخطي',
-              borderRadius: BorderRadius.circular(16),
-            ),
-          SlidableAction(
-            onPressed: (_) => _handleDelete(context),
-            backgroundColor: Colors.red,
-            foregroundColor: Colors.white,
-            icon: Icons.delete,
-            label: 'حذف',
-            borderRadius: BorderRadius.circular(16),
-          ),
-          SlidableAction(
-            onPressed: (_) => _handleEdit(context),
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            icon: Icons.edit,
-            label: 'تعديل',
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ],
-      ),
-      child: cardWidget,
     );
   }
 }
