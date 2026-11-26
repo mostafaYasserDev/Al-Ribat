@@ -1,11 +1,10 @@
 part of '../backup_export_service.dart';
 
-Future<void> _restoreBackupV2(
-  Map<String, dynamic> decoded,
-  Box<String> activitiesBox,
-  Box<String> reflBox,
-  Box<String> workBox,
-) async {
+({
+  Map<String, String> activities,
+  Map<String, String> reflections,
+  Map<String, String> workSessions,
+}) _parseBackupV2(Map<String, dynamic> decoded) {
   final activities = _asBackupStringList(
     decoded['activities'] ?? [],
     key: 'activities',
@@ -19,13 +18,22 @@ Future<void> _restoreBackupV2(
     key: 'workSessions',
   );
 
-  for (final item in activities) {
-    await _putBackupByEntityId(activitiesBox, item);
+  return (
+    activities: _indexByEntityId(activities),
+    reflections: _indexByEntityId(reflections),
+    workSessions: _indexByEntityId(workSessions),
+  );
+}
+
+Map<String, String> _indexByEntityId(List<String> items) {
+  final out = <String, String>{};
+  for (final jsonStr in items) {
+    final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+    final id = map['id']?.toString();
+    if (id == null || id.isEmpty) {
+      throw const FormatException('عنصر النسخة الاحتياطية يفتقد حقل id.');
+    }
+    out[id] = jsonStr;
   }
-  for (final item in reflections) {
-    await _putBackupByEntityId(reflBox, item);
-  }
-  for (final item in workSessions) {
-    await _putBackupByEntityId(workBox, item);
-  }
+  return out;
 }

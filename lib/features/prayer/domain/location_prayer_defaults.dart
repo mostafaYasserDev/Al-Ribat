@@ -195,4 +195,3 @@ abstract final class LocationPrayerDefaults {
     'kabul',
   ];
 }
-

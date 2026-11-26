@@ -18,13 +18,21 @@ part 'backup/backup_restore_v1_habits.dart';
 part 'backup/backup_restore_v2.dart';
 part 'backup/backup_restore_helpers.dart';
 
+enum BackupRestoreMode { replace, merge }
+
 class BackupExportService {
   static Future<String> buildJsonString() => _buildBackupJson();
 
   static Future<bool> exportInteractive() => _exportBackupInteractive();
 
-  static Future<bool> importInteractive() => _importBackupInteractive();
+  static Future<bool> importInteractive({
+    BackupRestoreMode mode = BackupRestoreMode.replace,
+  }) =>
+      _importBackupInteractive(mode: mode);
 
-  static Future<void> restoreFromJsonString(String raw) =>
-      _restoreBackupFromJson(raw);
+  static Future<void> restoreFromJsonString(
+    String raw, {
+    BackupRestoreMode mode = BackupRestoreMode.replace,
+  }) =>
+      _restoreBackupFromJson(raw, mode: mode);
 }

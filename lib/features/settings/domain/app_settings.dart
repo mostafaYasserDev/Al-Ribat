@@ -26,6 +26,8 @@ class AppSettings {
     this.phasePromptsEnabled = true,
     this.biometricLockEnabled = true,
     this.autoLockTimeoutSeconds = 15,
+    this.autoLocalBackupEnabled = false,
+    this.autoLocalBackupPath,
     this.manualLatitude,
     this.manualLongitude,
     this.manualLocationLabel,
@@ -45,6 +47,8 @@ class AppSettings {
   final PrayerLocationMode prayerLocationMode;
   final bool biometricLockEnabled;
   final int autoLockTimeoutSeconds;
+  final bool autoLocalBackupEnabled;
+  final String? autoLocalBackupPath;
   final double? manualLatitude;
   final double? manualLongitude;
   final String? manualLocationLabel;
@@ -61,6 +65,9 @@ class AppSettings {
     PrayerLocationMode? prayerLocationMode,
     bool? biometricLockEnabled,
     int? autoLockTimeoutSeconds,
+    bool? autoLocalBackupEnabled,
+    String? autoLocalBackupPath,
+    bool clearAutoLocalBackupPath = false,
     double? manualLatitude,
     double? manualLongitude,
     String? manualLocationLabel,
@@ -80,6 +87,11 @@ class AppSettings {
       biometricLockEnabled: biometricLockEnabled ?? this.biometricLockEnabled,
       autoLockTimeoutSeconds:
           autoLockTimeoutSeconds ?? this.autoLockTimeoutSeconds,
+      autoLocalBackupEnabled:
+          autoLocalBackupEnabled ?? this.autoLocalBackupEnabled,
+      autoLocalBackupPath: clearAutoLocalBackupPath
+          ? null
+          : (autoLocalBackupPath ?? this.autoLocalBackupPath),
       manualLatitude:
           clearManualLocation ? null : (manualLatitude ?? this.manualLatitude),
       manualLongitude: clearManualLocation
@@ -103,6 +115,8 @@ class AppSettings {
     prayerLocationMode: PrayerLocationMode.automatic,
     biometricLockEnabled: true,
     autoLockTimeoutSeconds: 15,
+    autoLocalBackupEnabled: false,
+    autoLocalBackupPath: null,
     manualLatitude: null,
     manualLongitude: null,
     manualLocationLabel: null,

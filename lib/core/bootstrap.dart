@@ -4,12 +4,15 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../services/backup/local_auto_backup_service.dart';
+
 Future<void> bootstrap() async {
   await Hive.initFlutter();
   await Hive.openBox<String>('meta_box');
   await Hive.openBox<String>('reflections_box');
   await Hive.openBox<String>('activities_box');
   await Hive.openBox<String>('work_sessions_box');
+  await LocalAutoBackupService.initFromSettings();
   await initializeDateFormatting('ar');
   tzDataInit();
   await _configureTimezone();

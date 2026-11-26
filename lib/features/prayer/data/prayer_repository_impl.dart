@@ -187,9 +187,8 @@ class PrayerRepositoryImpl implements PrayerRepository {
     DateTime date,
   ) {
     final params = _toPrayerMethod(settings.prayerMethod).getParameters()
-      ..madhab = settings.asrMadhab == AsrMadhab.hanafi
-          ? Madhab.hanafi
-          : Madhab.shafi;
+      ..madhab =
+          settings.asrMadhab == AsrMadhab.hanafi ? Madhab.hanafi : Madhab.shafi;
     final dc = DateComponents(date.year, date.month, date.day);
     final prayerTimes = PrayerTimes(coordinates, dc, params);
     return _PrayerDayData(

@@ -1,6 +1,8 @@
 part of '../backup_export_service.dart';
 
-Future<bool> _importBackupInteractive() async {
+Future<bool> _importBackupInteractive({
+  BackupRestoreMode mode = BackupRestoreMode.replace,
+}) async {
   final picked = await FilePicker.platform.pickFiles(
     dialogTitle: 'اختر ملف النسخة الاحتياطية',
     type: FileType.custom,
@@ -19,6 +21,6 @@ Future<bool> _importBackupInteractive() async {
   if (raw == null || raw.trim().isEmpty) {
     throw const FormatException('الملف فارغ أو غير قابل للقراءة.');
   }
-  await BackupExportService.restoreFromJsonString(raw);
+  await BackupExportService.restoreFromJsonString(raw, mode: mode);
   return true;
 }

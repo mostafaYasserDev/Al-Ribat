@@ -1,12 +1,15 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' show DateFormat;
 
 import '../../../../application/providers.dart';
 import '../../../../core/app_startup.dart';
 import '../../../../core/ui_feedback.dart';
 import '../../../../domain/entities/app_settings.dart';
+import '../../../../services/backup/local_auto_backup_service.dart';
 import '../../../../services/backup_export_service.dart';
 import '../../../../services/cloud_sync_service.dart';
 import '../widgets/settings_ui_components.dart';
@@ -44,39 +47,97 @@ class _SyncBackupSettingsPageState
     ref.invalidate(streakProvider);
   }
 
-  Future<void> _confirmAndImport() async {
-    final ok = await showDialog<bool>(
+  Future<BackupRestoreMode?> _askRestoreMode({
+    required String title,
+  }) async {
+    return showDialog<BackupRestoreMode>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('استيراد واستبدال البيانات؟'),
+        title: Text(title),
         content: const Text(
-          'سيتم استبدال الأنشطة والتأملات والجلسات والإعدادات الحالية ببيانات الملف.',
+          'اختر طريقة استعادة البيانات من الملف:',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('إلغاء'),
           ),
+          OutlinedButton(
+            onPressed: () => Navigator.pop(ctx, BackupRestoreMode.merge),
+            child: const Text('دمج مع الحالي'),
+          ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('استيراد'),
+            onPressed: () => Navigator.pop(ctx, BackupRestoreMode.replace),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            child: const Text('استبدال الكل'),
           ),
         ],
       ),
     );
-    if (ok != true || !mounted) return;
+  }
+
+  Future<void> _confirmAndImport() async {
+    final mode = await _askRestoreMode(title: 'استيراد نسخة احتياطية');
+    if (mode == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      final imported = await BackupExportService.importInteractive();
+      final imported = await BackupExportService.importInteractive(mode: mode);
       if (!imported) return;
       _invalidateAll();
-      if (mounted) appSnack(context, 'تم الاستيراد بنجاح.');
+      if (mounted) {
+        appSnack(
+          context,
+          mode == BackupRestoreMode.merge
+              ? 'تم دمج البيانات المستوردة بنجاح.'
+              : 'تم استبدال البيانات بالنسخة الاحتياطية بنجاح.',
+        );
+      }
     } catch (e) {
       if (mounted) {
         appError(context, e, fallback: 'تعذر استيراد النسخة الاحتياطية.');
       }
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirmAndRestoreAutoBackup() async {
+    final mode = await _askRestoreMode(title: 'استعادة من الملف التلقائي');
+    if (mode == null || !mounted) return;
+    await _run(() async {
+      await LocalAutoBackupService.restoreFromAutoBackup(mode: mode);
+      _invalidateAll();
+    },
+        mode == BackupRestoreMode.merge
+            ? 'تم دمج بيانات الملف التلقائي.'
+            : 'تمت الاستعادة من الملف التلقائي.');
+  }
+
+  Future<void> _pickAutoBackupDirectory(AppSettings settings) async {
+    try {
+      final dir = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: 'اختر مجلد الحفظ التلقائي',
+      );
+      if (dir == null || dir.trim().isEmpty || !mounted) return;
+      await ref.read(settingsProvider.notifier).updateSettings(
+            settings.copyWith(
+              autoLocalBackupEnabled: true,
+              autoLocalBackupPath: dir.trim(),
+            ),
+          );
+      if (mounted) {
+        appSnack(context, 'تم تحديث مسار الحفظ التلقائي.');
+      }
+    } catch (e) {
+      if (mounted) {
+        appError(
+          context,
+          e,
+          fallback: 'تعذر تغيير المجلد على هذا الجهاز.',
+        );
+      }
     }
   }
 
@@ -112,6 +173,8 @@ class _SyncBackupSettingsPageState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final settings =
+        ref.watch(settingsProvider).valueOrNull ?? AppSettings.defaults;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -351,10 +414,18 @@ class _SyncBackupSettingsPageState
                             icon: Icons.file_upload_outlined,
                             iconColor: const Color(0xFFFF9500),
                             title: 'استيراد نسخة احتياطية',
-                            subtitle: 'استبدال البيانات الحالية بملف JSON سابق',
+                            subtitle: 'دمج أو استبدال البيانات بملف JSON سابق',
                             onTap: _busy ? null : _confirmAndImport,
                           ),
                         ],
+                      ),
+                      const SettingsSectionHeader(
+                        title: 'الحفظ التلقائي الفوري في ملف محلي',
+                      ),
+                      _buildAutoLocalBackupCard(theme, settings),
+                      const SettingsSectionFooter(
+                        text:
+                            'يُحدّث الملف تلقائياً وفورياً مع كل تغيير في أنشطتك أو تأملاتك أو إعداداتك لضمان أمان بياناتك محلياً.',
                       ),
                       const SettingsSectionHeader(title: 'إدارة الإعدادات'),
                       SettingsGroupCard(
@@ -378,6 +449,137 @@ class _SyncBackupSettingsPageState
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAutoLocalBackupCard(ThemeData theme, AppSettings settings) {
+    return ValueListenableBuilder<LocalAutoBackupState>(
+      valueListenable: LocalAutoBackupService.statusNotifier,
+      builder: (context, status, _) {
+        final lastSavedText = status.lastSavedAt == null
+            ? 'لم يُحفظ بعد'
+            : DateFormat('yyyy/MM/dd – HH:mm:ss', 'ar')
+                .format(status.lastSavedAt!.toLocal());
+
+        return SettingsGroupCard(
+          dividerIndent: 16,
+          children: [
+            SettingsSwitchTile(
+              icon: Icons.autorenew_rounded,
+              iconColor: const Color(0xFF34C759),
+              title: 'تفعيل الحفظ التلقائي الفوري',
+              subtitle: 'تحديث ملف النسخة المحلية فوراً عند أي تعديل',
+              value: settings.autoLocalBackupEnabled,
+              onChanged: _busy
+                  ? (_) {}
+                  : (value) async {
+                      await ref.read(settingsProvider.notifier).updateSettings(
+                            settings.copyWith(autoLocalBackupEnabled: value),
+                          );
+                    },
+            ),
+            if (settings.autoLocalBackupEnabled || status.filePath != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'آخر تحديث:',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            status.isWriting ? 'جاري الحفظ…' : lastSavedText,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                        SettingsStatusPill(
+                          label:
+                              settings.autoLocalBackupEnabled ? 'نشط' : 'متوقف',
+                          color: settings.autoLocalBackupEnabled
+                              ? const Color(0xFF34C759)
+                              : theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.45),
+                        ),
+                      ],
+                    ),
+                    if (status.filePath != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        status.filePath!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textDirection: TextDirection.ltr,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 11.5,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                    if (status.lastError != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'تعذر الحفظ في المسار المحدد: ${status.lastError}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.tonalIcon(
+                          onPressed: _busy
+                              ? null
+                              : () => _run(
+                                    () => LocalAutoBackupService.writeNow(),
+                                    'تم تحديث الملف المحلي الآن.',
+                                  ),
+                          icon: const Icon(Icons.save_rounded, size: 17),
+                          label: const Text('حفظ الآن'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _busy
+                              ? null
+                              : () => _run(
+                                    () => LocalAutoBackupService
+                                        .shareAutoBackupFile(),
+                                    'تم تجهيز الملف للمشاركة.',
+                                  ),
+                          icon: const Icon(Icons.share_rounded, size: 17),
+                          label: const Text('مشاركة'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _busy
+                              ? null
+                              : () => _pickAutoBackupDirectory(settings),
+                          icon: const Icon(Icons.folder_open_rounded, size: 17),
+                          label: const Text('تغيير المجلد'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed:
+                              _busy ? null : _confirmAndRestoreAutoBackup,
+                          icon: const Icon(Icons.restore_rounded, size: 17),
+                          label: const Text('استعادة منه'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

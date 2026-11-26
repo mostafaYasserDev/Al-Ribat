@@ -11,9 +11,15 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 
   Future<void> updateSettings(AppSettings settings) async {
+    final prev = state.valueOrNull;
     state = await AsyncValue.guard(() async {
       await ref.read(settingsRepositoryProvider).saveSettings(settings);
       return settings;
     });
+    if (prev == null ||
+        prev.autoLocalBackupEnabled != settings.autoLocalBackupEnabled ||
+        prev.autoLocalBackupPath != settings.autoLocalBackupPath) {
+      unawaited(LocalAutoBackupService.applySettings(settings));
+    }
   }
 }

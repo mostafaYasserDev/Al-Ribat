@@ -23,6 +23,8 @@ class AppSettingsModel extends AppSettings {
     super.phasePromptsEnabled = true,
     super.biometricLockEnabled = true,
     super.autoLockTimeoutSeconds = 15,
+    super.autoLocalBackupEnabled = false,
+    super.autoLocalBackupPath,
     super.manualLatitude,
     super.manualLongitude,
     super.manualLocationLabel,
@@ -41,6 +43,8 @@ class AppSettingsModel extends AppSettings {
       prayerLocationMode: settings.prayerLocationMode,
       biometricLockEnabled: settings.biometricLockEnabled,
       autoLockTimeoutSeconds: settings.autoLockTimeoutSeconds,
+      autoLocalBackupEnabled: settings.autoLocalBackupEnabled,
+      autoLocalBackupPath: settings.autoLocalBackupPath,
       manualLatitude: settings.manualLatitude,
       manualLongitude: settings.manualLongitude,
       manualLocationLabel: settings.manualLocationLabel,
@@ -66,8 +70,8 @@ class AppSettingsModel extends AppSettings {
         json['asrMadhab'] as String?,
         defaults.asrMadhab,
       ),
-      notificationsEnabled:
-          json['notificationsEnabled'] as bool? ?? defaults.notificationsEnabled,
+      notificationsEnabled: json['notificationsEnabled'] as bool? ??
+          defaults.notificationsEnabled,
       focusModeEnabled:
           json['focusModeEnabled'] as bool? ?? defaults.focusModeEnabled,
       phasePromptsEnabled:
@@ -85,6 +89,9 @@ class AppSettingsModel extends AppSettings {
           defaults.biometricLockEnabled,
       autoLockTimeoutSeconds: json['autoLockTimeoutSeconds'] as int? ??
           defaults.autoLockTimeoutSeconds,
+      autoLocalBackupEnabled: json['autoLocalBackupEnabled'] as bool? ??
+          defaults.autoLocalBackupEnabled,
+      autoLocalBackupPath: json['autoLocalBackupPath'] as String?,
       manualLatitude: (json['manualLatitude'] as num?)?.toDouble(),
       manualLongitude: (json['manualLongitude'] as num?)?.toDouble(),
       manualLocationLabel: json['manualLocationLabel'] as String?,
@@ -104,6 +111,8 @@ class AppSettingsModel extends AppSettings {
       'prayerLocationMode': prayerLocationMode.name,
       'biometricLockEnabled': biometricLockEnabled,
       'autoLockTimeoutSeconds': autoLockTimeoutSeconds,
+      'autoLocalBackupEnabled': autoLocalBackupEnabled,
+      'autoLocalBackupPath': autoLocalBackupPath,
       'manualLatitude': manualLatitude,
       'manualLongitude': manualLongitude,
       'manualLocationLabel': manualLocationLabel,

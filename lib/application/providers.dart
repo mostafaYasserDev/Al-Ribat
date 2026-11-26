@@ -27,6 +27,7 @@ import '../domain/repositories/prayer_repository.dart';
 import '../domain/repositories/reflection_repository.dart';
 import '../domain/repositories/settings_repository.dart';
 import '../domain/repositories/work_session_repository.dart';
+import '../services/backup/local_auto_backup_service.dart';
 import '../services/notification_service.dart';
 
 part 'parts/repository_providers.dart';
