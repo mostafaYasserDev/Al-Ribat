@@ -127,4 +127,38 @@ void main() {
     expect(find.text('سجل جلسات التركيز'), findsOneWidget);
     expect(find.text('لا توجد جلسات مسجلة بعد'), findsOneWidget);
   });
+
+  testWidgets('Opens anchored link popover with Tasks & Projects tabs',
+      (tester) async {
+    await tester.pumpWidget(buildTestApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('ربط الجلسة بمهمة أو مشروع'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('مهام اليوم'), findsOneWidget);
+    expect(find.textContaining('المشاريع'), findsOneWidget);
+
+    await tester.tap(find.textContaining('المشاريع'));
+    await tester.pumpAndSettle();
+    expect(find.text('لا توجد مشاريع مضافة بعد'), findsOneWidget);
+  });
+
+  testWidgets('Opens anchored duration wheel popover and applies duration',
+      (tester) async {
+    await tester.pumpWidget(buildTestApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('مؤقت'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('تخصيص الساعات والدقائق والثواني'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('تحديد مدة الجلسة'), findsOneWidget);
+    expect(find.text('اعتماد المدة'), findsOneWidget);
+
+    await tester.tap(find.text('اعتماد المدة'));
+    await tester.pumpAndSettle();
+  });
 }

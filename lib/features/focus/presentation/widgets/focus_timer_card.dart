@@ -1,7 +1,10 @@
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
+import 'package:al_ribat/features/projects/presentation/widgets/anchored_popover.dart';
 import '../../domain/active_focus_state.dart';
 import '../../domain/focus_time_formatter.dart';
 
@@ -46,128 +49,154 @@ class FocusTimerCard extends StatelessWidget {
     (minutes: 120, label: '2س', isPomodoro: false),
   ];
 
-  void _openDurationPicker(BuildContext context) {
-    var hours = selectedSeconds ~/ 3600;
+  void _openDurationPopover(BuildContext anchorContext) {
+    HapticFeedback.lightImpact();
+    var hours = (selectedSeconds ~/ 3600).clamp(0, 8);
     var minutes = (selectedSeconds % 3600) ~/ 60;
     var seconds = selectedSeconds % 60;
 
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      useSafeArea: true,
+    showAnchoredPopover<void>(
+      anchorContext,
+      width: 320,
+      preferAbove: true,
+      anchorRadius: 20,
       builder: (ctx) {
         final theme = Theme.of(ctx);
-        final isDark = theme.brightness == Brightness.dark;
-        final sheetBg = theme.cardTheme.color ??
-            (isDark ? const Color(0xFF111B2E) : Colors.white);
+        final colorScheme = theme.colorScheme;
 
         return StatefulBuilder(
-          builder: (ctx, setModalState) {
+          builder: (ctx, setPopoverState) {
             final totalSec =
                 ((hours * 3600) + (minutes * 60) + seconds).clamp(1, 28800);
-            final colorScheme = theme.colorScheme;
 
             return Directionality(
               textDirection: TextDirection.rtl,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: Material(
-                  color: sheetBg,
-                  borderRadius: BorderRadius.circular(24),
-                  clipBehavior: Clip.antiAlias,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          width: 36,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 14),
-                          decoration: BoxDecoration(
-                            color: colorScheme.onSurface.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        Text(
-                          'تحديد مدة الجلسة',
-                          style: theme.textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 6),
-                        Directionality(
-                          textDirection: TextDirection.ltr,
+                        Flexible(
                           child: Text(
-                            FocusTimeFormatter.formatCountdown(totalSec),
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.primary,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
+                            'تحديد مدة الجلسة',
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
-                        const SizedBox(height: 18),
-                        Directionality(
-                          textDirection: TextDirection.ltr,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              _UnitStepper(
-                                label: 'ساعات',
-                                value: hours,
-                                min: 0,
-                                max: 8,
-                                onChanged: (v) =>
-                                    setModalState(() => hours = v),
-                              ),
-                              _colonSeparator(theme, colorScheme),
-                              _UnitStepper(
-                                label: 'دقائق',
-                                value: minutes,
-                                min: 0,
-                                max: 59,
-                                onChanged: (v) =>
-                                    setModalState(() => minutes = v),
-                              ),
-                              _colonSeparator(theme, colorScheme),
-                              _UnitStepper(
-                                label: 'ثوانٍ',
-                                value: seconds,
-                                min: (hours == 0 && minutes == 0) ? 1 : 0,
-                                max: 59,
-                                onChanged: (v) =>
-                                    setModalState(() => seconds = v),
-                              ),
-                            ],
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
                           ),
-                        ),
-                        const SizedBox(height: 22),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Directionality(
+                            textDirection: TextDirection.ltr,
+                            child: Text(
+                              FocusTimeFormatter.formatCountdown(totalSec),
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: colorScheme.primary,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
                               ),
-                            ),
-                            onPressed: () {
-                              HapticFeedback.selectionClick();
-                              onDurationSecondsChanged(totalSec);
-                              Navigator.pop(ctx);
-                            },
-                            child: const Text(
-                              'اعتماد المدة',
-                              style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: SizedBox(
+                        height: 148,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color:
+                                    colorScheme.primary.withValues(alpha: 0.10),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: colorScheme.primary
+                                      .withValues(alpha: 0.22),
+                                  width: 0.8,
+                                ),
+                              ),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: _DraggableUnitWheel(
+                                    label: 'ساعات',
+                                    value: hours,
+                                    min: 0,
+                                    max: 8,
+                                    onChanged: (v) =>
+                                        setPopoverState(() => hours = v),
+                                  ),
+                                ),
+                                _colonSeparator(theme, colorScheme),
+                                Expanded(
+                                  child: _DraggableUnitWheel(
+                                    label: 'دقائق',
+                                    value: minutes,
+                                    min: 0,
+                                    max: 59,
+                                    onChanged: (v) =>
+                                        setPopoverState(() => minutes = v),
+                                  ),
+                                ),
+                                _colonSeparator(theme, colorScheme),
+                                Expanded(
+                                  child: _DraggableUnitWheel(
+                                    label: 'ثوانٍ',
+                                    value: seconds,
+                                    min: 0,
+                                    max: 59,
+                                    onChanged: (v) =>
+                                        setPopoverState(() => seconds = v),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: const StadiumBorder(),
+                        ),
+                        onPressed: () {
+                          HapticFeedback.selectionClick();
+                          onDurationSecondsChanged(totalSec);
+                          Navigator.pop(ctx);
+                        },
+                        child: const Text(
+                          'اعتماد المدة',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -179,12 +208,12 @@ class FocusTimerCard extends StatelessWidget {
 
   Widget _colonSeparator(ThemeData theme, ColorScheme colorScheme) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.only(top: 16, left: 2, right: 2),
       child: Text(
         ':',
-        style: theme.textTheme.headlineMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: colorScheme.onSurfaceVariant,
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
         ),
       ),
     );
@@ -206,10 +235,10 @@ class FocusTimerCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isActive
               ? accentColor.withValues(alpha: 0.45)
@@ -220,9 +249,9 @@ class FocusTimerCard extends StatelessWidget {
             ? null
             : [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.028),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 14,
+                  offset: const Offset(0, 5),
                 ),
               ],
       ),
@@ -231,49 +260,74 @@ class FocusTimerCard extends StatelessWidget {
           _buildHeaderBadge(context, accentColor),
           const SizedBox(height: 16),
           RepaintBoundary(
-            child: Column(
-              children: [
-                Directionality(
-                  textDirection: TextDirection.ltr,
-                  child: Text(
-                    displayTime,
-                    style: theme.textTheme.displayLarge?.copyWith(
-                      fontSize: 54,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 2,
-                      color: isPaused
-                          ? const Color(0xFFFF9500)
-                          : (isActive ? accentColor : colorScheme.onSurface),
-                      fontFeatures: const [FontFeature.tabularFigures()],
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    accentColor.withValues(alpha: isDark ? 0.10 : 0.055),
+                    accentColor.withValues(alpha: isDark ? 0.03 : 0.015),
+                  ],
+                ),
+                border: Border.all(
+                  color: accentColor.withValues(alpha: isDark ? 0.18 : 0.10),
+                  width: 0.7,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Text(
+                      displayTime,
+                      style: theme.textTheme.displayLarge?.copyWith(
+                        fontSize: 56,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 2.2,
+                        height: 1.05,
+                        color: isPaused
+                            ? const Color(0xFFFF9500)
+                            : (isActive ? accentColor : colorScheme.onSurface),
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _buildSubtitle(),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 12.5,
-                    color: colorScheme.onSurface.withValues(alpha: 0.6),
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(height: 10),
+                  Text(
+                    _buildSubtitle(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 12.5,
+                      color: colorScheme.onSurface.withValues(alpha: 0.64),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                if (isActive) ...[
-                  const SizedBox(height: 18),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: LinearProgressIndicator(
-                      value: selectedMode == FocusSessionMode.openStopwatch
-                          ? null
-                          : progress,
-                      minHeight: 7,
-                      color: accentColor,
-                      backgroundColor: colorScheme.surfaceContainerHighest
-                          .withValues(alpha: 0.65),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    height: 24,
+                    width: double.infinity,
+                    child: CustomPaint(
+                      painter: _FocusHorizonPainter(
+                        progress: isActive
+                            ? (selectedMode == FocusSessionMode.openStopwatch
+                                ? 1.0
+                                : progress)
+                            : 0.0,
+                        isActive: isActive,
+                        isOpenStopwatch:
+                            selectedMode == FocusSessionMode.openStopwatch,
+                        accentColor: accentColor,
+                        inactiveColor: colorScheme.onSurface
+                            .withValues(alpha: isDark ? 0.16 : 0.12),
+                      ),
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
           ),
           AnimatedSize(
@@ -283,13 +337,7 @@ class FocusTimerCard extends StatelessWidget {
             child: showCustomControls
                 ? Column(
                     children: [
-                      const SizedBox(height: 18),
-                      Divider(
-                        height: 0.6,
-                        thickness: 0.6,
-                        color: colorScheme.onSurface.withValues(alpha: 0.08),
-                      ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 16),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -337,10 +385,28 @@ class FocusTimerCard extends StatelessWidget {
                         }).toList(),
                       ),
                       const SizedBox(height: 12),
-                      TextButton.icon(
-                        onPressed: () => _openDurationPicker(context),
-                        icon: const Icon(Icons.schedule_rounded, size: 18),
-                        label: const Text('تخصيص الساعات والدقائق والثواني'),
+                      Builder(
+                        builder: (anchorCtx) => OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            shape: const StadiumBorder(),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 9,
+                            ),
+                            side: BorderSide(
+                              color: colorScheme.primary.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          onPressed: () => _openDurationPopover(anchorCtx),
+                          icon: const Icon(Icons.tune_rounded, size: 17),
+                          label: const Text(
+                            'تخصيص الساعات والدقائق والثواني',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   )
@@ -436,8 +502,90 @@ class FocusTimerCard extends StatelessWidget {
   }
 }
 
-class _UnitStepper extends StatelessWidget {
-  const _UnitStepper({
+/// Precision 29-tick chronometer horizon bar replacing generic circular rings.
+class _FocusHorizonPainter extends CustomPainter {
+  const _FocusHorizonPainter({
+    required this.progress,
+    required this.isActive,
+    required this.isOpenStopwatch,
+    required this.accentColor,
+    required this.inactiveColor,
+  });
+
+  final double progress;
+  final bool isActive;
+  final bool isOpenStopwatch;
+  final Color accentColor;
+  final Color inactiveColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const tickCount = 29;
+    final step = size.width / (tickCount - 1);
+    final activeCutoff = isActive
+        ? (isOpenStopwatch
+            ? tickCount - 1
+            : (progress * (tickCount - 1)).round())
+        : -1;
+
+    for (var i = 0; i < tickCount; i++) {
+      final isMajor = i % 7 == 0;
+      final isFrontier = isActive && !isOpenStopwatch && i == activeCutoff;
+      final isFilled = isActive && i <= activeCutoff;
+
+      final tickHeight = isFrontier
+          ? size.height
+          : (isMajor ? size.height * 0.78 : size.height * 0.48);
+      final top = (size.height - tickHeight) / 2;
+      final x = i * step;
+
+      final Color color;
+      if (isFrontier) {
+        color = accentColor;
+      } else if (isFilled) {
+        color = accentColor.withValues(alpha: 0.72);
+      } else if (!isActive && isMajor) {
+        color = accentColor.withValues(alpha: 0.38);
+      } else {
+        color = inactiveColor;
+      }
+
+      if (isFrontier) {
+        final glowPaint = Paint()
+          ..color = accentColor.withValues(alpha: 0.28)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(x - 2.4, top - 1, 4.8, tickHeight + 2),
+            const Radius.circular(3),
+          ),
+          glowPaint,
+        );
+      }
+
+      final paint = Paint()..color = color;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x - 1.5, top, 3.0, tickHeight),
+          const Radius.circular(2),
+        ),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FocusHorizonPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.isActive != isActive ||
+        oldDelegate.isOpenStopwatch != isOpenStopwatch ||
+        oldDelegate.accentColor != accentColor ||
+        oldDelegate.inactiveColor != inactiveColor;
+  }
+}
+
+class _DraggableUnitWheel extends StatefulWidget {
+  const _DraggableUnitWheel({
     required this.label,
     required this.value,
     required this.min,
@@ -452,56 +600,97 @@ class _UnitStepper extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   @override
+  State<_DraggableUnitWheel> createState() => _DraggableUnitWheelState();
+}
+
+class _DraggableUnitWheelState extends State<_DraggableUnitWheel> {
+  late FixedExtentScrollController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = FixedExtentScrollController(
+      initialItem:
+          (widget.value - widget.min).clamp(0, widget.max - widget.min),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final count = widget.max - widget.min + 1;
 
     return Column(
-      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          label,
+          widget.label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w700,
           ),
         ),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              IconButton(
-                onPressed: value + 1 <= max
-                    ? () {
-                        HapticFeedback.selectionClick();
-                        onChanged(value + 1);
-                      }
-                    : null,
-                icon: const Icon(Icons.keyboard_arrow_up_rounded),
+        const SizedBox(height: 4),
+        Expanded(
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(
+              dragDevices: const {
+                PointerDeviceKind.touch,
+                PointerDeviceKind.mouse,
+                PointerDeviceKind.trackpad,
+                PointerDeviceKind.stylus,
+              },
+            ),
+            child: ListWheelScrollView.useDelegate(
+              controller: _controller,
+              itemExtent: 38,
+              diameterRatio: 1.45,
+              perspective: 0.003,
+              physics: const FixedExtentScrollPhysics(),
+              onSelectedItemChanged: (idx) {
+                HapticFeedback.selectionClick();
+                widget.onChanged(widget.min + idx);
+              },
+              childDelegate: ListWheelChildBuilderDelegate(
+                childCount: count,
+                builder: (context, idx) {
+                  final numVal = widget.min + idx;
+                  final isSelected = numVal == widget.value;
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      _controller.animateToItem(
+                        idx,
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutCubic,
+                      );
+                    },
+                    child: Center(
+                      child: AnimatedDefaultTextStyle(
+                        duration: const Duration(milliseconds: 140),
+                        style: TextStyle(
+                          fontSize: isSelected ? 22 : 16,
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w500,
+                          color: isSelected
+                              ? colorScheme.primary
+                              : colorScheme.onSurface.withValues(alpha: 0.42),
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                        child: Text(numVal.toString().padLeft(2, '0')),
+                      ),
+                    ),
+                  );
+                },
               ),
-              Text(
-                value.toString().padLeft(2, '0'),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              IconButton(
-                onPressed: value - 1 >= min
-                    ? () {
-                        HapticFeedback.selectionClick();
-                        onChanged(value - 1);
-                      }
-                    : null,
-                icon: const Icon(Icons.keyboard_arrow_down_rounded),
-              ),
-            ],
+            ),
           ),
         ),
       ],

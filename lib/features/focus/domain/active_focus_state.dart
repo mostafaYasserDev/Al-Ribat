@@ -65,6 +65,7 @@ class ActiveFocusState {
     String? linkedActivityTitle,
     bool clearLinkedActivity = false,
     String? projectName,
+    bool clearLinkedProject = false,
     bool? isBreak,
     int? pomodoroCycle,
   }) {
@@ -83,7 +84,8 @@ class ActiveFocusState {
       linkedActivityTitle: clearLinkedActivity
           ? null
           : (linkedActivityTitle ?? this.linkedActivityTitle),
-      projectName: projectName ?? this.projectName,
+      projectName:
+          clearLinkedProject ? null : (projectName ?? this.projectName),
       isBreak: isBreak ?? this.isBreak,
       pomodoroCycle: pomodoroCycle ?? this.pomodoroCycle,
     );

@@ -163,6 +163,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     required DateTime nextPrayerTime,
     String? linkedActivityId,
     String? linkedActivityTitle,
+    String? projectName,
   }) async {
     final now = DateTime.now();
     var diffSeconds = nextPrayerTime.difference(now).inSeconds;
@@ -178,6 +179,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
       mode: FocusSessionMode.untilPrayer,
       linkedActivityId: linkedActivityId,
       linkedActivityTitle: linkedActivityTitle,
+      projectName: projectName,
     );
   }
 
@@ -186,6 +188,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     int workMinutes = 25,
     String? linkedActivityId,
     String? linkedActivityTitle,
+    String? projectName,
   }) async {
     await startSession(
       title: title.isEmpty ? 'بومودورو تركيز' : title,
@@ -193,6 +196,7 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
       mode: FocusSessionMode.pomodoro,
       linkedActivityId: linkedActivityId,
       linkedActivityTitle: linkedActivityTitle,
+      projectName: projectName,
     );
   }
 
@@ -297,13 +301,26 @@ class ActiveFocusNotifier extends Notifier<ActiveFocusState?> {
     state = current.copyWith(
       linkedActivityId: id,
       linkedActivityTitle: title,
+      clearLinkedProject: true,
+    );
+  }
+
+  void linkProject(String projectName) {
+    final current = state;
+    if (current == null) return;
+    state = current.copyWith(
+      projectName: projectName,
+      clearLinkedActivity: true,
     );
   }
 
   void clearLinkedActivity() {
     final current = state;
     if (current == null) return;
-    state = current.copyWith(clearLinkedActivity: true);
+    state = current.copyWith(
+      clearLinkedActivity: true,
+      clearLinkedProject: true,
+    );
   }
 
   Future<void> _savePomodoroWorkAndStartBreak(ActiveFocusState work) async {

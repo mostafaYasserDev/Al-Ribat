@@ -33,6 +33,7 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
   int _selectedSeconds = 25 * 60;
   bool _isPomodoroPreset = false;
   ActivityItem? _linkedActivity;
+  String? _linkedProjectName;
   late final String _dailyQuote;
   Timer? _prayerRefreshTimer;
 
@@ -72,66 +73,77 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
     HapticFeedback.mediumImpact();
     final notifier = ref.read(activeFocusProvider.notifier);
     final taskTitle = _linkedActivity?.title;
+    final projectTitle = _linkedProjectName;
+    final displayContext = taskTitle ?? projectTitle;
 
     switch (_selectedMode) {
       case FocusSessionMode.untilPrayer:
         if (schedule != null) {
           final next = _nextPrayer(schedule);
           notifier.startUntilPrayer(
-            title: taskTitle != null
-                ? 'رباط $taskTitle'
+            title: displayContext != null
+                ? 'رباط $displayContext'
                 : 'الرباط حتى ${next.phase.arabicName}',
             nextPrayerTime: next.time,
             linkedActivityId: _linkedActivity?.id,
             linkedActivityTitle: taskTitle,
+            projectName: projectTitle,
           );
         } else {
           notifier.startSession(
-            title: taskTitle ?? 'جلسة تركيز',
+            title: displayContext ?? 'جلسة تركيز',
             plannedMinutes: (_selectedSeconds / 60).ceil(),
             plannedSeconds: _selectedSeconds,
             mode: FocusSessionMode.customTimer,
             linkedActivityId: _linkedActivity?.id,
             linkedActivityTitle: taskTitle,
+            projectName: projectTitle,
           );
         }
         break;
 
       case FocusSessionMode.pomodoro:
         notifier.startPomodoro(
-          title: taskTitle != null ? 'بومودورو: $taskTitle' : 'بومودورو تركيز',
+          title: displayContext != null
+              ? 'بومودورو: $displayContext'
+              : 'بومودورو تركيز',
           workMinutes: 25,
           linkedActivityId: _linkedActivity?.id,
           linkedActivityTitle: taskTitle,
+          projectName: projectTitle,
         );
         break;
 
       case FocusSessionMode.customTimer:
         if (_isPomodoroPreset) {
           notifier.startPomodoro(
-            title:
-                taskTitle != null ? 'بومودورو: $taskTitle' : 'بومودورو تركيز',
+            title: displayContext != null
+                ? 'بومودورو: $displayContext'
+                : 'بومودورو تركيز',
             workMinutes: 25,
             linkedActivityId: _linkedActivity?.id,
             linkedActivityTitle: taskTitle,
+            projectName: projectTitle,
           );
         } else {
           notifier.startSession(
-            title: taskTitle ?? 'جلسة تركيز',
+            title: displayContext ?? 'جلسة تركيز',
             plannedMinutes: (_selectedSeconds / 60).ceil(),
             plannedSeconds: _selectedSeconds,
             mode: FocusSessionMode.customTimer,
             linkedActivityId: _linkedActivity?.id,
             linkedActivityTitle: taskTitle,
+            projectName: projectTitle,
           );
         }
         break;
 
       case FocusSessionMode.openStopwatch:
         notifier.startOpenStopwatch(
-          title: taskTitle ?? 'تركيز مفتوح',
+          title: displayContext ?? 'تركيز مفتوح',
           linkedActivityId: _linkedActivity?.id,
           linkedActivityTitle: taskTitle,
+          projectName: projectTitle,
         );
         break;
     }
@@ -284,13 +296,31 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
                               )
                             : null)
                         : _linkedActivity,
+                    selectedProjectName: isSessionActive
+                        ? activeSession.projectName
+                        : _linkedProjectName,
                     onSelectActivity: (act) {
                       if (isSessionActive) {
                         ref
                             .read(activeFocusProvider.notifier)
                             .linkActivity(act.id, act.title);
                       } else {
-                        setState(() => _linkedActivity = act);
+                        setState(() {
+                          _linkedActivity = act;
+                          _linkedProjectName = null;
+                        });
+                      }
+                    },
+                    onSelectProject: (projectName) {
+                      if (isSessionActive) {
+                        ref
+                            .read(activeFocusProvider.notifier)
+                            .linkProject(projectName);
+                      } else {
+                        setState(() {
+                          _linkedProjectName = projectName;
+                          _linkedActivity = null;
+                        });
                       }
                     },
                     onClearActivity: () {
@@ -299,7 +329,10 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
                             .read(activeFocusProvider.notifier)
                             .clearLinkedActivity();
                       } else {
-                        setState(() => _linkedActivity = null);
+                        setState(() {
+                          _linkedActivity = null;
+                          _linkedProjectName = null;
+                        });
                       }
                     },
                   ),
@@ -357,33 +390,17 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
                               },
                               onFinish: () => _showFinishSessionDialog(context),
                             )
-                          : SizedBox(
+                          : _FocusStartPillButton(
                               key: const ValueKey('idle_controls'),
-                              width: double.infinity,
-                              child: FilledButton.icon(
-                                style: FilledButton.styleFrom(
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                  elevation: 0,
-                                ),
-                                onPressed: () => _onStartFocus(schedule),
-                                icon: const Icon(Icons.play_arrow_rounded,
-                                    size: 24),
-                                label: const Text(
-                                  'ابدأ التركيز الآن',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
+                              onTap: () => _onStartFocus(schedule),
                             ),
                     ),
                   ),
-                  const SizedBox(height: 26),
+                  const SizedBox(height: 18),
+                  _TodayFocusMiniSummary(
+                    onTapHistory: () => FocusHistorySheet.show(context),
+                  ),
+                  const SizedBox(height: 18),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Text(
@@ -414,6 +431,181 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
     } else {
       notifier.cancelSession();
     }
+  }
+}
+
+class _FocusStartPillButton extends StatefulWidget {
+  const _FocusStartPillButton({
+    super.key,
+    required this.onTap,
+  });
+
+  final VoidCallback onTap;
+
+  @override
+  State<_FocusStartPillButton> createState() => _FocusStartPillButtonState();
+}
+
+class _FocusStartPillButtonState extends State<_FocusStartPillButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final accentEnd = Color.lerp(colorScheme.primary, Colors.teal, 0.35) ??
+        colorScheme.primary;
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.965 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOutCubic,
+        child: Container(
+          height: 54,
+          decoration: ShapeDecoration(
+            shape: const StadiumBorder(),
+            gradient: LinearGradient(
+              colors: [colorScheme.primary, accentEnd],
+              begin: AlignmentDirectional.centerStart,
+              end: AlignmentDirectional.centerEnd,
+            ),
+            shadows: [
+              BoxShadow(
+                color: colorScheme.primary.withValues(alpha: 0.30),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            shape: const StadiumBorder(),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: widget.onTap,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 19,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'ابدأ التركيز الآن',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TodayFocusMiniSummary extends ConsumerWidget {
+  const _TodayFocusMiniSummary({required this.onTapHistory});
+
+  final VoidCallback onTapHistory;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sessions = ref.watch(workSessionsProvider).valueOrNull ?? const [];
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final todaySessions =
+        sessions.where((s) => !s.startedAt.isBefore(todayStart)).toList();
+    final totalMinutes = todaySessions.fold<int>(
+      0,
+      (sum, item) => sum + item.actualMinutes,
+    );
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Material(
+        color: isDark
+            ? const Color(0xFF111B2E).withValues(alpha: 0.72)
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            onTapHistory();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: colorScheme.onSurface
+                    .withValues(alpha: isDark ? 0.08 : 0.06),
+                width: 0.7,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.insights_rounded,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    todaySessions.isEmpty
+                        ? 'لم تبدأ جلسة تركيز اليوم بعد'
+                        : 'إنجاز اليوم: ${todaySessions.length} جلسات · $totalMinutes د تركيز',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface.withValues(alpha: 0.78),
+                    ),
+                  ),
+                ),
+                Text(
+                  'السجل',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.chevron_left_rounded,
+                  size: 16,
+                  color: colorScheme.primary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
