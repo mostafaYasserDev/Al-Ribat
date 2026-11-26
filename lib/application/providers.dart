@@ -39,4 +39,5 @@ part 'parts/streak_provider.dart';
 part 'parts/stats_provider.dart';
 part 'parts/stats_calculation.dart';
 part 'parts/stats_helpers.dart';
+part 'parts/scoped_stats.dart';
 part 'parts/day_state_provider.dart';

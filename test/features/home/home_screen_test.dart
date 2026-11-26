@@ -219,7 +219,23 @@ void main() {
   testWidgets(
       'StatsScreen opens via AppleMorphRoute and ? button opens help popover',
       (tester) async {
-    await tester.pumpWidget(buildTestApp());
+    final now = DateTime.now();
+    await tester.pumpWidget(
+      buildTestApp(
+        initialActivities: [
+          ActivityItem(
+            id: 'a_stats_1',
+            title: 'ورد التلاوة اليومي',
+            createdAt: DateTime(now.year, now.month, now.day, 12),
+            repetition: ActivityRepetition.daily,
+            type: ActivityType.afterPrayer,
+            linkedPrayer: PrayerPhase.fajr,
+            projectName: 'ختمة القرآن',
+            groupName: 'التلاوة',
+          ),
+        ],
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.insights_rounded));
@@ -247,5 +263,14 @@ void main() {
       ),
     );
     expect(find.text('توزيع الإنجاز حسب الصلوات'), findsOneWidget);
+
+    // Switch to المشاريع & الأنشطة tabs in StatsScreen
+    await tester.tap(find.text('المشاريع'));
+    await tester.pumpAndSettle();
+    expect(find.text('ختمة القرآن'), findsWidgets);
+
+    await tester.tap(find.text('الأنشطة'));
+    await tester.pumpAndSettle();
+    expect(find.text('ورد التلاوة اليومي'), findsWidgets);
   });
 }

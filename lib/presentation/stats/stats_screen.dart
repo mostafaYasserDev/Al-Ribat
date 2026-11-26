@@ -6,8 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/core/constants/prayer_phase.dart';
+import 'package:al_ribat/core/theme/app_icons.dart';
+import 'package:al_ribat/domain/entities/activity_item.dart';
 import 'package:al_ribat/domain/entities/stats_snapshot.dart';
 import 'package:al_ribat/features/home/presentation/widgets/home_prayer_hero_card.dart';
+import 'package:al_ribat/features/projects/domain/project_aggregate.dart';
 import 'package:al_ribat/features/projects/presentation/widgets/anchored_popover.dart';
 import 'package:al_ribat/features/reflections/presentation/widgets/apple_morph_route.dart';
 
@@ -38,6 +41,16 @@ class StatsScreen extends ConsumerStatefulWidget {
 
 class _StatsScreenState extends ConsumerState<StatsScreen> {
   final _helpKey = GlobalKey();
+  int _scopeIndex = 0; // 0: الكل, 1: المشاريع, 2: الأنشطة
+  String? _selectedProjectName;
+  String? _selectedActivityId;
+  final _activitySearchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _activitySearchCtrl.dispose();
+    super.dispose();
+  }
 
   void _showHelpPopover(BuildContext anchorContext) {
     HapticFeedback.selectionClick();
@@ -183,48 +196,85 @@ class _StatsScreenState extends ConsumerState<StatsScreen> {
             child: Container(height: 0.6, color: dividerColor),
           ),
         ),
-        body: ListView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
+        body: Column(
           children: [
-            // 1. Hero Commitment Ring + Streak Card
-            _HeroStatsCard(
-              stats: stats,
-              streak: streak,
-              cardColor: cardColor,
-              dividerColor: dividerColor,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+              child: _StatsScopeBar(
+                selectedIndex: _scopeIndex,
+                onChanged: (idx) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _scopeIndex = idx);
+                },
+              ),
             ),
-            const SizedBox(height: 14),
-
-            // 2. Smart Insights Card
-            _SmartInsightsCard(
-              stats: stats,
-              cardColor: cardColor,
-              dividerColor: dividerColor,
-            ),
-            const SizedBox(height: 14),
-
-            // 3. Weekly Pulse Bar Chart (7 days)
-            _WeeklyPulseCard(
-              dailyCounts: stats.weeklyDailyCounts,
-              cardColor: cardColor,
-              dividerColor: dividerColor,
-            ),
-            const SizedBox(height: 14),
-
-            // 4. 2x2 Pillars Grid
-            _PillarsGrid(
-              stats: stats,
-              cardColor: cardColor,
-              dividerColor: dividerColor,
-            ),
-            const SizedBox(height: 14),
-
-            // 5. Prayer Distribution Map
-            _PrayerDistributionCard(
-              byPhase: stats.byPhase,
-              cardColor: cardColor,
-              dividerColor: dividerColor,
+            Expanded(
+              child: ListView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 240),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: switch (_scopeIndex) {
+                      1 => _ProjectStatsSection(
+                          key: const ValueKey('scope_projects'),
+                          selectedProjectName: _selectedProjectName,
+                          onSelectProject: (name) =>
+                              setState(() => _selectedProjectName = name),
+                          cardColor: cardColor,
+                          dividerColor: dividerColor,
+                        ),
+                      2 => _ActivityStatsSection(
+                          key: const ValueKey('scope_activities'),
+                          searchController: _activitySearchCtrl,
+                          selectedActivityId: _selectedActivityId,
+                          onSearchChanged: () => setState(() {}),
+                          onSelectActivity: (id) =>
+                              setState(() => _selectedActivityId = id),
+                          cardColor: cardColor,
+                          dividerColor: dividerColor,
+                        ),
+                      _ => Column(
+                          key: const ValueKey('scope_all'),
+                          children: [
+                            _HeroStatsCard(
+                              stats: stats,
+                              streak: streak,
+                              cardColor: cardColor,
+                              dividerColor: dividerColor,
+                            ),
+                            const SizedBox(height: 14),
+                            _SmartInsightsCard(
+                              stats: stats,
+                              cardColor: cardColor,
+                              dividerColor: dividerColor,
+                            ),
+                            const SizedBox(height: 14),
+                            _WeeklyPulseCard(
+                              dailyCounts: stats.weeklyDailyCounts,
+                              cardColor: cardColor,
+                              dividerColor: dividerColor,
+                            ),
+                            const SizedBox(height: 14),
+                            _PillarsGrid(
+                              stats: stats,
+                              cardColor: cardColor,
+                              dividerColor: dividerColor,
+                            ),
+                            const SizedBox(height: 14),
+                            _PrayerDistributionCard(
+                              byPhase: stats.byPhase,
+                              cardColor: cardColor,
+                              dividerColor: dividerColor,
+                            ),
+                          ],
+                        ),
+                    },
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -964,6 +1014,647 @@ class _HelpItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StatsScopeBar extends StatelessWidget {
+  const _StatsScopeBar({
+    required this.selectedIndex,
+    required this.onChanged,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  static const _labels = ['الكل', 'المشاريع', 'الأنشطة'];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final trackColor = isDark
+        ? const Color(0xFF0A101D)
+        : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7);
+    final pillColor = isDark ? const Color(0xFF1D2C46) : Colors.white;
+
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: trackColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final w = constraints.maxWidth / _labels.length;
+          return Stack(
+            children: [
+              AnimatedPositionedDirectional(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutCubic,
+                start: selectedIndex * w,
+                top: 0,
+                bottom: 0,
+                width: w,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: pillColor,
+                    borderRadius: BorderRadius.circular(11),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Row(
+                children: List.generate(_labels.length, (i) {
+                  final isSel = i == selectedIndex;
+                  return Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onChanged(i),
+                      child: Center(
+                        child: Text(
+                          _labels[i],
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight:
+                                isSel ? FontWeight.w800 : FontWeight.w600,
+                            color: isSel
+                                ? theme.colorScheme.primary
+                                : theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.65),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ProjectStatsSection extends ConsumerWidget {
+  const _ProjectStatsSection({
+    super.key,
+    required this.selectedProjectName,
+    required this.onSelectProject,
+    required this.cardColor,
+    required this.dividerColor,
+  });
+
+  final String? selectedProjectName;
+  final ValueChanged<String> onSelectProject;
+  final Color cardColor;
+  final Color dividerColor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final activities =
+        ref.watch(activitiesProvider).valueOrNull ?? const <ActivityItem>[];
+    final projects = ProjectAggregate.fromActivities(activities, theme);
+
+    if (projects.isEmpty) {
+      return _EmptyScopedCard(
+        icon: Icons.folder_off_rounded,
+        title: 'لا توجد مشاريع بعد',
+        subtitle: 'أنشئ مشروعاً أو اربط أنشطتك بمشاريع لتظهر إحصائياتها هنا.',
+        cardColor: cardColor,
+        dividerColor: dividerColor,
+      );
+    }
+
+    final current = projects.firstWhere(
+      (p) => p.name == selectedProjectName,
+      orElse: () => projects.first,
+    );
+    final snap = buildProjectStats(current.name, activities);
+    final rate = snap.completionRateThisWeek.clamp(0.0, 1.0);
+    final totalGroupDone =
+        snap.byGroup.values.fold<int>(0, (sum, v) => sum + v);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 40,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: projects.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, idx) {
+              final p = projects[idx];
+              final isSel = p.name == current.name;
+              return InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onSelectProject(p.name);
+                },
+                borderRadius: BorderRadius.circular(13),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: isSel ? p.color.withValues(alpha: 0.16) : cardColor,
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(
+                      color: isSel ? p.color : dividerColor,
+                      width: isSel ? 1.4 : 0.7,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(p.icon, size: 16, color: p.color),
+                      const SizedBox(width: 6),
+                      Text(
+                        p.name,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: isSel ? p.color : colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: dividerColor, width: 0.7),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: rate),
+                duration: const Duration(milliseconds: 680),
+                curve: Curves.easeOutCubic,
+                builder: (_, val, __) => SizedBox(
+                  width: 90,
+                  height: 90,
+                  child: CustomPaint(
+                    painter: _RingPainter(
+                      progress: val,
+                      activeColor: current.color,
+                      trackColor: current.color.withValues(alpha: 0.14),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${(val * 100).round()}%',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: current.color,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      current.name,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${snap.totalActivities} مهام • أنجزت ${snap.totalDoneThisWeek} من ${snap.totalDueThisWeek} هذا الأسبوع',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withValues(alpha: 0.68),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'إجمالي الشهر: ${snap.monthlyCompleted} إنجاز',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: current.color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _WeeklyPulseCard(
+          dailyCounts: snap.weeklyDailyCounts,
+          cardColor: cardColor,
+          dividerColor: dividerColor,
+        ),
+        const SizedBox(height: 14),
+        Container(
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: dividerColor, width: 0.7),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _SquircleBadge(
+                    icon: Icons.layers_rounded,
+                    color: current.color,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'توزيع الإنجاز حسب الجوانب',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              ...snap.byGroup.entries.map((entry) {
+                final ratio = totalGroupDone == 0
+                    ? 0.0
+                    : (entry.value / totalGroupDone).clamp(0.0, 1.0);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              entry.key,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            totalGroupDone == 0
+                                ? '${entry.value}'
+                                : '${entry.value} (${(ratio * 100).round()}%)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color:
+                                  colorScheme.onSurface.withValues(alpha: 0.65),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: LinearProgressIndicator(
+                          value: ratio,
+                          minHeight: 7,
+                          backgroundColor:
+                              current.color.withValues(alpha: 0.13),
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(current.color),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActivityStatsSection extends ConsumerWidget {
+  const _ActivityStatsSection({
+    super.key,
+    required this.searchController,
+    required this.selectedActivityId,
+    required this.onSearchChanged,
+    required this.onSelectActivity,
+    required this.cardColor,
+    required this.dividerColor,
+  });
+
+  final TextEditingController searchController;
+  final String? selectedActivityId;
+  final VoidCallback onSearchChanged;
+  final ValueChanged<String> onSelectActivity;
+  final Color cardColor;
+  final Color dividerColor;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final allActivities =
+        ref.watch(activitiesProvider).valueOrNull ?? const <ActivityItem>[];
+
+    if (allActivities.isEmpty) {
+      return _EmptyScopedCard(
+        icon: Icons.task_alt_rounded,
+        title: 'لا توجد أنشطة بعد',
+        subtitle: 'أضف نشاطاً أو عادة يومية لمتابعة إحصائياتها التفصيلية هنا.',
+        cardColor: cardColor,
+        dividerColor: dividerColor,
+      );
+    }
+
+    final q = searchController.text.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? allActivities
+        : allActivities
+            .where((a) => a.title.toLowerCase().contains(q))
+            .toList();
+
+    final current = filtered.isNotEmpty
+        ? filtered.firstWhere(
+            (a) => a.id == selectedActivityId,
+            orElse: () => filtered.first,
+          )
+        : allActivities.first;
+
+    final snap = buildActivityStats(current);
+    final actColor =
+        AppIcons.parseColor(current.colorHex) ?? colorScheme.primary;
+    final rate = snap.completionRateThisWeek.clamp(0.0, 1.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (allActivities.length > 5) ...[
+          SizedBox(
+            height: 38,
+            child: TextField(
+              controller: searchController,
+              onChanged: (_) => onSearchChanged(),
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                hintText: 'ابحث عن نشاط…',
+                hintStyle: TextStyle(
+                  fontSize: 12.5,
+                  color: colorScheme.onSurface.withValues(alpha: 0.36),
+                ),
+                prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+        SizedBox(
+          height: 40,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: filtered.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (_, idx) {
+              final act = filtered[idx];
+              final c =
+                  AppIcons.parseColor(act.colorHex) ?? colorScheme.primary;
+              final isSel = act.id == current.id;
+              return InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onSelectActivity(act.id);
+                },
+                borderRadius: BorderRadius.circular(13),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: isSel ? c.withValues(alpha: 0.16) : cardColor,
+                    borderRadius: BorderRadius.circular(13),
+                    border: Border.all(
+                      color: isSel ? c : dividerColor,
+                      width: isSel ? 1.4 : 0.7,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(AppIcons.getIconData(act.iconName),
+                          size: 16, color: c),
+                      const SizedBox(width: 6),
+                      Text(
+                        act.title,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          color: isSel ? c : colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: dividerColor, width: 0.7),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: rate),
+                duration: const Duration(milliseconds: 680),
+                curve: Curves.easeOutCubic,
+                builder: (_, val, __) => SizedBox(
+                  width: 90,
+                  height: 90,
+                  child: CustomPaint(
+                    painter: _RingPainter(
+                      progress: val,
+                      activeColor: actColor,
+                      trackColor: actColor.withValues(alpha: 0.14),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${(val * 100).round()}%',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: actColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      current.title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'أنجزت ${snap.totalDoneThisWeek} من ${snap.totalDueThisWeek} هذا الأسبوع',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withValues(alpha: 0.68),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          'إجمالي الإنجاز: ${snap.totalCompletedAllTime}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: actColor,
+                          ),
+                        ),
+                        if (snap.totalSkippedAllTime > 0)
+                          Text(
+                            'التخطي: ${snap.totalSkippedAllTime}',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFFFF9500),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (current.isMeasurable) ...[
+          const SizedBox(height: 14),
+          Container(
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: dividerColor, width: 0.7),
+            ),
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                _SquircleBadge(
+                  icon: Icons.track_changes_rounded,
+                  color: actColor,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'التقدم الرقمي هذا الأسبوع',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${snap.weeklyProgressTotal.toInt()} ${current.goalUnit ?? ""}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: actColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        _WeeklyPulseCard(
+          dailyCounts: snap.weeklyDailyCounts,
+          cardColor: cardColor,
+          dividerColor: dividerColor,
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyScopedCard extends StatelessWidget {
+  const _EmptyScopedCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.cardColor,
+    required this.dividerColor,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color cardColor;
+  final Color dividerColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: dividerColor, width: 0.7),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+      child: Column(
+        children: [
+          Icon(icon,
+              size: 36, color: colorScheme.onSurface.withValues(alpha: 0.35)),
+          const SizedBox(height: 10),
+          Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
