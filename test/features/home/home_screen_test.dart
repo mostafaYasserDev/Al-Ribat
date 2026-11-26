@@ -135,10 +135,24 @@ void main() {
     await tester.pumpWidget(buildTestApp());
     await tester.pumpAndSettle();
 
+    // Go to future (tomorrow)
     await tester.tap(find.byIcon(Icons.chevron_left_rounded));
     await tester.pumpAndSettle();
-
     expect(find.byIcon(Icons.today_rounded), findsOneWidget);
+    expect(find.text('غداً'), findsOneWidget);
+    expect(find.text('العودة لليوم'), findsOneWidget);
+
+    // Return to today and go to past (yesterday)
+    await tester.tap(find.text('العودة لليوم'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.chevron_right_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('أمس'), findsOneWidget);
+
+    // Open anchored Arabic calendar popover
+    await tester.tap(find.byIcon(Icons.history_rounded).first);
+    await tester.pumpAndSettle();
+    expect(find.text('اليوم'), findsWidgets);
   });
 
   testWidgets(

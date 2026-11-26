@@ -9,6 +9,7 @@ import '../../../application/providers.dart';
 import '../../../core/constants/prayer_phase.dart';
 import '../../../core/ui/error_view.dart';
 import '../../../core/ui_feedback.dart';
+import '../../../core/widgets/arabic_date_popover.dart';
 import '../../../domain/entities/activity_item.dart';
 import '../../../domain/entities/day_state.dart';
 import '../../../domain/entities/prayer_schedule.dart';
@@ -339,17 +340,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             ref.read(selectedDateProvider.notifier).state =
                                 selectedDate.add(const Duration(days: 1));
                           },
-                          onPickDate: () async {
-                            final date = await showDatePicker(
-                              context: context,
+                          onReturnToToday: () {
+                            ref.read(selectedDateProvider.notifier).state =
+                                DateTime.now();
+                          },
+                          onPickDate: (anchorCtx) {
+                            showArabicDatePopover(
+                              anchorCtx,
                               initialDate: selectedDate,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime(2030),
+                              onSelected: (date) {
+                                ref.read(selectedDateProvider.notifier).state =
+                                    date;
+                              },
                             );
-                            if (date != null) {
-                              ref.read(selectedDateProvider.notifier).state =
-                                  date;
-                            }
                           },
                         ),
                         const SizedBox(height: 12),
