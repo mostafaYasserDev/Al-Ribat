@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../application/providers.dart';
 import '../../../../core/security/app_security.dart';
 import '../../../../core/ui_feedback.dart';
+import '../../../../domain/entities/app_settings.dart';
 
 /// Shows an Apple/Telegram-style modal bottom sheet to set, change, or remove
 /// the 4-digit app lock PIN. Returns `true` if PIN state changed.
@@ -19,18 +22,25 @@ Future<bool?> showAppLockSheet(BuildContext context) {
   );
 }
 
-class _AppLockSheet extends StatefulWidget {
+class _AppLockSheet extends ConsumerStatefulWidget {
   const _AppLockSheet();
 
   @override
-  State<_AppLockSheet> createState() => _AppLockSheetState();
+  ConsumerState<_AppLockSheet> createState() => _AppLockSheetState();
 }
 
-class _AppLockSheetState extends State<_AppLockSheet> {
+class _AppLockSheetState extends ConsumerState<_AppLockSheet> {
   final _currentPinController = TextEditingController();
   final _newPinController = TextEditingController();
   final _confirmPinController = TextEditingController();
   bool _saving = false;
+
+  static const _timeoutOptions = <(int seconds, String label)>[
+    (0, 'فوري'),
+    (15, '15 ث'),
+    (60, '1 د'),
+    (300, '5 د'),
+  ];
 
   @override
   void dispose() {
@@ -92,6 +102,8 @@ class _AppLockSheetState extends State<_AppLockSheet> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final hasPin = AppSecurity.hasPinSet();
+    final settings =
+        ref.watch(settingsProvider).valueOrNull ?? AppSettings.defaults;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
     return Container(
@@ -176,6 +188,54 @@ class _AppLockSheetState extends State<_AppLockSheet> {
               controller: _confirmPinController,
               hint: 'تأكيد الرمز الجديد',
             ),
+            const SizedBox(height: 14),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'فتح القفل بالبصمة / الوجه',
+                style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600),
+              ),
+              value: settings.biometricLockEnabled,
+              onChanged: (value) async {
+                await ref.read(settingsProvider.notifier).updateSettings(
+                      settings.copyWith(biometricLockEnabled: value),
+                    );
+              },
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'مهلة القفل التلقائي بعد الخروج',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: _timeoutOptions.map((opt) {
+                final selected = settings.autoLockTimeoutSeconds == opt.$1;
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: ChoiceChip(
+                      label: Center(child: Text(opt.$2)),
+                      selected: selected,
+                      showCheckmark: false,
+                      onSelected: (_) async {
+                        if (selected) return;
+                        HapticFeedback.selectionClick();
+                        await ref
+                            .read(settingsProvider.notifier)
+                            .updateSettings(
+                              settings.copyWith(
+                                autoLockTimeoutSeconds: opt.$1,
+                              ),
+                            );
+                      },
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
             const SizedBox(height: 18),
             FilledButton(
               onPressed: _saving ? null : () => _savePin(hasPin),
@@ -218,6 +278,7 @@ class _PinField extends StatelessWidget {
     return TextField(
       controller: controller,
       keyboardType: TextInputType.number,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       maxLength: 4,
       obscureText: true,
       textAlign: TextAlign.center,

@@ -21,9 +21,9 @@ part 'backup/backup_restore_helpers.dart';
 class BackupExportService {
   static Future<String> buildJsonString() => _buildBackupJson();
 
-  static Future<void> exportInteractive() => _exportBackupInteractive();
+  static Future<bool> exportInteractive() => _exportBackupInteractive();
 
-  static Future<void> importInteractive() => _importBackupInteractive();
+  static Future<bool> importInteractive() => _importBackupInteractive();
 
   static Future<void> restoreFromJsonString(String raw) =>
       _restoreBackupFromJson(raw);

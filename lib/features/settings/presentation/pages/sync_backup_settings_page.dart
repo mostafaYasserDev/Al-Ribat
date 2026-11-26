@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../application/providers.dart';
 import '../../../../core/app_startup.dart';
 import '../../../../core/ui_feedback.dart';
+import '../../../../domain/entities/app_settings.dart';
 import '../../../../services/backup_export_service.dart';
 import '../../../../services/cloud_sync_service.dart';
 import '../widgets/settings_ui_components.dart';
@@ -64,15 +65,48 @@ class _SyncBackupSettingsPageState
       ),
     );
     if (ok != true || !mounted) return;
+    setState(() => _busy = true);
     try {
-      await BackupExportService.importInteractive();
+      final imported = await BackupExportService.importInteractive();
+      if (!imported) return;
       _invalidateAll();
       if (mounted) appSnack(context, 'تم الاستيراد بنجاح.');
     } catch (e) {
       if (mounted) {
         appError(context, e, fallback: 'تعذر استيراد النسخة الاحتياطية.');
       }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _confirmAndResetSettings() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('إعادة ضبط الإعدادات؟'),
+        content: const Text(
+          'سيتم استعادة جميع الإعدادات (المظهر، الصلاة، الإشعارات، الأمان) إلى قيمها الافتراضية دون المساس بأنشطتك أو تأملاتك.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('إعادة ضبط'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    await _run(() async {
+      await ref
+          .read(settingsProvider.notifier)
+          .updateSettings(AppSettings.defaults);
+      ref.invalidate(prayerScheduleProvider);
+    }, 'تمت إعادة ضبط الإعدادات للافتراضي.');
   }
 
   @override
@@ -283,30 +317,55 @@ class _SyncBackupSettingsPageState
                             title: 'تصدير نسخة احتياطية',
                             subtitle:
                                 'حفظ الأنشطة والتأملات والجلسات والإعدادات في ملف',
-                            onTap: () async {
-                              HapticFeedback.lightImpact();
-                              try {
-                                await BackupExportService.exportInteractive();
-                                if (context.mounted) {
-                                  appSnack(context, 'تم تجهيز النسخة.');
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  appError(
-                                    context,
-                                    e,
-                                    fallback: 'تعذر تجهيز النسخة الاحتياطية.',
-                                  );
-                                }
-                              }
-                            },
+                            onTap: _busy
+                                ? null
+                                : () async {
+                                    HapticFeedback.lightImpact();
+                                    setState(() => _busy = true);
+                                    try {
+                                      final exported = await BackupExportService
+                                          .exportInteractive();
+                                      if (exported && context.mounted) {
+                                        appSnack(
+                                          context,
+                                          'تم حفظ النسخة الاحتياطية.',
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (context.mounted) {
+                                        appError(
+                                          context,
+                                          e,
+                                          fallback:
+                                              'تعذر تجهيز النسخة الاحتياطية.',
+                                        );
+                                      }
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() => _busy = false);
+                                      }
+                                    }
+                                  },
                           ),
                           SettingsNavTile(
                             icon: Icons.file_upload_outlined,
                             iconColor: const Color(0xFFFF9500),
                             title: 'استيراد نسخة احتياطية',
                             subtitle: 'استبدال البيانات الحالية بملف JSON سابق',
-                            onTap: _confirmAndImport,
+                            onTap: _busy ? null : _confirmAndImport,
+                          ),
+                        ],
+                      ),
+                      const SettingsSectionHeader(title: 'إدارة الإعدادات'),
+                      SettingsGroupCard(
+                        children: [
+                          SettingsNavTile(
+                            icon: Icons.restart_alt_rounded,
+                            iconColor: const Color(0xFFFF3B30),
+                            title: 'إعادة ضبط الإعدادات للافتراضي',
+                            subtitle:
+                                'استعادة إعدادات التطبيق دون حذف أنشطتك أو تأملاتك',
+                            onTap: _busy ? null : _confirmAndResetSettings,
                           ),
                         ],
                       ),

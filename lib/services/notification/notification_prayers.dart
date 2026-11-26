@@ -49,7 +49,11 @@ Future<void> _schedulePrayerNotifications(
       continue;
     }
 
-    await _schedulePrayerLead(service, p, i, settings, scheduled);
-    await _schedulePhasePrompt(service, p, i, afterPrayerPrompt);
+    if (settings.focusModeEnabled) {
+      await _schedulePrayerLead(service, p, i, settings, scheduled);
+    }
+    if (settings.phasePromptsEnabled) {
+      await _schedulePhasePrompt(service, p, i, afterPrayerPrompt);
+    }
   }
 }

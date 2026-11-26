@@ -169,13 +169,27 @@ class PrayerRepositoryImpl implements PrayerRepository {
     box.put('cached_gps_lng', lng.toString());
   }
 
+  static ({double latitude, double longitude})? cachedGpsCoordinates() {
+    if (!Hive.isBoxOpen('meta_box')) return null;
+    final box = Hive.box<String>('meta_box');
+    final latStr = box.get('cached_gps_lat');
+    final lngStr = box.get('cached_gps_lng');
+    if (latStr == null || lngStr == null) return null;
+    final lat = double.tryParse(latStr);
+    final lng = double.tryParse(lngStr);
+    if (lat == null || lng == null) return null;
+    return (latitude: lat, longitude: lng);
+  }
+
   _PrayerDayData _computePrayerForDate(
     Coordinates coordinates,
     AppSettings settings,
     DateTime date,
   ) {
     final params = _toPrayerMethod(settings.prayerMethod).getParameters()
-      ..madhab = Madhab.shafi;
+      ..madhab = settings.asrMadhab == AsrMadhab.hanafi
+          ? Madhab.hanafi
+          : Madhab.shafi;
     final dc = DateComponents(date.year, date.month, date.day);
     final prayerTimes = PrayerTimes(coordinates, dc, params);
     return _PrayerDayData(

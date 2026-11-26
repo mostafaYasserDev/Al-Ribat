@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../application/providers.dart';
+import '../../../core/app_startup.dart';
 import '../../../core/security/app_security.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../services/cloud_sync_service.dart';
@@ -339,7 +340,9 @@ class _AccountHeaderCard extends StatelessWidget {
                             Text(
                               signedIn
                                   ? (user.email ?? 'المزامنة السحابية متصلة')
-                                  : 'اضغط لربط حساب Google والمزامنة',
+                                  : AppStartup.isFirebaseReady
+                                      ? 'اضغط لربط حساب Google والمزامنة'
+                                      : 'النسخ الاحتياطي المحلي (JSON) متاح',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall?.copyWith(

@@ -11,10 +11,12 @@ mixin _AppLockWrapperAuth on _AppLockWrapperAuthBase {
     }
 
     if (hasPin) {
+      final settings =
+          ref.read(settingsProvider).valueOrNull ?? AppSettings.defaults;
       setState(() {
         _isLocked = true;
       });
-      if (_canCheckBiometrics) {
+      if (_canCheckBiometrics && settings.biometricLockEnabled) {
         _authenticateBiometric();
       }
     }

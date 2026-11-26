@@ -2,10 +2,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/ui_feedback.dart';
 import '../widgets/settings_ui_components.dart';
 
 class AboutAppScreen extends StatelessWidget {
   const AboutAppScreen({super.key});
+
+  static const _appVersion = '0.1.0';
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +67,13 @@ class AboutAppScreen extends StatelessWidget {
                     ),
                     textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: 6),
+                  Center(
+                    child: SettingsStatusPill(
+                      label: 'الإصدار $_appVersion',
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
                   const SettingsSectionHeader(title: 'فكرة التطبيق'),
                   SettingsGroupCard(
                     dividerIndent: 16,
@@ -101,11 +111,24 @@ class AboutAppScreen extends StatelessWidget {
                           final uri =
                               Uri.parse('https://forms.gle/HSGemvnVdrfsNxWM8');
                           try {
-                            await launchUrl(
+                            final launched = await launchUrl(
                               uri,
                               mode: LaunchMode.externalApplication,
                             );
-                          } catch (_) {}
+                            if (!launched && context.mounted) {
+                              appSnack(
+                                context,
+                                'تعذر فتح نموذج الملاحظات على هذا الجهاز.',
+                              );
+                            }
+                          } catch (_) {
+                            if (context.mounted) {
+                              appSnack(
+                                context,
+                                'تعذر فتح الرابط. يرجى المحاولة لاحقاً.',
+                              );
+                            }
+                          }
                         },
                       ),
                       SettingsNavTile(

@@ -11,6 +11,8 @@ import '../../../../core/errors/error_reporter.dart';
 import '../../../../core/ui_feedback.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../../../prayer/data/location_search_service.dart';
+import '../../../prayer/data/prayer_repository_impl.dart';
+import '../../../prayer/domain/location_prayer_defaults.dart';
 import '../../../prayer/presentation/widgets/manual_location_dialog.dart';
 import '../widgets/settings_ui_components.dart';
 
@@ -132,9 +134,51 @@ class _PrayerLocationSettingsPageState
       return;
     }
 
-    await ref.read(settingsProvider.notifier).updateSettings(
-          settings.copyWith(prayerLocationMode: mode),
+    final cachedGps = PrayerRepositoryImpl.cachedGpsCoordinates();
+    final updated = settings.copyWith(prayerLocationMode: mode);
+    if (cachedGps != null) {
+      final smart = LocationPrayerDefaults.infer(
+        latitude: cachedGps.latitude,
+        longitude: cachedGps.longitude,
+      );
+      await ref.read(settingsProvider.notifier).updateSettings(
+            updated.copyWith(
+              prayerMethod: smart.method,
+              asrMadhab: smart.madhab,
+            ),
+          );
+    } else {
+      await ref.read(settingsProvider.notifier).updateSettings(updated);
+    }
+    ref.invalidate(prayerScheduleProvider);
+  }
+
+  Future<void> _refreshAutomaticLocation(AppSettings settings) async {
+    ref.invalidate(prayerScheduleProvider);
+    final schedule = await ref.read(prayerScheduleProvider.future);
+    final cachedGps = PrayerRepositoryImpl.cachedGpsCoordinates();
+    if (!mounted) return;
+    if (cachedGps != null) {
+      final smart = LocationPrayerDefaults.infer(
+        latitude: cachedGps.latitude,
+        longitude: cachedGps.longitude,
+      );
+      await ref.read(settingsProvider.notifier).updateSettings(
+            settings.copyWith(
+              prayerLocationMode: PrayerLocationMode.automatic,
+              prayerMethod: smart.method,
+              asrMadhab: smart.madhab,
+            ),
+          );
+      if (mounted) {
+        appSnack(
+          context,
+          'تم تحديث الموقع (${cachedGps.latitude.toStringAsFixed(2)}, ${cachedGps.longitude.toStringAsFixed(2)}) وضبط ${prayerMethodShortLabel(smart.method)}.',
         );
+      }
+    } else if (schedule.today.isNotEmpty) {
+      appSnack(context, 'تم تحديث جدول المواقيت.');
+    }
   }
 
   Future<void> _runSearch(AppSettings settings) async {
@@ -165,35 +209,55 @@ class _PrayerLocationSettingsPageState
     AppSettings settings,
   ) async {
     final label = result.fullLabel;
+    final smart = LocationPrayerDefaults.infer(
+      locationLabel: label,
+      latitude: result.latitude,
+      longitude: result.longitude,
+    );
     await ref.read(settingsProvider.notifier).updateSettings(
           settings.copyWith(
             prayerLocationMode: PrayerLocationMode.manual,
             manualLatitude: result.latitude,
             manualLongitude: result.longitude,
             manualLocationLabel: label,
+            prayerMethod: smart.method,
+            asrMadhab: smart.madhab,
           ),
         );
     HapticFeedback.mediumImpact();
     if (mounted) {
       setState(() => _addressResults = const []);
-      appSnack(context, 'تم ضبط الموقع: $label');
+      appSnack(
+        context,
+        'تم ضبط الموقع: $label • ${prayerMethodShortLabel(smart.method)}',
+      );
     }
   }
 
   Future<void> _pickFromPopularDialog(AppSettings settings) async {
     final picked = await showManualLocationPickerDialog(context);
     if (picked == null || !mounted) return;
+    final smart = LocationPrayerDefaults.infer(
+      locationLabel: picked.$2,
+      latitude: picked.$1.latitude,
+      longitude: picked.$1.longitude,
+    );
     await ref.read(settingsProvider.notifier).updateSettings(
           settings.copyWith(
             prayerLocationMode: PrayerLocationMode.manual,
             manualLatitude: picked.$1.latitude,
             manualLongitude: picked.$1.longitude,
             manualLocationLabel: picked.$2,
+            prayerMethod: smart.method,
+            asrMadhab: smart.madhab,
           ),
         );
     HapticFeedback.mediumImpact();
     if (mounted) {
-      appSnack(context, 'تم ضبط الموقع: ${picked.$2}');
+      appSnack(
+        context,
+        'تم ضبط الموقع: ${picked.$2} • ${prayerMethodShortLabel(smart.method)}',
+      );
     }
   }
 
@@ -252,30 +316,49 @@ class _PrayerLocationSettingsPageState
                               alignment: Alignment.topCenter,
                               child: isManual
                                   ? _buildManualLocationBody(theme, settings)
-                                  : Padding(
-                                      padding: const EdgeInsets.only(top: 12),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.gps_fixed_rounded,
-                                            size: 16,
-                                            color: theme.colorScheme.primary,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text(
-                                              'يتم تحديث المواقيت تلقائياً حسب موقعك الحالي.',
-                                              style: theme.textTheme.bodySmall,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                  : _buildAutomaticLocationBody(
+                                      theme,
+                                      settings,
                                     ),
                             ),
                           ],
                         ),
                       ),
                     ],
+                  ),
+                  const SettingsSectionHeader(
+                      title: 'المذهب الفقهي لصلاة العصر'),
+                  SettingsGroupCard(
+                    dividerIndent: 16,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: AnimatedSegmentedControl<AsrMadhab>(
+                          options: const [
+                            SegmentOption(
+                              value: AsrMadhab.shafi,
+                              label: 'الشافعي / الجمهور',
+                            ),
+                            SegmentOption(
+                              value: AsrMadhab.hanafi,
+                              label: 'الحنفي',
+                            ),
+                          ],
+                          selected: settings.asrMadhab,
+                          onChanged: (madhab) async {
+                            await ref
+                                .read(settingsProvider.notifier)
+                                .updateSettings(
+                                  settings.copyWith(asrMadhab: madhab),
+                                );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SettingsSectionFooter(
+                    text:
+                        'يؤثر المذهب الفقهي على وقت دخول صلاة العصر فقط (يتأخر قليلاً في المذهب الحنفي).',
                   ),
                   const SettingsSectionHeader(title: 'طريقة الحساب الفقهي'),
                   SettingsGroupCard(
@@ -346,12 +429,80 @@ class _PrayerLocationSettingsPageState
     );
   }
 
+  Widget _buildAutomaticLocationBody(ThemeData theme, AppSettings settings) {
+    final cachedGps = PrayerRepositoryImpl.cachedGpsCoordinates();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.gps_fixed_rounded,
+                size: 16,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  cachedGps != null
+                      ? 'الإحداثيات الحالية: ${cachedGps.latitude.toStringAsFixed(3)}, ${cachedGps.longitude.toStringAsFixed(3)}'
+                      : 'يتم تحديث المواقيت تلقائياً عند توفر الموقع أو عبر الشبكة.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _refreshAutomaticLocation(settings),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('تحديث'),
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildManualLocationBody(ThemeData theme, AppSettings settings) {
+    final hasManualCoords =
+        settings.manualLatitude != null && settings.manualLongitude != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: 14),
-        if (settings.manualLocationLabel != null) ...[
+        if (!hasManualCoords) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.orange.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  size: 18,
+                  color: Colors.orange,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'لم يتم تحديد مدينة بعد — يُستخدم التوقيت الافتراضي مؤقتاً. ابحث عن مدينتك أو اختر من المدن الشائعة.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.orange.shade800,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ] else if (settings.manualLocationLabel != null) ...[
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(

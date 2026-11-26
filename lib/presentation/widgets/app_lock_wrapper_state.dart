@@ -1,6 +1,6 @@
 part of 'app_lock_wrapper.dart';
 
-abstract class _AppLockWrapperAuthBase extends State<AppLockWrapper>
+abstract class _AppLockWrapperAuthBase extends ConsumerState<AppLockWrapper>
     with WidgetsBindingObserver {
   bool _isLocked = false;
   final TextEditingController _pinController = TextEditingController();
@@ -34,15 +34,17 @@ class _AppLockWrapperState extends _AppLockWrapperAuthBase
       }
     } else if (state == AppLifecycleState.resumed) {
       if (_isAuthenticating) return;
-      // Re-lock if more than 15 seconds in background and PIN is set
+      final settings =
+          ref.read(settingsProvider).valueOrNull ?? AppSettings.defaults;
+      final timeoutSec = settings.autoLockTimeoutSeconds;
       if (_lastPausedTime != null &&
-          DateTime.now().difference(_lastPausedTime!).inSeconds >= 15) {
+          DateTime.now().difference(_lastPausedTime!).inSeconds >= timeoutSec) {
         if (AppSecurity.hasPinSet() && !_isLocked) {
           setState(() {
             _isLocked = true;
             _pinController.clear();
           });
-          if (_canCheckBiometrics) {
+          if (_canCheckBiometrics && settings.biometricLockEnabled) {
             _authenticateBiometric();
           }
         }

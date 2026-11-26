@@ -1,6 +1,6 @@
 part of '../backup_export_service.dart';
 
-Future<void> _exportBackupInteractive() async {
+Future<bool> _exportBackupInteractive() async {
   final json = await BackupExportService.buildJsonString();
   final name = 'al_ribat_backup_${DateTime.now().millisecondsSinceEpoch}.json';
 
@@ -11,27 +11,29 @@ Future<void> _exportBackupInteractive() async {
       final file = File(path);
       await file.writeAsString(json, flush: true);
       await Share.shareXFiles([XFile(path)], subject: name);
-      return;
-    } catch (e, st) {
-      reportError('BackupExportService', e, st);
-    }
-
-    try {
-      final path = await FilePicker.platform.saveFile(
-        dialogTitle: 'حفظ النسخة الاحتياطية',
-        fileName: name,
-        type: FileType.custom,
-        allowedExtensions: const ['json'],
-      );
-      if (path != null) {
-        final p = path.toLowerCase().endsWith('.json') ? path : '$path.json';
-        await File(p).writeAsString(json);
-        return;
-      }
+      return true;
     } catch (e, st) {
       reportError('BackupExportService', e, st);
     }
   }
 
-  await Share.share(json, subject: name);
+  try {
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: 'حفظ النسخة الاحتياطية',
+      fileName: name,
+      type: FileType.custom,
+      allowedExtensions: const ['json'],
+    );
+    if (path == null) return false;
+    final p = path.toLowerCase().endsWith('.json') ? path : '$path.json';
+    await File(p).writeAsString(json, flush: true);
+    return true;
+  } catch (e, st) {
+    reportError('BackupExportService', e, st);
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      await Share.share(json, subject: name);
+      return true;
+    }
+    rethrow;
+  }
 }

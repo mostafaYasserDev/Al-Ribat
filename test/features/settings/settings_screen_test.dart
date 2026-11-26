@@ -98,9 +98,21 @@ void main() {
 
     expect(find.byType(PrayerLocationSettingsPage), findsOneWidget);
     expect(find.text('طريقة الحساب الفقهي'), findsOneWidget);
+    expect(find.text('المذهب الفقهي لصلاة العصر'), findsOneWidget);
     expect(
       find.byType(AnimatedSegmentedControl<PrayerLocationMode>),
       findsOneWidget,
+    );
+
+    await tester.tap(find.text('الحنفي'));
+    await tester.pumpAndSettle();
+
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(PrayerLocationSettingsPage)),
+    );
+    expect(
+      container.read(settingsProvider).valueOrNull?.asrMadhab,
+      AsrMadhab.hanafi,
     );
   });
 

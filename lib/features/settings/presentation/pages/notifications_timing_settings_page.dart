@@ -7,21 +7,109 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../application/providers.dart';
+import '../../../../core/ui_feedback.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../../../../services/app_permissions.dart';
 import '../widgets/settings_ui_components.dart';
 
-class NotificationsTimingSettingsPage extends ConsumerWidget {
+class NotificationsTimingSettingsPage extends ConsumerStatefulWidget {
   const NotificationsTimingSettingsPage({super.key});
 
+  @override
+  ConsumerState<NotificationsTimingSettingsPage> createState() =>
+      _NotificationsTimingSettingsPageState();
+}
+
+class _NotificationsTimingSettingsPageState
+    extends ConsumerState<NotificationsTimingSettingsPage>
+    with WidgetsBindingObserver {
   static const _leadOptions = [5, 10, 15, 20, 25];
 
+  double? _slotDurationDraft;
+  bool? _notifGranted;
+  bool? _exactAlarmGranted;
+  bool? _batteryIgnored;
+
+  bool get _isAndroid => !kIsWeb && Platform.isAndroid;
+  bool get _isNotificationsSupported =>
+      !kIsWeb && (Platform.isAndroid || Platform.isIOS || Platform.isMacOS);
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refreshPermissions();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshPermissions();
+    }
+  }
+
+  Future<void> _refreshPermissions() async {
+    if (!_isAndroid) return;
+    try {
+      final notif = await Permission.notification.isGranted;
+      final alarm = await Permission.scheduleExactAlarm.isGranted;
+      final battery = await Permission.ignoreBatteryOptimizations.isGranted;
+      if (mounted) {
+        setState(() {
+          _notifGranted = notif;
+          _exactAlarmGranted = alarm;
+          _batteryIgnored = battery;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _onNotificationsToggled(
+    AppSettings settings,
+    bool value,
+  ) async {
+    if (value && !_isNotificationsSupported) {
+      appSnack(
+        context,
+        'التنبيهات المحلية مدعومة على أندرويد وiOS وmacOS فقط.',
+      );
+    }
+
+    if (value && _isAndroid) {
+      await AppPermissions.requestNotificationIfNeeded();
+      await AppPermissions.requestExactAlarmIfNeeded();
+      await AppPermissions.requestIgnoreBatteryOptimizationsIfNeeded();
+      await _refreshPermissions();
+      if (_notifGranted == false) {
+        if (mounted) {
+          appSnack(
+            context,
+            'يرجى منح إذن الإشعارات من إعدادات النظام لتفعيل التنبيهات.',
+          );
+        }
+        return;
+      }
+    }
+
+    await ref.read(settingsProvider.notifier).updateSettings(
+          settings.copyWith(notificationsEnabled: value),
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings =
         ref.watch(settingsProvider).valueOrNull ?? AppSettings.defaults;
     final theme = Theme.of(context);
-    final showAndroidAlarm = !kIsWeb && Platform.isAndroid;
+    final slotMinutes =
+        (_slotDurationDraft ?? settings.prayerSlotDurationMinutes.toDouble())
+            .round();
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -48,30 +136,69 @@ class NotificationsTimingSettingsPage extends ConsumerWidget {
                         icon: Icons.notifications_active_rounded,
                         iconColor: const Color(0xFFFF3B30),
                         title: 'تفعيل الإشعارات',
-                        subtitle: 'تنبيهات الأذان والأنشطة المرتبطة بالصلاة',
+                        subtitle: _isNotificationsSupported
+                            ? 'تنبيهات الأذان والأنشطة المرتبطة بالصلاة'
+                            : 'متاح على أجهزة أندرويد وiOS وmacOS',
                         value: settings.notificationsEnabled,
+                        onChanged: (value) =>
+                            _onNotificationsToggled(settings, value),
+                      ),
+                      SettingsSwitchTile(
+                        icon: Icons.task_alt_rounded,
+                        iconColor: const Color(0xFF34C759),
+                        title: 'تنبيهات مرحلة بعد الصلاة',
+                        subtitle: 'تذكير باختيار نشاطك بعد انتهاء وقت الصلاة',
+                        value: settings.phasePromptsEnabled,
                         onChanged: (value) async {
-                          if (value) {
-                            await AppPermissions.requestNotificationIfNeeded();
-                            await AppPermissions.requestExactAlarmIfNeeded();
-                            await AppPermissions
-                                .requestIgnoreBatteryOptimizationsIfNeeded();
-                          }
                           await ref
                               .read(settingsProvider.notifier)
                               .updateSettings(
-                                settings.copyWith(notificationsEnabled: value),
+                                settings.copyWith(phasePromptsEnabled: value),
                               );
                         },
                       ),
-                      if (showAndroidAlarm)
+                      if (_isAndroid) ...[
                         SettingsNavTile(
                           icon: Icons.alarm_on_rounded,
                           iconColor: const Color(0xFFFF9500),
                           title: 'إذن التنبيه في الوقت المحدد',
                           subtitle: 'لضمان وصول تنبيهات الأذان بدقة في أندرويد',
-                          onTap: () => openAppSettings(),
+                          trailingWidget: _exactAlarmGranted == null
+                              ? null
+                              : SettingsStatusPill(
+                                  label: _exactAlarmGranted!
+                                      ? 'ممنوح'
+                                      : 'يحتاج تفعيل',
+                                  color: _exactAlarmGranted!
+                                      ? const Color(0xFF34C759)
+                                      : const Color(0xFFFF9500),
+                                ),
+                          onTap: () async {
+                            await openAppSettings();
+                            await _refreshPermissions();
+                          },
                         ),
+                        SettingsNavTile(
+                          icon: Icons.battery_saver_rounded,
+                          iconColor: const Color(0xFF007AFF),
+                          title: 'استثناء تحسين البطارية',
+                          subtitle: 'يمنع النظام من إيقاف التنبيهات في الخلفية',
+                          trailingWidget: _batteryIgnored == null
+                              ? null
+                              : SettingsStatusPill(
+                                  label:
+                                      _batteryIgnored! ? 'مفعّل' : 'غير مفعّل',
+                                  color: _batteryIgnored!
+                                      ? const Color(0xFF34C759)
+                                      : const Color(0xFFFF9500),
+                                ),
+                          onTap: () async {
+                            await AppPermissions
+                                .requestIgnoreBatteryOptimizationsIfNeeded();
+                            await _refreshPermissions();
+                          },
+                        ),
+                      ],
                     ],
                   ),
                   const SettingsSectionHeader(title: 'الاستعداد قبل الصلاة'),
@@ -81,7 +208,7 @@ class NotificationsTimingSettingsPage extends ConsumerWidget {
                         icon: Icons.self_improvement_rounded,
                         iconColor: const Color(0xFF5856D6),
                         title: 'وضع الهدوء قبل الصلاة',
-                        subtitle: 'تنبيه للاستعداد الذهني قبل دخول الوقت',
+                        subtitle: 'إرسال تنبيه للاستعداد الذهني قبل دخول الوقت',
                         value: settings.focusModeEnabled,
                         onChanged: (value) async {
                           await ref
@@ -221,8 +348,7 @@ class NotificationsTimingSettingsPage extends ConsumerWidget {
                                   ),
                                 ),
                                 SettingsStatusPill(
-                                  label:
-                                      '${settings.prayerSlotDurationMinutes} دقيقة',
+                                  label: '$slotMinutes دقيقة',
                                   color: theme.colorScheme.primary,
                                 ),
                               ],
@@ -236,20 +362,26 @@ class NotificationsTimingSettingsPage extends ConsumerWidget {
                                 ),
                               ),
                               child: Slider(
-                                value: settings.prayerSlotDurationMinutes
-                                    .toDouble(),
+                                value: slotMinutes.toDouble().clamp(10, 45),
                                 min: 10,
                                 max: 45,
                                 divisions: 35,
-                                label:
-                                    '${settings.prayerSlotDurationMinutes} دقيقة',
-                                onChanged: (value) async {
+                                label: '$slotMinutes دقيقة',
+                                onChanged: (value) {
+                                  setState(() => _slotDurationDraft = value);
+                                },
+                                onChangeEnd: (value) async {
+                                  final rounded = value.round();
+                                  setState(() => _slotDurationDraft = null);
+                                  if (rounded ==
+                                      settings.prayerSlotDurationMinutes) {
+                                    return;
+                                  }
                                   await ref
                                       .read(settingsProvider.notifier)
                                       .updateSettings(
                                         settings.copyWith(
-                                          prayerSlotDurationMinutes:
-                                              value.round(),
+                                          prayerSlotDurationMinutes: rounded,
                                         ),
                                       );
                                 },

@@ -28,22 +28,25 @@ final selectedDateProvider = StateProvider<DateTime>((ref) {
 });
 
 final prayerScheduleProvider = FutureProvider<PrayerSchedule>((ref) async {
-  final settings = await ref.watch(settingsProvider.future);
-  final repo = ref.watch(prayerRepositoryProvider);
   final date = ref.watch(selectedDateProvider);
-  final schedule = await repo.getPrayerSchedule(settings, date: date);
   final now = DateTime.now();
   final isToday =
       date.year == now.year && date.month == now.month && date.day == now.day;
   if (isToday) {
-    unawaited(_syncNotificationsAfterSchedule(ref, schedule, settings));
+    return ref.watch(todayPrayerScheduleProvider.future);
   }
-  return schedule;
+  // Keep today's notifications synced when settings change even while browsing another date.
+  ref.watch(todayPrayerScheduleProvider);
+  final settings = await ref.watch(settingsProvider.future);
+  final repo = ref.watch(prayerRepositoryProvider);
+  return repo.getPrayerSchedule(settings, date: date);
 });
 
 /// Real-time prayer schedule for [DateTime.now()], independent of [selectedDateProvider].
 final todayPrayerScheduleProvider = FutureProvider<PrayerSchedule>((ref) async {
   final settings = await ref.watch(settingsProvider.future);
   final repo = ref.watch(prayerRepositoryProvider);
-  return repo.getPrayerSchedule(settings, date: DateTime.now());
+  final schedule = await repo.getPrayerSchedule(settings, date: DateTime.now());
+  unawaited(_syncNotificationsAfterSchedule(ref, schedule, settings));
+  return schedule;
 });

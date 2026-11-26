@@ -1,6 +1,6 @@
 part of '../backup_export_service.dart';
 
-Future<void> _importBackupInteractive() async {
+Future<bool> _importBackupInteractive() async {
   final picked = await FilePicker.platform.pickFiles(
     dialogTitle: 'اختر ملف النسخة الاحتياطية',
     type: FileType.custom,
@@ -8,7 +8,7 @@ Future<void> _importBackupInteractive() async {
     withData: true,
   );
   if (picked == null || picked.files.isEmpty) {
-    throw Exception('تم إلغاء اختيار الملف.');
+    return false;
   }
   final file = picked.files.single;
   String? raw = file.bytes == null ? null : utf8.decode(file.bytes!);
@@ -20,4 +20,5 @@ Future<void> _importBackupInteractive() async {
     throw const FormatException('الملف فارغ أو غير قابل للقراءة.');
   }
   await BackupExportService.restoreFromJsonString(raw);
+  return true;
 }

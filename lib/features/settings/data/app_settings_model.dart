@@ -2,11 +2,12 @@ import 'dart:convert';
 
 import '../domain/app_settings.dart';
 
-PrayerLocationMode _parseLocationMode(String? name) {
-  for (final v in PrayerLocationMode.values) {
+T _parseEnum<T extends Enum>(List<T> values, String? name, T fallback) {
+  if (name == null) return fallback;
+  for (final v in values) {
     if (v.name == name) return v;
   }
-  return PrayerLocationMode.automatic;
+  return fallback;
 }
 
 class AppSettingsModel extends AppSettings {
@@ -18,6 +19,10 @@ class AppSettingsModel extends AppSettings {
     required super.focusLeadMinutes,
     required super.prayerSlotDurationMinutes,
     required super.prayerLocationMode,
+    super.asrMadhab = AsrMadhab.shafi,
+    super.phasePromptsEnabled = true,
+    super.biometricLockEnabled = true,
+    super.autoLockTimeoutSeconds = 15,
     super.manualLatitude,
     super.manualLongitude,
     super.manualLocationLabel,
@@ -27,11 +32,15 @@ class AppSettingsModel extends AppSettings {
     return AppSettingsModel(
       themeMode: settings.themeMode,
       prayerMethod: settings.prayerMethod,
+      asrMadhab: settings.asrMadhab,
       notificationsEnabled: settings.notificationsEnabled,
       focusModeEnabled: settings.focusModeEnabled,
+      phasePromptsEnabled: settings.phasePromptsEnabled,
       focusLeadMinutes: settings.focusLeadMinutes,
       prayerSlotDurationMinutes: settings.prayerSlotDurationMinutes,
       prayerLocationMode: settings.prayerLocationMode,
+      biometricLockEnabled: settings.biometricLockEnabled,
+      autoLockTimeoutSeconds: settings.autoLockTimeoutSeconds,
       manualLatitude: settings.manualLatitude,
       manualLongitude: settings.manualLongitude,
       manualLocationLabel: settings.manualLocationLabel,
@@ -40,24 +49,42 @@ class AppSettingsModel extends AppSettings {
 
   factory AppSettingsModel.fromJson(String source) {
     final json = jsonDecode(source) as Map<String, dynamic>;
+    const defaults = AppSettings.defaults;
     return AppSettingsModel(
-      themeMode: AppThemeMode.values.firstWhere(
-        (e) =>
-            e.name == (json['themeMode'] as String? ?? AppThemeMode.dark.name),
+      themeMode: _parseEnum(
+        AppThemeMode.values,
+        json['themeMode'] as String?,
+        defaults.themeMode,
       ),
-      prayerMethod: PrayerCalculationMethod.values.firstWhere(
-        (e) =>
-            e.name ==
-            (json['prayerMethod'] as String? ??
-                PrayerCalculationMethod.muslimWorldLeague.name),
+      prayerMethod: _parseEnum(
+        PrayerCalculationMethod.values,
+        json['prayerMethod'] as String?,
+        defaults.prayerMethod,
       ),
-      notificationsEnabled: json['notificationsEnabled'] as bool? ?? true,
-      focusModeEnabled: json['focusModeEnabled'] as bool? ?? true,
-      focusLeadMinutes: json['focusLeadMinutes'] as int? ?? 15,
-      prayerSlotDurationMinutes:
-          json['prayerSlotDurationMinutes'] as int? ?? 20,
-      prayerLocationMode:
-          _parseLocationMode(json['prayerLocationMode'] as String?),
+      asrMadhab: _parseEnum(
+        AsrMadhab.values,
+        json['asrMadhab'] as String?,
+        defaults.asrMadhab,
+      ),
+      notificationsEnabled:
+          json['notificationsEnabled'] as bool? ?? defaults.notificationsEnabled,
+      focusModeEnabled:
+          json['focusModeEnabled'] as bool? ?? defaults.focusModeEnabled,
+      phasePromptsEnabled:
+          json['phasePromptsEnabled'] as bool? ?? defaults.phasePromptsEnabled,
+      focusLeadMinutes:
+          json['focusLeadMinutes'] as int? ?? defaults.focusLeadMinutes,
+      prayerSlotDurationMinutes: json['prayerSlotDurationMinutes'] as int? ??
+          defaults.prayerSlotDurationMinutes,
+      prayerLocationMode: _parseEnum(
+        PrayerLocationMode.values,
+        json['prayerLocationMode'] as String?,
+        defaults.prayerLocationMode,
+      ),
+      biometricLockEnabled: json['biometricLockEnabled'] as bool? ??
+          defaults.biometricLockEnabled,
+      autoLockTimeoutSeconds: json['autoLockTimeoutSeconds'] as int? ??
+          defaults.autoLockTimeoutSeconds,
       manualLatitude: (json['manualLatitude'] as num?)?.toDouble(),
       manualLongitude: (json['manualLongitude'] as num?)?.toDouble(),
       manualLocationLabel: json['manualLocationLabel'] as String?,
@@ -68,11 +95,15 @@ class AppSettingsModel extends AppSettings {
     return jsonEncode({
       'themeMode': themeMode.name,
       'prayerMethod': prayerMethod.name,
+      'asrMadhab': asrMadhab.name,
       'notificationsEnabled': notificationsEnabled,
       'focusModeEnabled': focusModeEnabled,
+      'phasePromptsEnabled': phasePromptsEnabled,
       'focusLeadMinutes': focusLeadMinutes,
       'prayerSlotDurationMinutes': prayerSlotDurationMinutes,
       'prayerLocationMode': prayerLocationMode.name,
+      'biometricLockEnabled': biometricLockEnabled,
+      'autoLockTimeoutSeconds': autoLockTimeoutSeconds,
       'manualLatitude': manualLatitude,
       'manualLongitude': manualLongitude,
       'manualLocationLabel': manualLocationLabel,
