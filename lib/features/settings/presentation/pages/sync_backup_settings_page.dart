@@ -12,6 +12,7 @@ import '../../../../domain/entities/app_settings.dart';
 import '../../../../services/backup/local_auto_backup_service.dart';
 import '../../../../services/backup_export_service.dart';
 import '../../../../services/cloud_sync_service.dart';
+import '../widgets/settings_action_sheet.dart';
 import '../widgets/settings_ui_components.dart';
 
 class SyncBackupSettingsPage extends ConsumerStatefulWidget {
@@ -25,6 +26,9 @@ class SyncBackupSettingsPage extends ConsumerStatefulWidget {
 class _SyncBackupSettingsPageState
     extends ConsumerState<SyncBackupSettingsPage> {
   bool _busy = false;
+  final _importTileKey = GlobalKey();
+  final _restoreAutoBtnKey = GlobalKey();
+  final _resetTileKey = GlobalKey();
 
   Future<void> _run(Future<void> Function() action, String successMsg) async {
     setState(() => _busy = true);
@@ -48,38 +52,38 @@ class _SyncBackupSettingsPageState
   }
 
   Future<BackupRestoreMode?> _askRestoreMode({
+    required GlobalKey anchorKey,
     required String title,
-  }) async {
-    return showDialog<BackupRestoreMode>(
+  }) {
+    return showAnchoredSettingsMenu<BackupRestoreMode>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: const Text(
-          'اختر طريقة استعادة البيانات من الملف:',
+      anchorKey: anchorKey,
+      title: title,
+      subtitle: 'اختر كيف تريد التعامل مع بياناتك الحالية:',
+      options: const [
+        AnchoredMenuOption(
+          value: BackupRestoreMode.merge,
+          title: 'دمج مع البيانات الحالية',
+          subtitle: 'يُبقي على بياناتك ويضيف إليها محتوى الملف',
+          icon: Icons.merge_rounded,
+          color: Color(0xFF007AFF),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء'),
-          ),
-          OutlinedButton(
-            onPressed: () => Navigator.pop(ctx, BackupRestoreMode.merge),
-            child: const Text('دمج مع الحالي'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, BackupRestoreMode.replace),
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            child: const Text('استبدال الكل'),
-          ),
-        ],
-      ),
+        AnchoredMenuOption(
+          value: BackupRestoreMode.replace,
+          title: 'استبدال البيانات الحالية',
+          subtitle: 'يمسح البيانات الحالية ويستعيد الملف فقط',
+          icon: Icons.delete_sweep_rounded,
+          isDestructive: true,
+        ),
+      ],
     );
   }
 
   Future<void> _confirmAndImport() async {
-    final mode = await _askRestoreMode(title: 'استيراد نسخة احتياطية');
+    final mode = await _askRestoreMode(
+      anchorKey: _importTileKey,
+      title: 'استيراد نسخة احتياطية',
+    );
     if (mode == null || !mounted) return;
     setState(() => _busy = true);
     try {
@@ -104,7 +108,10 @@ class _SyncBackupSettingsPageState
   }
 
   Future<void> _confirmAndRestoreAutoBackup() async {
-    final mode = await _askRestoreMode(title: 'استعادة من الملف التلقائي');
+    final mode = await _askRestoreMode(
+      anchorKey: _restoreAutoBtnKey,
+      title: 'استعادة من الملف التلقائي',
+    );
     if (mode == null || !mounted) return;
     await _run(() async {
       await LocalAutoBackupService.restoreFromAutoBackup(mode: mode);
@@ -142,24 +149,20 @@ class _SyncBackupSettingsPageState
   }
 
   Future<void> _confirmAndResetSettings() async {
-    final ok = await showDialog<bool>(
+    final ok = await showAnchoredSettingsMenu<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('إعادة ضبط الإعدادات؟'),
-        content: const Text(
-          'سيتم استعادة جميع الإعدادات (المظهر، الصلاة، الإشعارات، الأمان) إلى قيمها الافتراضية دون المساس بأنشطتك أو تأملاتك.',
+      anchorKey: _resetTileKey,
+      title: 'إعادة ضبط الإعدادات؟',
+      subtitle: 'تُستعاد الإعدادات الافتراضية دون حذف أنشطتك أو تأملاتك.',
+      options: const [
+        AnchoredMenuOption(
+          value: true,
+          title: 'تأكيد إعادة الضبط',
+          subtitle: 'المظهر، الصلاة، الإشعارات، والأمان',
+          icon: Icons.restart_alt_rounded,
+          isDestructive: true,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('إعادة ضبط'),
-          ),
-        ],
-      ),
+      ],
     );
     if (ok != true || !mounted) return;
     await _run(() async {
@@ -410,12 +413,16 @@ class _SyncBackupSettingsPageState
                                     }
                                   },
                           ),
-                          SettingsNavTile(
-                            icon: Icons.file_upload_outlined,
-                            iconColor: const Color(0xFFFF9500),
-                            title: 'استيراد نسخة احتياطية',
-                            subtitle: 'دمج أو استبدال البيانات بملف JSON سابق',
-                            onTap: _busy ? null : _confirmAndImport,
+                          KeyedSubtree(
+                            key: _importTileKey,
+                            child: SettingsNavTile(
+                              icon: Icons.file_upload_outlined,
+                              iconColor: const Color(0xFFFF9500),
+                              title: 'استيراد نسخة احتياطية',
+                              subtitle:
+                                  'دمج أو استبدال البيانات بملف JSON سابق',
+                              onTap: _busy ? null : _confirmAndImport,
+                            ),
                           ),
                         ],
                       ),
@@ -430,13 +437,16 @@ class _SyncBackupSettingsPageState
                       const SettingsSectionHeader(title: 'إدارة الإعدادات'),
                       SettingsGroupCard(
                         children: [
-                          SettingsNavTile(
-                            icon: Icons.restart_alt_rounded,
-                            iconColor: const Color(0xFFFF3B30),
-                            title: 'إعادة ضبط الإعدادات للافتراضي',
-                            subtitle:
-                                'استعادة إعدادات التطبيق دون حذف أنشطتك أو تأملاتك',
-                            onTap: _busy ? null : _confirmAndResetSettings,
+                          KeyedSubtree(
+                            key: _resetTileKey,
+                            child: SettingsNavTile(
+                              icon: Icons.restart_alt_rounded,
+                              iconColor: const Color(0xFFFF3B30),
+                              title: 'إعادة ضبط الإعدادات للافتراضي',
+                              subtitle:
+                                  'استعادة إعدادات التطبيق دون حذف أنشطتك أو تأملاتك',
+                              onTap: _busy ? null : _confirmAndResetSettings,
+                            ),
                           ),
                         ],
                       ),
@@ -453,6 +463,7 @@ class _SyncBackupSettingsPageState
   }
 
   Widget _buildAutoLocalBackupCard(ThemeData theme, AppSettings settings) {
+    final isDark = theme.brightness == Brightness.dark;
     return ValueListenableBuilder<LocalAutoBackupState>(
       valueListenable: LocalAutoBackupService.statusNotifier,
       builder: (context, status, _) {
@@ -460,6 +471,8 @@ class _SyncBackupSettingsPageState
             ? 'لم يُحفظ بعد'
             : DateFormat('yyyy/MM/dd – HH:mm:ss', 'ar')
                 .format(status.lastSavedAt!.toLocal());
+        final expanded =
+            settings.autoLocalBackupEnabled || status.filePath != null;
 
         return SettingsGroupCard(
           dividerIndent: 16,
@@ -478,108 +491,217 @@ class _SyncBackupSettingsPageState
                           );
                     },
             ),
-            if (settings.autoLocalBackupEnabled || status.filePath != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'آخر تحديث:',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w700,
+            AnimatedSize(
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: expanded
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.04)
+                                  : theme.colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.45),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      status.isWriting
+                                          ? Icons.sync_rounded
+                                          : Icons.check_circle_rounded,
+                                      size: 16,
+                                      color: settings.autoLocalBackupEnabled
+                                          ? const Color(0xFF34C759)
+                                          : theme.colorScheme.onSurface
+                                              .withValues(alpha: 0.45),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        status.isWriting
+                                            ? 'جاري الحفظ…'
+                                            : 'آخر تحديث: $lastSavedText',
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    SettingsStatusPill(
+                                      label: settings.autoLocalBackupEnabled
+                                          ? 'نشط'
+                                          : 'متوقف',
+                                      color: settings.autoLocalBackupEnabled
+                                          ? const Color(0xFF34C759)
+                                          : theme.colorScheme.onSurface
+                                              .withValues(alpha: 0.45),
+                                    ),
+                                  ],
+                                ),
+                                if (status.filePath != null) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    status.filePath!,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    textDirection: TextDirection.ltr,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontSize: 11,
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.56),
+                                    ),
+                                  ),
+                                ],
+                                if (status.lastError != null) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'تعذر الحفظ في المسار المحدد: ${status.lastError}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.error,
+                                      fontSize: 11.5,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            status.isWriting ? 'جاري الحفظ…' : lastSavedText,
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ),
-                        SettingsStatusPill(
-                          label:
-                              settings.autoLocalBackupEnabled ? 'نشط' : 'متوقف',
-                          color: settings.autoLocalBackupEnabled
-                              ? const Color(0xFF34C759)
-                              : theme.colorScheme.onSurface
-                                  .withValues(alpha: 0.45),
-                        ),
-                      ],
-                    ),
-                    if (status.filePath != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        status.filePath!,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textDirection: TextDirection.ltr,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 11.5,
-                          color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6),
-                        ),
-                      ),
-                    ],
-                    if (status.lastError != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        'تعذر الحفظ في المسار المحدد: ${status.lastError}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.error,
-                          fontSize: 11.5,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        FilledButton.tonalIcon(
-                          onPressed: _busy
-                              ? null
-                              : () => _run(
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _TelegramQuickAction(
+                                  icon: Icons.save_rounded,
+                                  label: 'حفظ الآن',
+                                  color: const Color(0xFF34C759),
+                                  enabled: !_busy,
+                                  onTap: () => _run(
                                     () => LocalAutoBackupService.writeNow(),
                                     'تم تحديث الملف المحلي الآن.',
                                   ),
-                          icon: const Icon(Icons.save_rounded, size: 17),
-                          label: const Text('حفظ الآن'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _busy
-                              ? null
-                              : () => _run(
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _TelegramQuickAction(
+                                  icon: Icons.ios_share_rounded,
+                                  label: 'مشاركة',
+                                  color: const Color(0xFF007AFF),
+                                  enabled: !_busy,
+                                  onTap: () => _run(
                                     () => LocalAutoBackupService
                                         .shareAutoBackupFile(),
                                     'تم تجهيز الملف للمشاركة.',
                                   ),
-                          icon: const Icon(Icons.share_rounded, size: 17),
-                          label: const Text('مشاركة'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _busy
-                              ? null
-                              : () => _pickAutoBackupDirectory(settings),
-                          icon: const Icon(Icons.folder_open_rounded, size: 17),
-                          label: const Text('تغيير المجلد'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed:
-                              _busy ? null : _confirmAndRestoreAutoBackup,
-                          icon: const Icon(Icons.restore_rounded, size: 17),
-                          label: const Text('استعادة منه'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _TelegramQuickAction(
+                                  icon: Icons.folder_rounded,
+                                  label: 'المجلد',
+                                  color: const Color(0xFFFF9500),
+                                  enabled: !_busy,
+                                  onTap: () =>
+                                      _pickAutoBackupDirectory(settings),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: KeyedSubtree(
+                                  key: _restoreAutoBtnKey,
+                                  child: _TelegramQuickAction(
+                                    icon: Icons.history_rounded,
+                                    label: 'استعادة',
+                                    color: const Color(0xFF5856D6),
+                                    enabled: !_busy,
+                                    onTap: _confirmAndRestoreAutoBackup,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
           ],
         );
       },
+    );
+  }
+}
+
+class _TelegramQuickAction extends StatelessWidget {
+  const _TelegramQuickAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bg =
+        isDark ? color.withValues(alpha: 0.14) : color.withValues(alpha: 0.10);
+
+    return PressableScale(
+      enabled: enabled,
+      onTap: onTap,
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled
+              ? () {
+                  HapticFeedback.lightImpact();
+                  onTap();
+                }
+              : null,
+          splashColor: color.withValues(alpha: 0.14),
+          highlightColor: color.withValues(alpha: 0.08),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, color: color, size: 20),
+                const SizedBox(height: 5),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
