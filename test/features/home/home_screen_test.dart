@@ -138,7 +138,7 @@ void main() {
     // Go to future (tomorrow)
     await tester.tap(find.byIcon(Icons.chevron_left_rounded));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.today_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.today_rounded), findsNothing);
     expect(find.text('غداً'), findsOneWidget);
     expect(find.text('العودة لليوم'), findsOneWidget);
 
@@ -148,6 +148,14 @@ void main() {
     await tester.tap(find.byIcon(Icons.chevron_right_rounded));
     await tester.pumpAndSettle();
     expect(find.text('أمس'), findsOneWidget);
+
+    // Opening AddActivitySheet while on a past day shows the subtle date notice
+    await tester.tap(find.text('إضافة نشاط'));
+    await tester.pumpAndSettle();
+    expect(
+        find.textContaining('سيُضاف هذا النشاط إلى سجل يوم'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
 
     // Open anchored Arabic calendar popover
     await tester.tap(find.byIcon(Icons.history_rounded).first);

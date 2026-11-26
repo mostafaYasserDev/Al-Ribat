@@ -106,7 +106,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         await ref.read(activitiesProvider.notifier).addActivity(activity);
         lightSuccessHaptic();
         if (mounted) {
-          appSnack(context, 'أُضِيف النشاط — ${MotivationQuotes.randomLine()}');
+          final sel = ref.read(selectedDateProvider);
+          final now = DateTime.now();
+          final isToday = sel.year == now.year &&
+              sel.month == now.month &&
+              sel.day == now.day;
+          final prefix = isToday
+              ? 'أُضِيف النشاط'
+              : 'أُضِيف النشاط ليوم ${DateFormat('d MMMM', 'ar').format(sel)}';
+          appSnack(context, '$prefix — ${MotivationQuotes.randomLine()}');
         }
         return true;
       },
@@ -215,25 +223,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           scrolledUnderElevation: 0,
           backgroundColor: theme.scaffoldBackgroundColor,
           actions: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: todayStr != nowStr
-                  ? Padding(
-                      key: const ValueKey('today_btn'),
-                      padding: const EdgeInsetsDirectional.only(end: 6),
-                      child: _HomeHeaderPillButton(
-                        icon: Icons.today_rounded,
-                        tooltip: 'العودة لليوم',
-                        color: theme.colorScheme.primary,
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          ref.read(selectedDateProvider.notifier).state =
-                              DateTime.now();
-                        },
-                      ),
-                    )
-                  : const SizedBox.shrink(key: ValueKey('no_today_btn')),
-            ),
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 6),
               child: Builder(

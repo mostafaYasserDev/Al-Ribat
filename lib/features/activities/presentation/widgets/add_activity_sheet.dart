@@ -379,6 +379,60 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
             MediaQuery.of(context).viewInsets.bottom + 36,
           ),
           children: [
+            if (widget.initialActivity == null)
+              Builder(
+                builder: (context) {
+                  final sel = ref.watch(selectedDateProvider);
+                  final now = DateTime.now();
+                  final selDay = DateTime(sel.year, sel.month, sel.day);
+                  final today = DateTime(now.year, now.month, now.day);
+                  if (selDay == today) return const SizedBox.shrink();
+                  final isPast = selDay.isBefore(today);
+                  final noticeColor = isPast
+                      ? const Color(0xFFD97706)
+                      : const Color(0xFF007AFF);
+                  final noticeIcon =
+                      isPast ? Icons.history_rounded : Icons.upcoming_rounded;
+                  final dateLabel =
+                      DateFormat('EEEE d MMMM', 'ar').format(selDay);
+                  final noticeText = isPast
+                      ? 'سيُضاف هذا النشاط إلى سجل يوم $dateLabel'
+                      : 'سيُضاف هذا النشاط ليبدأ من يوم $dateLabel';
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: noticeColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: noticeColor.withValues(alpha: 0.28),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(noticeIcon, size: 17, color: noticeColor),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              noticeText,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: noticeColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             // 1. Basic Info Card
             _GroupedCard(
               cardColor: cardColor,
