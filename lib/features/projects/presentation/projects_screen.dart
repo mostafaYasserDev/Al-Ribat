@@ -74,26 +74,28 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
               actions: [
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: 12),
-                  child: Tooltip(
-                    message: 'قوالب ملهمة',
-                    child: Material(
-                      color: isDark
-                          ? const Color(0xFF152036)
-                          : theme.colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(12),
-                      child: InkWell(
+                  child: Builder(
+                    builder: (btnCtx) => Tooltip(
+                      message: 'قوالب ملهمة',
+                      child: Material(
+                        color: isDark
+                            ? const Color(0xFF152036)
+                            : theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.7),
                         borderRadius: BorderRadius.circular(12),
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          _openTemplates(context);
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Icon(
-                            Icons.auto_awesome_rounded,
-                            size: 20,
-                            color: theme.colorScheme.primary,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            _openTemplates(btnCtx);
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 20,
+                              color: theme.colorScheme.primary,
+                            ),
                           ),
                         ),
                       ),
@@ -166,33 +168,43 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     );
   }
 
-  void _openTemplates(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => ProjectTemplatesSheet(onSelect: (t) async {
-        final now = DateTime.now();
-        final list = <ActivityItem>[];
-        for (final entry in t.groups.entries) {
-          await ProjectGroupsService.saveGroup(t.title, entry.key, null);
-          for (final title in entry.value) {
-            list.add(ActivityItem(
-              id: (now.microsecondsSinceEpoch + list.length).toString(),
-              title: title,
-              createdAt: now,
-              repetition: ActivityRepetition.once,
-              projectName: t.title,
-              groupName: entry.key,
-              colorHex: t.colorHex,
-            ));
+  void _openTemplates(BuildContext sourceContext) {
+    ProjectTemplatesSheet.open(
+      context,
+      sourceContext: sourceContext,
+      sourceColor: Theme.of(context).colorScheme.primaryContainer,
+      onSelect: (t) async {
+        await ProjectGroupsService.saveProjectInfo(
+          t.title,
+          description: t.description,
+          iconName: t.iconName,
+          colorHex: t.colorHex,
+        );
+        if (t.groups.isNotEmpty) {
+          final now = DateTime.now();
+          final list = <ActivityItem>[];
+          for (final entry in t.groups.entries) {
+            await ProjectGroupsService.saveGroup(t.title, entry.key, null);
+            for (final title in entry.value) {
+              list.add(ActivityItem(
+                id: (now.microsecondsSinceEpoch + list.length).toString(),
+                title: title,
+                createdAt: now,
+                repetition: ActivityRepetition.once,
+                projectName: t.title,
+                groupName: entry.key,
+                colorHex: t.colorHex,
+              ));
+            }
           }
+          await ref
+              .read(activitiesProvider.notifier)
+              .addMultipleActivities(list);
         }
-        await ref.read(activitiesProvider.notifier).addMultipleActivities(list);
         if (!mounted) return;
-        appSnack(this.context, 'تم إنشاء مشروع "${t.title}".');
-      }),
+        setState(() {});
+        appSnack(context, 'تم إنشاء مشروع "${t.title}".');
+      },
     );
   }
 
