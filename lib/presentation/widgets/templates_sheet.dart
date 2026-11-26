@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:al_ribat/core/theme/app_icons.dart';
 import 'package:al_ribat/features/reflections/presentation/widgets/apple_morph_route.dart';
 import '../../core/constants/prayer_phase.dart';
 import '../../domain/entities/activity_item.dart';
@@ -23,6 +24,8 @@ part 'templates/data_home_a.dart';
 part 'templates/data_home_b.dart';
 part 'templates/data_lifestyle_a.dart';
 part 'templates/data_lifestyle_b.dart';
+part 'templates/data_finance.dart';
+part 'templates/data_digital_wellness.dart';
 part 'templates/icons_a.dart';
 part 'templates/icons_b.dart';
 part 'templates/sheet_helpers.dart';
@@ -78,7 +81,9 @@ class TemplatesSheet extends StatefulWidget {
   static const List<Map<String, dynamic>> _categories = [
     _worship,
     _selfDevelopment,
+    _digitalWellness,
     _health,
+    _finance,
     _diet,
     _relations,
     _bodyCare,

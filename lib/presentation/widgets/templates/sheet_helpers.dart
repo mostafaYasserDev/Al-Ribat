@@ -1,6 +1,6 @@
 part of '../templates_sheet.dart';
 
-IconData _getIcon(String name) => _iconMap[name] ?? Icons.task_alt;
+IconData _getIcon(String name) => _iconMap[name] ?? AppIcons.getIconData(name);
 
 Color _getColor(String hex) {
   final buffer = StringBuffer();
