@@ -77,7 +77,8 @@ void main() {
       expect(projects.first.progress, 1.0);
     });
 
-    test('assigns default group name when groupName is omitted', () {
+    test('places ungrouped tasks in generalTasks without auto-creating a group',
+        () {
       final now = DateTime.now();
       final activities = [
         ActivityItem(
@@ -90,7 +91,9 @@ void main() {
 
       final projects =
           ProjectAggregate.fromActivities(activities, ThemeData.light());
-      expect(projects.first.groups.containsKey('المرحلة الأولى'), isTrue);
+      expect(projects.first.groups.isEmpty, isTrue);
+      expect(projects.first.generalTasks.length, 1);
+      expect(projects.first.generalTasks.first.title, 'مهمة بدون مرحلة');
     });
   });
 }

@@ -170,7 +170,7 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
                         context, ref, proj.name),
                   ),
                   const SizedBox(height: 16),
-                  if (groupMap.isEmpty) ...[
+                  if (groupMap.isEmpty && proj.generalTasks.isEmpty) ...[
                     Container(
                       padding: const EdgeInsets.symmetric(
                         vertical: 26,
@@ -239,6 +239,18 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
                       onAddTask: () => _openAddTaskSheet(proj.name, e.key),
                     );
                   }),
+                  if (proj.generalTasks.isNotEmpty)
+                    ProjectGroupAccordion(
+                      groupName: 'مهام عامة داخل المشروع',
+                      description: 'مهام غير مرتبطة بجانب معين',
+                      tasks: proj.generalTasks,
+                      color: proj.color,
+                      onToggleDone: (t) =>
+                          ProjectTaskActions.toggleDone(context, ref, t),
+                      onOpenDetails: (t, anchorCtx) =>
+                          ProjectTaskActions.openDetails(anchorCtx, ref, t),
+                      onAddTask: () => _openAddTaskSheet(proj.name, null),
+                    ),
                   const SizedBox(height: 4),
                   _AddGroupActionCard(
                     accentColor: proj.color,
@@ -257,28 +269,27 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
     );
   }
 
-  void _openAddTaskSheet(String projectName, String groupName) {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => AddActivitySheet(
-        initialProject: projectName,
-        initialGroup: groupName,
-        isIndependentInitial: true,
-        onSave: (activity) async {
-          await ref.read(activitiesProvider.notifier).addActivity(
-                activity.copyWith(
-                  projectName: projectName,
-                  groupName: groupName,
-                  repetition: ActivityRepetition.once,
-                ),
-              );
-          lightSuccessHaptic();
-          if (mounted) appSnack(context, 'أُضيفت المهمة إلى $groupName بنجاح.');
-          return true;
-        },
-      ),
+  void _openAddTaskSheet(String projectName, String? groupName) {
+    AddActivitySheet.open(
+      context,
+      initialProject: projectName,
+      initialGroup: groupName,
+      isIndependentInitial: true,
+      onSave: (activity) async {
+        await ref.read(activitiesProvider.notifier).addActivity(
+              activity.copyWith(
+                projectName: projectName,
+                groupName: groupName,
+                repetition: ActivityRepetition.once,
+              ),
+            );
+        lightSuccessHaptic();
+        if (mounted) {
+          final target = groupName ?? 'المهام العامة في $projectName';
+          appSnack(context, 'أُضيفت المهمة إلى $target بنجاح.');
+        }
+        return true;
+      },
     );
   }
 }

@@ -10,28 +10,38 @@ class ProjectAggregate {
   final IconData icon;
   final Map<String, List<ActivityItem>> groups;
 
+  /// Activities linked to this project without any specific group/aspect.
+  final List<ActivityItem> generalTasks;
+
   const ProjectAggregate({
     required this.name,
     required this.color,
     required this.icon,
     required this.groups,
+    this.generalTasks = const [],
   });
 
-  int get totalTasks => groups.values.fold(0, (sum, l) => sum + l.length);
+  int get totalTasks =>
+      groups.values.fold(0, (sum, l) => sum + l.length) + generalTasks.length;
 
-  int get completedTasks => groups.values.fold(
-        0,
-        (sum, l) =>
-            sum +
-            l.where((a) {
-              final now = DateTime.now();
-              final todayStr =
-                  "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-              return a.repetition == ActivityRepetition.once
-                  ? a.historyDates.isNotEmpty
-                  : a.isDoneOn(todayStr);
-            }).length,
-      );
+  static int _countDone(List<ActivityItem> items, String todayStr) {
+    return items.where((a) {
+      return a.repetition == ActivityRepetition.once
+          ? a.historyDates.isNotEmpty
+          : a.isDoneOn(todayStr);
+    }).length;
+  }
+
+  int get completedTasks {
+    final now = DateTime.now();
+    final todayStr =
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final groupedDone = groups.values.fold<int>(
+      0,
+      (sum, l) => sum + _countDone(l, todayStr),
+    );
+    return groupedDone + _countDone(generalTasks, todayStr);
+  }
 
   double get progress =>
       totalTasks > 0 ? (completedTasks / totalTasks).clamp(0.0, 1.0) : 0.0;
@@ -43,21 +53,26 @@ class ProjectAggregate {
     ThemeData theme,
   ) {
     final map = <String, Map<String, List<ActivityItem>>>{};
+    final generalMap = <String, List<ActivityItem>>{};
 
     for (final act in activities) {
       final p = act.projectName?.trim();
       if (p == null || p.isEmpty) continue;
-      final g = (act.groupName != null && act.groupName!.trim().isNotEmpty)
-          ? act.groupName!.trim()
-          : 'المرحلة الأولى';
       map.putIfAbsent(p, () => {});
-      map[p]!.putIfAbsent(g, () => []);
-      map[p]![g]!.add(act);
+      generalMap.putIfAbsent(p, () => []);
+      final g = act.groupName?.trim();
+      if (g != null && g.isNotEmpty) {
+        map[p]!.putIfAbsent(g, () => []);
+        map[p]![g]!.add(act);
+      } else {
+        generalMap[p]!.add(act);
+      }
     }
 
     // Also include saved projects that may have 0 activities
     for (final savedName in ProjectGroupsService.getAllProjectNames()) {
       map.putIfAbsent(savedName, () => {});
+      generalMap.putIfAbsent(savedName, () => []);
     }
 
     final colors = [
@@ -72,6 +87,7 @@ class ProjectAggregate {
     return map.entries.map((e) {
       final pName = e.key;
       final groups = e.value;
+      final generalTasks = generalMap[pName] ?? const <ActivityItem>[];
       Color? c;
       IconData? icon;
 
@@ -83,7 +99,7 @@ class ProjectAggregate {
         icon = AppIcons.getIconData(info!.iconName);
       }
 
-      for (final acts in groups.values) {
+      for (final acts in [...groups.values, generalTasks]) {
         for (final a in acts) {
           c ??= AppIcons.parseColor(a.colorHex);
           if (icon == null && a.iconName != null) {
@@ -97,6 +113,7 @@ class ProjectAggregate {
         color: c ?? colors[pName.hashCode.abs() % colors.length],
         icon: icon ?? Icons.folder_special_rounded,
         groups: groups,
+        generalTasks: generalTasks,
       );
     }).toList();
   }

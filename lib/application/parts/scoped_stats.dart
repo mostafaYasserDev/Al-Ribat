@@ -76,7 +76,7 @@ ProjectStatsSnapshot buildProjectStats(
   for (final act in projectActs) {
     final group = (act.groupName?.trim().isNotEmpty ?? false)
         ? act.groupName!.trim()
-        : 'عام';
+        : 'مهام عامة (بدون جانب)';
     byGroup.putIfAbsent(group, () => 0);
 
     int skips = 0;
