@@ -95,6 +95,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     bool isIndependent = false,
     BuildContext? sourceContext,
     Color? sourceColor,
+    double sourceRadius = 18,
   }) {
     AddActivitySheet.open(
       context,
@@ -102,6 +103,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       isIndependentInitial: isIndependent,
       sourceContext: sourceContext,
       sourceColor: sourceColor ?? Theme.of(context).scaffoldBackgroundColor,
+      sourceRadius: sourceRadius,
       onSave: (activity) async {
         await ref.read(activitiesProvider.notifier).addActivity(activity);
         lightSuccessHaptic();
@@ -138,18 +140,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       textDirection: TextDirection.rtl,
       child: Scaffold(
         floatingActionButton: Builder(
-          builder: (fabCtx) => FloatingActionButton.extended(
-            heroTag: 'home_fab',
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              _showAddActivitySheet(
-                initialPhase: activePhase,
-                sourceContext: fabCtx,
-                sourceColor: theme.colorScheme.primaryContainer,
-              );
-            },
-            label: const Text('إضافة نشاط'),
-            icon: const Icon(Icons.add_rounded),
+          builder: (fabCtx) => SizedBox(
+            height: 46,
+            child: FloatingActionButton.extended(
+              heroTag: 'home_fab',
+              elevation: 3,
+              highlightElevation: 6,
+              shape: const StadiumBorder(),
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: Colors.white,
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                _showAddActivitySheet(
+                  initialPhase: activePhase,
+                  sourceContext: fabCtx,
+                  sourceColor: theme.colorScheme.primary,
+                  sourceRadius: 23,
+                );
+              },
+              label: const Text(
+                'إضافة نشاط',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+              ),
+              icon: const Icon(Icons.add_rounded, size: 20),
+            ),
           ),
         ),
         body: scheduleAsync.when(

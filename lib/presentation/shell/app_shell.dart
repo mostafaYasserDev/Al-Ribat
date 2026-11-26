@@ -73,7 +73,6 @@ class _AppShellState extends ConsumerState<AppShell>
     });
 
     return Scaffold(
-      extendBody: true,
       body: IndexedStack(
         index: _index,
         children: _screens,

@@ -38,14 +38,25 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         floatingActionButton: Builder(
-          builder: (fabCtx) => FloatingActionButton.extended(
-            heroTag: 'projects_fab',
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              _openNewProject(fabCtx);
-            },
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('مشروع جديد'),
+          builder: (fabCtx) => SizedBox(
+            height: 46,
+            child: FloatingActionButton.extended(
+              heroTag: 'projects_fab',
+              elevation: 3,
+              highlightElevation: 6,
+              shape: const StadiumBorder(),
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: Colors.white,
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                _openNewProject(fabCtx);
+              },
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text(
+                'مشروع جديد',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+              ),
+            ),
           ),
         ),
         body: CustomScrollView(
