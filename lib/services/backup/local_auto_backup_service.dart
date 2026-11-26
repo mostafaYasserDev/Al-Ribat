@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:al_ribat/core/errors/error_reporter.dart';
 import 'package:al_ribat/features/settings/data/app_settings_model.dart';
 import 'package:al_ribat/features/settings/domain/app_settings.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
@@ -240,9 +241,40 @@ abstract final class LocalAutoBackupService {
     await tmp.rename(path);
   }
 
-  static Future<void> shareAutoBackupFile() async {
+  static Future<bool> shareAutoBackupFile() async {
     final path = await writeNow();
-    await Share.shareXFiles([XFile(path)], subject: fileName);
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      await Share.shareXFiles([XFile(path)], subject: fileName);
+      return true;
+    }
+
+    final parentDir = File(path).parent.path;
+    final dest = await FilePicker.platform.saveFile(
+      dialogTitle: 'حفظ نسخة من الملف التلقائي',
+      fileName: fileName,
+      initialDirectory: await Directory(parentDir).exists() ? parentDir : null,
+      type: FileType.custom,
+      allowedExtensions: const ['json'],
+    );
+    if (dest == null) return false;
+    final outPath = dest.toLowerCase().endsWith('.json') ? dest : '$dest.json';
+    await File(path).copy(outPath);
+    return true;
+  }
+
+  static Future<void> openContainingFolder() async {
+    final path = statusNotifier.value.filePath ?? await resolveTargetPath();
+    final dir = File(path).parent;
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    if (Platform.isLinux) {
+      await Process.start('xdg-open', [dir.path]);
+    } else if (Platform.isMacOS) {
+      await Process.start('open', [dir.path]);
+    } else if (Platform.isWindows) {
+      await Process.start('explorer', [dir.path]);
+    }
   }
 
   static Future<void> restoreFromAutoBackup({

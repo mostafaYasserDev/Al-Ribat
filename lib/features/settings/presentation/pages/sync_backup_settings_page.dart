@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,7 +30,7 @@ class _SyncBackupSettingsPageState
     extends ConsumerState<SyncBackupSettingsPage> {
   bool _busy = false;
   final _importTileKey = GlobalKey();
-  final _restoreAutoBtnKey = GlobalKey();
+  final _locationBtnKey = GlobalKey();
   final _resetTileKey = GlobalKey();
 
   Future<void> _run(Future<void> Function() action, String successMsg) async {
@@ -107,42 +110,135 @@ class _SyncBackupSettingsPageState
     }
   }
 
-  Future<void> _confirmAndRestoreAutoBackup() async {
-    final mode = await _askRestoreMode(
-      anchorKey: _restoreAutoBtnKey,
-      title: 'استعادة من الملف التلقائي',
-    );
-    if (mode == null || !mounted) return;
-    await _run(() async {
-      await LocalAutoBackupService.restoreFromAutoBackup(mode: mode);
-      _invalidateAll();
-    },
-        mode == BackupRestoreMode.merge
-            ? 'تم دمج بيانات الملف التلقائي.'
-            : 'تمت الاستعادة من الملف التلقائي.');
+  Future<void> _shareAutoBackup() async {
+    setState(() => _busy = true);
+    try {
+      final shared = await LocalAutoBackupService.shareAutoBackupFile();
+      if (shared && mounted) {
+        final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+        appSnack(
+          context,
+          isMobile ? 'تم تجهيز الملف للمشاركة.' : 'تم حفظ نسخة من الملف.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        appError(context, e, fallback: 'تعذر مشاركة الملف.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
-  Future<void> _pickAutoBackupDirectory(AppSettings settings) async {
-    try {
-      final dir = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: 'اختر مجلد الحفظ التلقائي',
+  Future<void> _showLocationMenu(
+    AppSettings settings,
+    String? currentPath,
+  ) async {
+    final isDesktop =
+        !kIsWeb && (Platform.isLinux || Platform.isWindows || Platform.isMacOS);
+    final action = await showAnchoredSettingsMenu<String>(
+      context: context,
+      anchorKey: _locationBtnKey,
+      title: 'مكان ملف الحفظ التلقائي',
+      options: [
+        const AnchoredMenuOption(
+          value: 'change',
+          title: 'تغيير مكان المستند',
+          subtitle: 'اختر مجلداً أو مساراً جديداً للملف',
+          icon: Icons.drive_file_move_rounded,
+          color: Color(0xFFFF9500),
+        ),
+        if (isDesktop)
+          const AnchoredMenuOption(
+            value: 'open',
+            title: 'فتح المجلد الحالي',
+            subtitle: 'عرض الملف مباشرة في مدير الملفات',
+            icon: Icons.folder_open_rounded,
+            color: Color(0xFF007AFF),
+          ),
+        if (settings.autoLocalBackupPath != null)
+          const AnchoredMenuOption(
+            value: 'reset',
+            title: 'العودة للمسار الافتراضي',
+            subtitle: 'استخدام مجلد التطبيق الافتراضي',
+            icon: Icons.settings_backup_restore_rounded,
+            color: Color(0xFF5856D6),
+          ),
+      ],
+    );
+    if (action == null || !mounted) return;
+
+    if (action == 'open') {
+      await _run(
+        () => LocalAutoBackupService.openContainingFolder(),
+        'تم فتح المجلد.',
       );
-      if (dir == null || dir.trim().isEmpty || !mounted) return;
+    } else if (action == 'reset') {
+      await _run(() async {
+        await ref.read(settingsProvider.notifier).updateSettings(
+              settings.copyWith(
+                autoLocalBackupEnabled: true,
+                clearAutoLocalBackupPath: true,
+              ),
+            );
+      }, 'تمت استعادة المسار الافتراضي.');
+    } else if (action == 'change') {
+      await _pickAutoBackupLocation(settings, currentPath);
+    }
+  }
+
+  Future<void> _pickAutoBackupLocation(
+    AppSettings settings,
+    String? currentPath,
+  ) async {
+    try {
+      String? initialDir;
+      if (currentPath != null) {
+        final parent = File(currentPath).parent;
+        if (await parent.exists()) {
+          initialDir = parent.path;
+        }
+      }
+
+      String? chosenPath;
+      final isDesktop = !kIsWeb &&
+          (Platform.isLinux || Platform.isWindows || Platform.isMacOS);
+      if (isDesktop) {
+        chosenPath = await FilePicker.platform.saveFile(
+          dialogTitle: 'اختر مكان حفظ الملف التلقائي',
+          fileName: currentPath != null
+              ? File(currentPath).uri.pathSegments.last
+              : LocalAutoBackupService.fileName,
+          initialDirectory: initialDir,
+          type: FileType.custom,
+          allowedExtensions: const ['json'],
+        );
+        if (chosenPath != null && !chosenPath.toLowerCase().endsWith('.json')) {
+          chosenPath = '$chosenPath.json';
+        }
+      } else {
+        chosenPath = await FilePicker.platform.getDirectoryPath(
+          dialogTitle: 'اختر مجلد الحفظ التلقائي',
+          initialDirectory: initialDir,
+        );
+      }
+
+      if (chosenPath == null || chosenPath.trim().isEmpty || !mounted) return;
       await ref.read(settingsProvider.notifier).updateSettings(
             settings.copyWith(
               autoLocalBackupEnabled: true,
-              autoLocalBackupPath: dir.trim(),
+              autoLocalBackupPath: chosenPath.trim(),
             ),
           );
       if (mounted) {
-        appSnack(context, 'تم تحديث مسار الحفظ التلقائي.');
+        appSnack(context, 'تم تغيير مكان المستند وحفظه.');
       }
     } catch (e) {
       if (mounted) {
         appError(
           context,
           e,
-          fallback: 'تعذر تغيير المجلد على هذا الجهاز.',
+          fallback: 'تعذر تغيير مكان الملف على هذا الجهاز.',
         );
       }
     }
@@ -597,34 +693,22 @@ class _SyncBackupSettingsPageState
                                   label: 'مشاركة',
                                   color: const Color(0xFF007AFF),
                                   enabled: !_busy,
-                                  onTap: () => _run(
-                                    () => LocalAutoBackupService
-                                        .shareAutoBackupFile(),
-                                    'تم تجهيز الملف للمشاركة.',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _TelegramQuickAction(
-                                  icon: Icons.folder_rounded,
-                                  label: 'المجلد',
-                                  color: const Color(0xFFFF9500),
-                                  enabled: !_busy,
-                                  onTap: () =>
-                                      _pickAutoBackupDirectory(settings),
+                                  onTap: _shareAutoBackup,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: KeyedSubtree(
-                                  key: _restoreAutoBtnKey,
+                                  key: _locationBtnKey,
                                   child: _TelegramQuickAction(
-                                    icon: Icons.history_rounded,
-                                    label: 'استعادة',
-                                    color: const Color(0xFF5856D6),
+                                    icon: Icons.folder_rounded,
+                                    label: 'مكان الملف',
+                                    color: const Color(0xFFFF9500),
                                     enabled: !_busy,
-                                    onTap: _confirmAndRestoreAutoBackup,
+                                    onTap: () => _showLocationMenu(
+                                      settings,
+                                      status.filePath,
+                                    ),
                                   ),
                                 ),
                               ),
