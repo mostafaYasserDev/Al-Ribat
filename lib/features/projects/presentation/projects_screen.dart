@@ -37,6 +37,17 @@ class _ProjectsScreenState extends ConsumerState<ProjectsScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        floatingActionButton: Builder(
+          builder: (fabCtx) => FloatingActionButton.extended(
+            heroTag: 'projects_fab',
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _openNewProject(fabCtx);
+            },
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('مشروع جديد'),
+          ),
+        ),
         body: CustomScrollView(
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),

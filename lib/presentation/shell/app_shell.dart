@@ -11,19 +11,15 @@ import '../../application/providers.dart';
 import '../../core/errors/error_reporter.dart';
 import '../../core/ui_feedback.dart';
 import '../../domain/entities/app_settings.dart';
-import '../../features/activities/presentation/widgets/add_activity_sheet.dart';
 import '../../features/focus/application/active_focus_notifier.dart';
 import '../../features/focus/domain/work_session_item.dart';
 import '../../features/focus/presentation/widgets/focus_completion_sheet.dart';
 import '../../features/focus/presentation/widgets/focus_mini_player.dart';
-import '../../features/projects/presentation/widgets/anchored_popover.dart';
-import '../../features/reflections/presentation/reflection_editor_screen.dart';
-import '../../features/settings/presentation/settings_screen.dart';
-import '../../services/motivation_quotes.dart';
 import '../focus/focus_sessions_screen.dart';
 import '../history/reflection_history_screen.dart';
 import '../home/home_screen.dart';
 import '../projects/projects_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../widgets/manual_location_dialog.dart';
 
 part 'app_shell_location_dialog.dart';
@@ -37,10 +33,12 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
+  int _index = 2;
+
   static const _screens = [
-    HomeScreen(),
     ProjectsScreen(),
     FocusSessionsScreen(),
+    HomeScreen(),
     ReflectionHistoryScreen(),
     SettingsScreen(),
   ];
@@ -65,110 +63,8 @@ class _AppShellState extends ConsumerState<AppShell>
     await _showLocationModeDialog(context, ref);
   }
 
-  void _openQuickAddMenu(BuildContext anchorCtx) {
-    HapticFeedback.lightImpact();
-    final dividerColor =
-        Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08);
-    final hostContext = context;
-
-    showAnchoredPopover<void>(
-      anchorCtx,
-      width: 248,
-      preferAbove: true,
-      anchorRadius: 28,
-      builder: (popCtx) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          PopoverActionRow(
-            icon: Icons.add_task_rounded,
-            color: const Color(0xFF1F6F4A),
-            label: 'نشاط جديد',
-            onTap: () {
-              Navigator.pop(popCtx);
-              AddActivitySheet.open(
-                hostContext,
-                sourceContext: anchorCtx,
-                sourceColor: Theme.of(hostContext).colorScheme.primary,
-                sourceRadius: 28,
-                onSave: (activity) async {
-                  await ref
-                      .read(activitiesProvider.notifier)
-                      .addActivity(activity);
-                  lightSuccessHaptic();
-                  if (hostContext.mounted) {
-                    appSnack(
-                      hostContext,
-                      'أُضِيف النشاط — ${MotivationQuotes.randomLine()}',
-                    );
-                  }
-                  return true;
-                },
-              );
-            },
-          ),
-          Divider(height: 0.6, thickness: 0.6, indent: 52, color: dividerColor),
-          PopoverActionRow(
-            icon: Icons.center_focus_strong_rounded,
-            color: const Color(0xFF007AFF),
-            label: 'بدء جلسة تركيز',
-            onTap: () {
-              Navigator.pop(popCtx);
-              ref.read(shellTabProvider.notifier).state = 2;
-            },
-          ),
-          Divider(height: 0.6, thickness: 0.6, indent: 52, color: dividerColor),
-          PopoverActionRow(
-            icon: Icons.auto_stories_rounded,
-            color: const Color(0xFF7C3AED),
-            label: 'تأمل جديد',
-            onTap: () {
-              Navigator.pop(popCtx);
-              ReflectionEditorScreen.open(
-                hostContext,
-                sourceContext: anchorCtx,
-                sourceColor: const Color(0xFF7C3AED).withValues(alpha: 0.16),
-                sourceRadius: 28,
-              );
-            },
-          ),
-          Divider(height: 0.6, thickness: 0.6, indent: 52, color: dividerColor),
-          PopoverActionRow(
-            icon: Icons.create_new_folder_rounded,
-            color: const Color(0xFFFF9500),
-            label: 'مشروع جديد',
-            onTap: () {
-              Navigator.pop(popCtx);
-              NewProjectDialog.open(
-                hostContext,
-                sourceContext: anchorCtx,
-                sourceColor: const Color(0xFFFF9500).withValues(alpha: 0.16),
-                sourceRadius: 28,
-                onCreate: ({
-                  required String projectName,
-                  String? description,
-                  String? iconName,
-                  String? colorHex,
-                }) async {
-                  await ProjectGroupsService.saveProjectInfo(
-                    projectName,
-                    description: description,
-                    iconName: iconName,
-                    colorHex: colorHex,
-                  );
-                  ref.read(shellTabProvider.notifier).state = 1;
-                },
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final index = ref.watch(shellTabProvider);
-
     ref.listen<WorkSessionItem?>(lastCompletedSessionProvider, (prev, next) {
       if (next != null) {
         FocusCompletionSheet.show(context, next);
@@ -179,22 +75,21 @@ class _AppShellState extends ConsumerState<AppShell>
     return Scaffold(
       extendBody: true,
       body: IndexedStack(
-        index: index,
+        index: _index,
         children: _screens,
       ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (index != 2) const FocusMiniPlayer(),
-          _CurvedNotchedNavBar(
-            selectedIndex: index,
+          if (_index != 1) const FocusMiniPlayer(),
+          _FloatingNotchedNavBar(
+            selectedIndex: _index,
             onSelect: (value) {
-              if (value != index) {
+              if (value != _index) {
                 HapticFeedback.selectionClick();
-                ref.read(shellTabProvider.notifier).state = value;
+                setState(() => _index = value);
               }
             },
-            onCenterAddTap: _openQuickAddMenu,
           ),
         ],
       ),
@@ -204,70 +99,50 @@ class _AppShellState extends ConsumerState<AppShell>
 
 class _NavTabItem {
   const _NavTabItem({
-    required this.tabIndex,
     required this.icon,
     required this.selectedIcon,
     required this.label,
-    required this.activeColor,
   });
 
-  final int tabIndex;
   final IconData icon;
   final IconData selectedIcon;
   final String label;
-  final Color activeColor;
 }
 
-class _CurvedNotchedNavBar extends StatefulWidget {
-  const _CurvedNotchedNavBar({
+class _FloatingNotchedNavBar extends StatelessWidget {
+  const _FloatingNotchedNavBar({
     required this.selectedIndex,
     required this.onSelect,
-    required this.onCenterAddTap,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelect;
-  final void Function(BuildContext anchorContext) onCenterAddTap;
 
-  @override
-  State<_CurvedNotchedNavBar> createState() => _CurvedNotchedNavBarState();
-}
-
-class _CurvedNotchedNavBarState extends State<_CurvedNotchedNavBar> {
-  final _centerBtnKey = GlobalKey();
-  bool _centerPressed = false;
-
-  static const _rightTabs = [
+  static const _items = [
     _NavTabItem(
-      tabIndex: 0,
-      icon: Icons.home_outlined,
-      selectedIcon: Icons.home_rounded,
-      label: 'اليوم',
-      activeColor: Color(0xFF1F6F4A),
-    ),
-    _NavTabItem(
-      tabIndex: 1,
       icon: Icons.folder_outlined,
       selectedIcon: Icons.folder_rounded,
       label: 'المشاريع',
-      activeColor: Color(0xFF007AFF),
     ),
-  ];
-
-  static const _leftTabs = [
     _NavTabItem(
-      tabIndex: 3,
+      icon: Icons.center_focus_strong_outlined,
+      selectedIcon: Icons.center_focus_strong_rounded,
+      label: 'التركيز',
+    ),
+    _NavTabItem(
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      label: 'اليوم',
+    ),
+    _NavTabItem(
       icon: Icons.menu_book_outlined,
       selectedIcon: Icons.menu_book_rounded,
       label: 'التأملات',
-      activeColor: Color(0xFF7C3AED),
     ),
     _NavTabItem(
-      tabIndex: 4,
       icon: Icons.settings_outlined,
       selectedIcon: Icons.settings_rounded,
       label: 'الإعدادات',
-      activeColor: Color(0xFF10B981),
     ),
   ];
 
@@ -276,191 +151,187 @@ class _CurvedNotchedNavBarState extends State<_CurvedNotchedNavBar> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
-    final barColor = isDark ? const Color(0xFF10192A) : Colors.white;
-    final borderColor = colorScheme.onSurface.withValues(alpha: 0.08);
+    final dockColor = isDark ? const Color(0xFF10192B) : Colors.white;
+    final borderColor =
+        colorScheme.onSurface.withValues(alpha: isDark ? 0.1 : 0.07);
     final inactiveColor = colorScheme.onSurface.withValues(alpha: 0.52);
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final isHomeSelected = selectedIndex == 2;
 
-    return SizedBox(
-      height: 82 + bottomInset,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        clipBehavior: Clip.none,
-        children: [
-          // Curved notched bar background
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: 66 + bottomInset,
-            child: CustomPaint(
-              painter: _NotchedBarPainter(
-                color: barColor,
-                borderColor: borderColor,
-                shadowColor:
-                    Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-              ),
-              child: Padding(
-                padding: EdgeInsets.only(bottom: bottomInset, top: 6),
-                child: Row(
-                  children: [
-                    for (final item in _rightTabs)
-                      Expanded(
-                        child: _CurvedNavTabButton(
-                          item: item,
-                          selected: widget.selectedIndex == item.tabIndex,
-                          inactiveColor: inactiveColor,
-                          onTap: () => widget.onSelect(item.tabIndex),
-                        ),
-                      ),
-                    const SizedBox(width: 78),
-                    for (final item in _leftTabs)
-                      Expanded(
-                        child: _CurvedNavTabButton(
-                          item: item,
-                          selected: widget.selectedIndex == item.tabIndex,
-                          inactiveColor: inactiveColor,
-                          onTap: () => widget.onSelect(item.tabIndex),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Center floating circular (+) button cradled in the notch
-          Positioned(
-            bottom: 24 + bottomInset,
-            child: GestureDetector(
-              key: const Key('center_add_button'),
-              onTapDown: (_) => setState(() => _centerPressed = true),
-              onTapUp: (_) {
-                setState(() => _centerPressed = false);
-                widget.onCenterAddTap(
-                  _centerBtnKey.currentContext ?? context,
-                );
-              },
-              onTapCancel: () => setState(() => _centerPressed = false),
-              child: AnimatedScale(
-                key: _centerBtnKey,
-                scale: _centerPressed ? 0.9 : 1.0,
-                duration: const Duration(milliseconds: 140),
-                curve: Curves.easeOutBack,
-                child: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      colors: [
-                        colorScheme.primary,
-                        Color.lerp(colorScheme.primary, const Color(0xFF007AFF),
-                            0.28)!,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+        child: SizedBox(
+          height: 78,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.bottomCenter,
+            children: [
+              // Floating curved notched dock
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 62,
+                child: CustomPaint(
+                  painter: _NotchedDockPainter(
+                    fillColor: dockColor,
+                    borderColor: borderColor,
+                    shadowColor: Colors.black.withValues(
+                      alpha: isDark ? 0.42 : 0.10,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.primary.withValues(alpha: 0.38),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _SideNavTab(
+                          item: _items[0],
+                          selected: selectedIndex == 0,
+                          activeColor: colorScheme.primary,
+                          inactiveColor: inactiveColor,
+                          onTap: () => onSelect(0),
+                        ),
+                      ),
+                      Expanded(
+                        child: _SideNavTab(
+                          item: _items[1],
+                          selected: selectedIndex == 1,
+                          activeColor: colorScheme.primary,
+                          inactiveColor: inactiveColor,
+                          onTap: () => onSelect(1),
+                        ),
+                      ),
+                      const SizedBox(width: 74),
+                      Expanded(
+                        child: _SideNavTab(
+                          item: _items[3],
+                          selected: selectedIndex == 3,
+                          activeColor: colorScheme.primary,
+                          inactiveColor: inactiveColor,
+                          onTap: () => onSelect(3),
+                        ),
+                      ),
+                      Expanded(
+                        child: _SideNavTab(
+                          item: _items[4],
+                          selected: selectedIndex == 4,
+                          activeColor: colorScheme.primary,
+                          inactiveColor: inactiveColor,
+                          onTap: () => onSelect(4),
+                        ),
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.add_rounded,
-                    color: Colors.white,
-                    size: 30,
+                ),
+              ),
+
+              // Elevated Center Home Orb ("اليوم")
+              Positioned(
+                top: 0,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onSelect(2),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      AnimatedScale(
+                        scale: isHomeSelected ? 1.06 : 0.96,
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutBack,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: isHomeSelected
+                                ? LinearGradient(
+                                    colors: [
+                                      colorScheme.primary,
+                                      Color.lerp(
+                                            colorScheme.primary,
+                                            Colors.teal,
+                                            0.35,
+                                          ) ??
+                                          colorScheme.primary,
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  )
+                                : null,
+                            color: isHomeSelected
+                                ? null
+                                : (isDark
+                                    ? const Color(0xFF1A2842)
+                                    : const Color(0xFFEAF0ED)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isHomeSelected
+                                        ? colorScheme.primary
+                                        : Colors.black)
+                                    .withValues(
+                                  alpha: isHomeSelected ? 0.36 : 0.12,
+                                ),
+                                blurRadius: isHomeSelected ? 16 : 8,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            isHomeSelected
+                                ? _items[2].selectedIcon
+                                : _items[2].icon,
+                            size: 26,
+                            color: isHomeSelected
+                                ? Colors.white
+                                : colorScheme.onSurface.withValues(alpha: 0.72),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        _items[2].label,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: isHomeSelected
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: isHomeSelected
+                              ? colorScheme.primary
+                              : inactiveColor,
+                          height: 1.1,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _NotchedBarPainter extends CustomPainter {
-  const _NotchedBarPainter({
-    required this.color,
-    required this.borderColor,
-    required this.shadowColor,
-  });
-
-  final Color color;
-  final Color borderColor;
-  final Color shadowColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final cx = w / 2;
-    const cornerR = 26.0;
-    const notchHalfW = 46.0;
-    const notchDepth = 28.0;
-
-    final path = Path()
-      ..moveTo(0, cornerR)
-      ..quadraticBezierTo(0, 0, cornerR, 0)
-      ..lineTo(cx - notchHalfW, 0)
-      ..cubicTo(
-        cx - notchHalfW * 0.56,
-        0,
-        cx - notchHalfW * 0.54,
-        notchDepth,
-        cx,
-        notchDepth,
-      )
-      ..cubicTo(
-        cx + notchHalfW * 0.54,
-        notchDepth,
-        cx + notchHalfW * 0.56,
-        0,
-        cx + notchHalfW,
-        0,
-      )
-      ..lineTo(w - cornerR, 0)
-      ..quadraticBezierTo(w, 0, w, cornerR)
-      ..lineTo(w, h)
-      ..lineTo(0, h)
-      ..close();
-
-    canvas.drawShadow(path, shadowColor, 10, false);
-    canvas.drawPath(path, Paint()..color = color);
-
-    final borderPaint = Paint()
-      ..color = borderColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8;
-    canvas.drawPath(path, borderPaint);
-  }
-
-  @override
-  bool shouldRepaint(_NotchedBarPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.borderColor != borderColor;
-}
-
-class _CurvedNavTabButton extends StatelessWidget {
-  const _CurvedNavTabButton({
+class _SideNavTab extends StatelessWidget {
+  const _SideNavTab({
     required this.item,
     required this.selected,
+    required this.activeColor,
     required this.inactiveColor,
     required this.onTap,
   });
 
   final _NavTabItem item;
   final bool selected;
+  final Color activeColor;
   final Color inactiveColor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? item.activeColor : inactiveColor;
+    final color = selected ? activeColor : inactiveColor;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -476,7 +347,7 @@ class _CurvedNavTabButton extends StatelessWidget {
               child: Icon(
                 selected ? item.selectedIcon : item.icon,
                 key: ValueKey(selected),
-                size: 23,
+                size: 22,
                 color: color,
               ),
             ),
@@ -487,7 +358,7 @@ class _CurvedNavTabButton extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 10,
               fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
               color: color,
               height: 1.1,
@@ -497,4 +368,71 @@ class _CurvedNavTabButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _NotchedDockPainter extends CustomPainter {
+  const _NotchedDockPainter({
+    required this.fillColor,
+    required this.borderColor,
+    required this.shadowColor,
+  });
+
+  final Color fillColor;
+  final Color borderColor;
+  final Color shadowColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final cx = w / 2;
+    const r = 26.0;
+    const notchHalf = 42.0;
+    const notchDepth = 26.0;
+
+    final path = Path()
+      ..moveTo(r, 0)
+      ..lineTo(cx - notchHalf - 10, 0)
+      ..cubicTo(
+        cx - notchHalf + 4,
+        0,
+        cx - 32,
+        notchDepth,
+        cx,
+        notchDepth,
+      )
+      ..cubicTo(
+        cx + 32,
+        notchDepth,
+        cx + notchHalf - 4,
+        0,
+        cx + notchHalf + 10,
+        0,
+      )
+      ..lineTo(w - r, 0)
+      ..quadraticBezierTo(w, 0, w, r)
+      ..lineTo(w, h - r)
+      ..quadraticBezierTo(w, h, w - r, h)
+      ..lineTo(r, h)
+      ..quadraticBezierTo(0, h, 0, h - r)
+      ..lineTo(0, r)
+      ..quadraticBezierTo(0, 0, r, 0)
+      ..close();
+
+    canvas.drawShadow(path, shadowColor, 14, false);
+    canvas.drawPath(path, Paint()..color = fillColor);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = borderColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_NotchedDockPainter oldDelegate) =>
+      oldDelegate.fillColor != fillColor ||
+      oldDelegate.borderColor != borderColor ||
+      oldDelegate.shadowColor != shadowColor;
 }
