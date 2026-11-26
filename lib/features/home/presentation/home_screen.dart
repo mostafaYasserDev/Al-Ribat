@@ -25,14 +25,31 @@ class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen>
+class HomeScreenState extends ConsumerState<HomeScreen>
     with WidgetsBindingObserver {
   Timer? _uiTicker;
   PrayerPhase? _selectedPhase;
   double _syncTurns = 0.0;
+
+  /// Opens the Add Activity sheet from the center dock orb in [AppShell].
+  void openAddActivityFromShell({
+    BuildContext? sourceContext,
+    Color? sourceColor,
+    double sourceRadius = 27,
+  }) {
+    if (!mounted) return;
+    final dayState = ref.read(dayStateProvider);
+    final activePhase = _selectedPhase ?? dayState.currentPrayerPhase;
+    _showAddActivitySheet(
+      initialPhase: activePhase,
+      sourceContext: sourceContext,
+      sourceColor: sourceColor,
+      sourceRadius: sourceRadius,
+    );
+  }
 
   @override
   void initState() {
@@ -139,33 +156,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        floatingActionButton: Builder(
-          builder: (fabCtx) => SizedBox(
-            height: 46,
-            child: FloatingActionButton.extended(
-              heroTag: 'home_fab',
-              elevation: 3,
-              highlightElevation: 6,
-              shape: const StadiumBorder(),
-              backgroundColor: theme.colorScheme.primary,
-              foregroundColor: Colors.white,
-              onPressed: () {
-                HapticFeedback.lightImpact();
-                _showAddActivitySheet(
-                  initialPhase: activePhase,
-                  sourceContext: fabCtx,
-                  sourceColor: theme.colorScheme.primary,
-                  sourceRadius: 23,
-                );
-              },
-              label: const Text(
-                'إضافة نشاط',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
-              ),
-              icon: const Icon(Icons.add_rounded, size: 20),
-            ),
-          ),
-        ),
         body: scheduleAsync.when(
           skipLoadingOnReload: true,
           loading: () {

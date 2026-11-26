@@ -65,7 +65,6 @@ void main() {
   }
 
   for (final entry in {
-    'اليوم': 'إضافة نشاط',
     'المشاريع': 'المشاريع والمجموعات',
     'التركيز': 'جلسات التركيز',
     'التأملات': 'التأملات',
@@ -78,8 +77,20 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
       expect(tester.takeException(), isNull);
       expect(find.byType(Scaffold), findsWidgets);
+      expect(find.text('اليوم'), findsOneWidget);
     });
   }
+
+  testWidgets('center orb morphs to إضافة نشاط on Home tab and opens sheet',
+      (tester) async {
+    await pumpApp(tester);
+    expect(find.text('إضافة نشاط'), findsOneWidget);
+
+    await tester.tap(find.text('إضافة نشاط'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('نشاط جديد'), findsOneWidget);
+  });
 
   testWidgets('stats screen opens from app bar without errors', (tester) async {
     await pumpApp(tester);

@@ -34,13 +34,14 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell>
     with WidgetsBindingObserver {
   int _index = 2;
+  final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
 
-  static const _screens = [
-    ProjectsScreen(),
-    FocusSessionsScreen(),
-    HomeScreen(),
-    ReflectionHistoryScreen(),
-    SettingsScreen(),
+  late final List<Widget> _screens = [
+    const ProjectsScreen(),
+    const FocusSessionsScreen(),
+    HomeScreen(key: _homeKey),
+    const ReflectionHistoryScreen(),
+    const SettingsScreen(),
   ];
 
   @override
@@ -89,6 +90,14 @@ class _AppShellState extends ConsumerState<AppShell>
                 setState(() => _index = value);
               }
             },
+            onCenterAddTap: (orbContext) {
+              HapticFeedback.lightImpact();
+              _homeKey.currentState?.openAddActivityFromShell(
+                sourceContext: orbContext,
+                sourceColor: Theme.of(context).colorScheme.primary,
+                sourceRadius: 27,
+              );
+            },
           ),
         ],
       ),
@@ -112,10 +121,12 @@ class _FloatingNotchedNavBar extends StatelessWidget {
   const _FloatingNotchedNavBar({
     required this.selectedIndex,
     required this.onSelect,
+    required this.onCenterAddTap,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelect;
+  final void Function(BuildContext orbContext) onCenterAddTap;
 
   static const _items = [
     _NavTabItem(
@@ -224,84 +235,107 @@ class _FloatingNotchedNavBar extends StatelessWidget {
                 ),
               ),
 
-              // Elevated Center Home Orb ("اليوم")
+              // Elevated Center Orb: "إضافة نشاط" when on Home, "اليوم" otherwise
               Positioned(
                 top: 0,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => onSelect(2),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedScale(
-                        scale: isHomeSelected ? 1.06 : 0.96,
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeOutBack,
-                        child: AnimatedContainer(
+                child: Builder(
+                  builder: (orbCtx) => GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () =>
+                        isHomeSelected ? onCenterAddTap(orbCtx) : onSelect(2),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedScale(
+                          scale: isHomeSelected ? 1.06 : 0.96,
                           duration: const Duration(milliseconds: 220),
-                          width: 54,
-                          height: 54,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: isHomeSelected
-                                ? LinearGradient(
-                                    colors: [
-                                      colorScheme.primary,
-                                      Color.lerp(
+                          curve: Curves.easeOutBack,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: isHomeSelected
+                                  ? LinearGradient(
+                                      colors: [
+                                        colorScheme.primary,
+                                        Color.lerp(
+                                              colorScheme.primary,
+                                              Colors.teal,
+                                              0.35,
+                                            ) ??
                                             colorScheme.primary,
-                                            Colors.teal,
-                                            0.35,
-                                          ) ??
-                                          colorScheme.primary,
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  )
-                                : null,
-                            color: isHomeSelected
-                                ? null
-                                : (isDark
-                                    ? const Color(0xFF1A2842)
-                                    : const Color(0xFFEAF0ED)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: (isHomeSelected
-                                        ? colorScheme.primary
-                                        : Colors.black)
-                                    .withValues(
-                                  alpha: isHomeSelected ? 0.36 : 0.12,
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : null,
+                              color: isHomeSelected
+                                  ? null
+                                  : (isDark
+                                      ? const Color(0xFF1A2842)
+                                      : const Color(0xFFEAF0ED)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (isHomeSelected
+                                          ? colorScheme.primary
+                                          : Colors.black)
+                                      .withValues(
+                                    alpha: isHomeSelected ? 0.36 : 0.12,
+                                  ),
+                                  blurRadius: isHomeSelected ? 16 : 8,
+                                  offset: const Offset(0, 5),
                                 ),
-                                blurRadius: isHomeSelected ? 16 : 8,
-                                offset: const Offset(0, 5),
+                              ],
+                            ),
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 220),
+                              switchInCurve: Curves.easeOutBack,
+                              switchOutCurve: Curves.easeIn,
+                              transitionBuilder: (child, animation) =>
+                                  FadeTransition(
+                                opacity: animation,
+                                child: ScaleTransition(
+                                  scale: animation,
+                                  child: child,
+                                ),
                               ),
-                            ],
-                          ),
-                          child: Icon(
-                            isHomeSelected
-                                ? _items[2].selectedIcon
-                                : _items[2].icon,
-                            size: 26,
-                            color: isHomeSelected
-                                ? Colors.white
-                                : colorScheme.onSurface.withValues(alpha: 0.72),
+                              child: Icon(
+                                isHomeSelected
+                                    ? Icons.add_rounded
+                                    : _items[2].icon,
+                                key: ValueKey(isHomeSelected ? 'add' : 'home'),
+                                size: isHomeSelected ? 28 : 26,
+                                color: isHomeSelected
+                                    ? Colors.white
+                                    : colorScheme.onSurface
+                                        .withValues(alpha: 0.72),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        _items[2].label,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: isHomeSelected
-                              ? FontWeight.w800
-                              : FontWeight.w600,
-                          color: isHomeSelected
-                              ? colorScheme.primary
-                              : inactiveColor,
-                          height: 1.1,
+                        const SizedBox(height: 3),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          child: Text(
+                            isHomeSelected ? 'إضافة نشاط' : _items[2].label,
+                            key: ValueKey(
+                                isHomeSelected ? 'add_lbl' : 'home_lbl'),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: isHomeSelected
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              color: isHomeSelected
+                                  ? colorScheme.primary
+                                  : inactiveColor,
+                              height: 1.1,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
