@@ -65,9 +65,8 @@ void main() {
   }
 
   for (final entry in {
-    'اليوم': 'إضافة نشاط',
+    'اليوم': 'الرباط',
     'المشاريع': 'المشاريع والمجموعات',
-    'التركيز': 'جلسات التركيز',
     'التأملات': 'التأملات',
     'الإعدادات': 'الإعدادات',
   }.entries) {
@@ -80,6 +79,28 @@ void main() {
       expect(find.byType(Scaffold), findsWidgets);
     });
   }
+
+  testWidgets('tab التركيز opens from header pill and center + menu',
+      (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.byIcon(Icons.center_focus_strong_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
+    expect(find.text('حتى الأذان'), findsOneWidget);
+  });
+
+  testWidgets('center + button opens quick-add AnchoredPopover',
+      (tester) async {
+    await pumpApp(tester);
+    await tester.tap(find.byKey(const Key('center_add_button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('نشاط جديد'), findsOneWidget);
+    expect(find.text('بدء جلسة تركيز'), findsOneWidget);
+    expect(find.text('تأمل جديد'), findsOneWidget);
+    expect(find.text('مشروع جديد'), findsOneWidget);
+  });
 
   testWidgets('stats screen opens from app bar without errors', (tester) async {
     await pumpApp(tester);

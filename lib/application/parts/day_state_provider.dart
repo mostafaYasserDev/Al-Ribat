@@ -1,5 +1,8 @@
 part of '../providers.dart';
 
+/// Active tab index in [AppShell] (0: اليوم, 1: المشاريع, 2: التركيز, 3: التأملات, 4: الإعدادات).
+final shellTabProvider = StateProvider<int>((ref) => 0);
+
 final dayStateProvider = Provider<DayState>((ref) {
   final sched = ref.watch(prayerScheduleProvider).valueOrNull;
   final prayers = sched?.today ?? const <PrayerTime>[];

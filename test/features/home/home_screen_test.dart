@@ -150,7 +150,7 @@ void main() {
     expect(find.text('أمس'), findsOneWidget);
 
     // Opening AddActivitySheet while on a past day shows the subtle date notice
-    await tester.tap(find.text('إضافة نشاط'));
+    await tester.tap(find.byIcon(Icons.add_rounded).first);
     await tester.pumpAndSettle();
     expect(
         find.textContaining('سيُضاف هذا النشاط إلى سجل يوم'), findsOneWidget);
@@ -183,8 +183,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Open AddActivitySheet from the FAB and verify Telegram x Apple fields
-    await tester.tap(find.text('إضافة نشاط'));
+    // Open AddActivitySheet from the section header + button and verify Telegram x Apple fields
+    await tester.tap(find.byIcon(Icons.add_rounded).first);
     await tester.pumpAndSettle();
 
     expect(find.text('نشاط جديد'), findsOneWidget);

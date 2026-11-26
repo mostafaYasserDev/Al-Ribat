@@ -137,21 +137,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        floatingActionButton: Builder(
-          builder: (fabCtx) => FloatingActionButton.extended(
-            heroTag: 'home_fab',
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              _showAddActivitySheet(
-                initialPhase: activePhase,
-                sourceContext: fabCtx,
-                sourceColor: theme.colorScheme.primaryContainer,
-              );
-            },
-            label: const Text('إضافة نشاط'),
-            icon: const Icon(Icons.add_rounded),
-          ),
-        ),
         body: scheduleAsync.when(
           skipLoadingOnReload: true,
           loading: () {
@@ -223,6 +208,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           scrolledUnderElevation: 0,
           backgroundColor: theme.scaffoldBackgroundColor,
           actions: [
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 6),
+              child: _HomeHeaderPillButton(
+                icon: Icons.center_focus_strong_rounded,
+                tooltip: 'جلسات التركيز',
+                color: theme.colorScheme.primary,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(shellTabProvider.notifier).state = 2;
+                },
+              ),
+            ),
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 6),
               child: Builder(
