@@ -61,3 +61,30 @@ flutter analyze --no-pub
 flutter test --no-pub
 ```
 Zero analyzer errors or warnings allowed. All tests must pass before completing any task.
+
+---
+
+## 5. UI/UX Design Language (Telegram + Apple iOS)
+
+Follow this visual and interaction standard for all UI additions and edits (mobile-first, RTL Arabic):
+
+1. **Grouped Surfaces & Tactile Controls**:
+   - Prefer inset grouped cards (rounded containers, hairline dividers, subtle borders) and squircle tinted icon badges over flat Material lists.
+   - Use uniform, single-row soft-tinted quick-action bars or clean grouped rows instead of cluttered `Wrap` button chips or harsh solid-color Material pills.
+   - Soft destructive styling: use muted red text/icon with a light tinted background (`alpha: 0.10–0.14`), never heavy solid red blocks.
+
+2. **Anchored Popovers & Smooth Apple/Telegram Motion**:
+   - **Never** use abrupt generic Material `AlertDialog`s for contextual choices or confirmations.
+   - Use **anchored floating menus** (`showAnchoredSettingsMenu` pattern: `ScaleTransition` anchored to the tapped widget's `GlobalKey` + `BackdropFilter` blur + fade) so the menu springs out of the pressed button and collapses back into it on dismiss.
+   - Wrap expandable sections in `AnimatedSize` / `AnimatedSwitcher` and interactive cards/buttons in `PressableScale` with subtle `HapticFeedback`.
+
+3. **Sliders & Expensive Updates**:
+   - Commit slider values on `onChangeEnd` (using local draft state during `onChanged`) to keep UI dragging 60fps without redundant disk writes or provider rebuilds.
+
+---
+
+## 6. Post-Task Delivery
+
+After passing the Verification Gate on any code-modification task:
+1. **Push to GitHub**: Stage, commit with a clear message, and push to `origin main`.
+2. **Launch / Restart Linux App**: Restart `flutter run -d linux --no-pub` (killing any previous `al_ribat` process cleanly with `pkill -x al_ribat || true`) so the user can preview changes immediately.
