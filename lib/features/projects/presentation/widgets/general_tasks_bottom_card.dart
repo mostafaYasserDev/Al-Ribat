@@ -37,7 +37,7 @@ class _GeneralTasksBottomCardState extends State<GeneralTasksBottomCard> {
     final todayStr =
         "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
     final doneCount = widget.tasks.where((a) {
-      return a.repetition == ActivityRepetition.once
+      return a.isSingleCompletion
           ? a.historyDates.isNotEmpty
           : a.isDoneOn(todayStr);
     }).length;

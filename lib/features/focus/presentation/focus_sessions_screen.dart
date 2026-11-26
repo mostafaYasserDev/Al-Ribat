@@ -140,7 +140,7 @@ class _FocusSessionsScreenState extends ConsumerState<FocusSessionsScreen> {
   @override
   Widget build(BuildContext context) {
     final activeSession = ref.watch(activeFocusProvider);
-    final scheduleAsync = ref.watch(prayerScheduleProvider);
+    final scheduleAsync = ref.watch(todayPrayerScheduleProvider);
     final schedule = scheduleAsync.valueOrNull;
 
     final nextPrayer = schedule == null ? null : _nextPrayer(schedule);

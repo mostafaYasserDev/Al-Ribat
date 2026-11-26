@@ -237,11 +237,13 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
                       onOpenDetails: (t, anchorCtx) =>
                           ProjectTaskActions.openDetails(anchorCtx, ref, t),
                       onAddTask: () => _openAddTaskSheet(proj.name, e.key),
+                      onRenameGroup: (anchorCtx) =>
+                          _openRenameGroupPopover(anchorCtx, proj.name, e.key),
                     );
                   }),
                   if (proj.generalTasks.isNotEmpty)
                     ProjectGroupAccordion(
-                      groupName: 'مهام عامة داخل المشروع',
+                      groupName: 'مهام عامة',
                       description: 'مهام غير مرتبطة بجانب معين',
                       tasks: proj.generalTasks,
                       color: proj.color,
@@ -269,6 +271,95 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
     );
   }
 
+  void _openRenameGroupPopover(
+    BuildContext anchorCtx,
+    String projectName,
+    String oldName,
+  ) {
+    final ctrl = TextEditingController(text: oldName);
+    showAnchoredPopover(
+      anchorCtx,
+      width: 260,
+      preferAbove: false,
+      anchorRadius: 8,
+      builder: (popCtx) {
+        final theme = Theme.of(popCtx);
+        final colorScheme = theme.colorScheme;
+        return Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'تعديل اسم الجانب',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'اسم الجانب الجديد…',
+                  hintStyle: TextStyle(
+                    fontSize: 12.5,
+                    color: colorScheme.onSurface.withValues(alpha: 0.36),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              FilledButton(
+                onPressed: () async {
+                  final newName = ctrl.text.trim();
+                  if (newName.isEmpty || newName == oldName) {
+                    Navigator.pop(popCtx);
+                    return;
+                  }
+                  await ProjectGroupsService.renameGroup(
+                    projectName,
+                    oldName,
+                    newName,
+                  );
+                  final acts = ref.read(activitiesProvider).valueOrNull ??
+                      const <ActivityItem>[];
+                  for (final act in acts) {
+                    if (act.projectName?.trim() == projectName &&
+                        act.groupName?.trim() == oldName) {
+                      await ref
+                          .read(activitiesProvider.notifier)
+                          .updateActivity(act.copyWith(groupName: newName));
+                    }
+                  }
+                  if (popCtx.mounted) Navigator.pop(popCtx);
+                  if (mounted) {
+                    setState(() {});
+                    appSnack(context, 'تم تعديل اسم الجانب إلى «$newName»');
+                  }
+                },
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'حفظ',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _openAddTaskSheet(String projectName, String? groupName) {
     AddActivitySheet.open(
       context,
@@ -280,12 +371,11 @@ class _ProjectDetailsScreenState extends ConsumerState<ProjectDetailsScreen> {
               activity.copyWith(
                 projectName: projectName,
                 groupName: groupName,
-                repetition: ActivityRepetition.once,
               ),
             );
         lightSuccessHaptic();
         if (mounted) {
-          final target = groupName ?? 'المهام العامة في $projectName';
+          final target = groupName ?? 'المهام العامة';
           appSnack(context, 'أُضيفت المهمة إلى $target بنجاح.');
         }
         return true;

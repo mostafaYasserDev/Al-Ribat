@@ -40,3 +40,10 @@ final prayerScheduleProvider = FutureProvider<PrayerSchedule>((ref) async {
   }
   return schedule;
 });
+
+/// Real-time prayer schedule for [DateTime.now()], independent of [selectedDateProvider].
+final todayPrayerScheduleProvider = FutureProvider<PrayerSchedule>((ref) async {
+  final settings = await ref.watch(settingsProvider.future);
+  final repo = ref.watch(prayerRepositoryProvider);
+  return repo.getPrayerSchedule(settings, date: DateTime.now());
+});

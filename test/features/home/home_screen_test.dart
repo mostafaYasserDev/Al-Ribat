@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:al_ribat/application/providers.dart';
+import 'package:al_ribat/core/activity_schedule.dart';
 import 'package:al_ribat/core/constants/prayer_phase.dart';
 import 'package:al_ribat/core/theme/app_icons.dart';
 import 'package:al_ribat/core/theme/app_theme.dart';
@@ -272,5 +273,24 @@ void main() {
     await tester.tap(find.text('الأنشطة'));
     await tester.pumpAndSettle();
     expect(find.text('ورد التلاوة اليومي'), findsWidgets);
+  });
+
+  test('ActivityRepetition.open stays visible every day until completed', () {
+    final created = DateTime(2026, 11, 20, 10);
+    final openTask = ActivityItem(
+      id: 'open_1',
+      title: 'مراجعة أوراق المشروع',
+      createdAt: created,
+      repetition: ActivityRepetition.open,
+      type: ActivityType.independent,
+    );
+
+    expect(activityVisibleOnDate(openTask, DateTime(2026, 11, 20)), isTrue);
+    expect(activityVisibleOnDate(openTask, DateTime(2026, 11, 25)), isTrue);
+    expect(activityVisibleOnDate(openTask, DateTime(2026, 11, 19)), isFalse);
+
+    final doneTask = openTask.copyWith(historyDates: const {'2026-11-25'});
+    expect(activityVisibleOnDate(doneTask, DateTime(2026, 11, 25)), isTrue);
+    expect(activityVisibleOnDate(doneTask, DateTime(2026, 11, 26)), isFalse);
   });
 }

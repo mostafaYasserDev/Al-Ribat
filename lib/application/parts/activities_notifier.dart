@@ -105,7 +105,7 @@ class ActivitiesNotifier extends AsyncNotifier<List<ActivityItem>> {
   }
 
   Future<void> toggleDone(ActivityItem activity, String date) async {
-    final isOnce = activity.repetition == ActivityRepetition.once;
+    final isOnce = activity.isSingleCompletion;
     final isDone =
         isOnce ? activity.historyDates.isNotEmpty : activity.isDoneOn(date);
     final newHistory = List<ActivityRecord>.from(activity.history);

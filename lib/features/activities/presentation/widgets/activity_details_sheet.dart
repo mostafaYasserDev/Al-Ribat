@@ -257,6 +257,8 @@ class ActivityDetailsSheet extends StatelessWidget {
         return 'أسبوعياً';
       case ActivityRepetition.monthly:
         return 'شهرياً';
+      case ActivityRepetition.open:
+        return 'مفتوحة (حتى الإتمام)';
     }
   }
 }

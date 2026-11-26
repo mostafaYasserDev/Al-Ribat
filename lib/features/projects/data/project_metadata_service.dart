@@ -111,4 +111,26 @@ class ProjectGroupsService {
       jsonEncode(updated.map((e) => e.toJson()).toList()),
     );
   }
+
+  static Future<void> renameGroup(
+    String projectName,
+    String oldName,
+    String newName,
+  ) async {
+    final box = _getBox();
+    if (box == null) return;
+    final current = getGroups(projectName);
+    final updated = current
+        .map((g) => g.name == oldName
+            ? ProjectGroupInfo(name: newName, description: g.description)
+            : g)
+        .toList();
+    if (!updated.any((g) => g.name == newName)) {
+      updated.add(ProjectGroupInfo(name: newName));
+    }
+    await box.put(
+      '$_prefix$projectName',
+      jsonEncode(updated.map((e) => e.toJson()).toList()),
+    );
+  }
 }

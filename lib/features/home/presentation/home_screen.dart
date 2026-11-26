@@ -76,6 +76,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     PrayerSchedule schedule,
     PrayerPhase currentPhase,
   ) {
+    final now = DateTime.now();
+    if (schedule.today.isNotEmpty &&
+        currentPhase == PrayerPhase.isha &&
+        now.isBefore(schedule.today.first.time)) {
+      return schedule.today.first;
+    }
     final idx = schedule.today.indexWhere((p) => p.phase == currentPhase);
     if (idx >= 0 && idx < schedule.today.length - 1) {
       return schedule.today[idx + 1];

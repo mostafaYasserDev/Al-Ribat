@@ -14,6 +14,7 @@ class ProjectGroupAccordion extends StatefulWidget {
     required this.onToggleDone,
     required this.onOpenDetails,
     required this.onAddTask,
+    this.onRenameGroup,
   });
 
   final String groupName;
@@ -24,6 +25,7 @@ class ProjectGroupAccordion extends StatefulWidget {
   final void Function(ActivityItem task, BuildContext anchorContext)
       onOpenDetails;
   final VoidCallback onAddTask;
+  final void Function(BuildContext anchorContext)? onRenameGroup;
 
   @override
   State<ProjectGroupAccordion> createState() => _ProjectGroupAccordionState();
@@ -109,6 +111,28 @@ class _ProjectGroupAccordionState extends State<ProjectGroupAccordion> {
                           ],
                         ),
                       ),
+                      if (widget.onRenameGroup != null) ...[
+                        const SizedBox(width: 4),
+                        Builder(
+                          builder: (renameCtx) => InkWell(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              widget.onRenameGroup!(renameCtx);
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: Icon(
+                                Icons.edit_outlined,
+                                size: 16,
+                                color: colorScheme.onSurface
+                                    .withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,

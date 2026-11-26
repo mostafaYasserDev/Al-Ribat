@@ -64,10 +64,13 @@ class HomePrayerHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
+    final isToday = selectedDate.year == now.year &&
+        selectedDate.month == now.month &&
+        selectedDate.day == now.day;
     final remaining = nextPrayer.time.difference(now);
     final totalSpan = nextPrayer.time.difference(currentPrayer.time);
     final elapsed = now.difference(currentPrayer.time);
-    final double progress = totalSpan.inSeconds > 0
+    final double progress = (isToday && totalSpan.inSeconds > 0)
         ? (elapsed.inSeconds / totalSpan.inSeconds).clamp(0.0, 1.0)
         : 0.0;
 
@@ -97,8 +100,7 @@ class HomePrayerHeroCard extends StatelessWidget {
     // Daily tasks completion ring stats
     final dueToday = activities.where((a) {
       if (a.type == ActivityType.independent) {
-        return a.repetition != ActivityRepetition.once ||
-            a.historyDates.isEmpty;
+        return !a.isSingleCompletion || a.historyDates.isEmpty;
       }
       return activitiesForPhase(
               activities, a.linkedPrayer ?? PrayerPhase.fajr, selectedDate)
@@ -167,7 +169,9 @@ class HomePrayerHeroCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$remainingFormatted حتى أذان ${nextPrayer.phase.arabicName}',
+                        isToday
+                            ? '$remainingFormatted حتى أذان ${nextPrayer.phase.arabicName}'
+                            : 'مواقيت ${DateFormat('EEEE d MMMM', 'ar').format(selectedDate)}',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

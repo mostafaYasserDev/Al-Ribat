@@ -47,6 +47,8 @@ class ActivityActionTile extends StatelessWidget {
         return 'شهري';
       case ActivityRepetition.once:
         return 'مرة واحدة';
+      case ActivityRepetition.open:
+        return 'مفتوحة (حتى الإتمام)';
     }
   }
 

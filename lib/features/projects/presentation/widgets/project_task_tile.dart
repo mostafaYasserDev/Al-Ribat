@@ -36,7 +36,7 @@ class _ProjectTaskTileState extends State<ProjectTaskTile> {
     final now = DateTime.now();
     final todayStr =
         "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-    final isDone = task.repetition == ActivityRepetition.once
+    final isDone = task.isSingleCompletion
         ? task.historyDates.isNotEmpty
         : task.isDoneOn(todayStr);
     final iconColor = AppIcons.parseColor(task.colorHex) ?? colorScheme.primary;

@@ -22,6 +22,8 @@ final dayStateProvider = Provider<DayState>((ref) {
           selectedDate.month == now.month &&
           selectedDate.day > now.day)) {
     current = PrayerPhase.fajr;
+  } else if (prayers.isNotEmpty && now.isBefore(prayers.first.time)) {
+    current = PrayerPhase.isha;
   } else {
     for (final p in prayers) {
       if (now.isAfter(p.time)) {

@@ -1,6 +1,6 @@
 import 'package:al_ribat/features/prayer/domain/prayer_phase.dart';
 
-enum ActivityRepetition { once, daily, weekly, monthly }
+enum ActivityRepetition { once, daily, weekly, monthly, open }
 
 enum ActivityType { beforePrayer, afterPrayer, independent }
 
@@ -90,6 +90,10 @@ class ActivityItem {
   final int orderIndex;
   final String? colorHex;
   final String? iconName;
+
+  bool get isSingleCompletion =>
+      repetition == ActivityRepetition.once ||
+      repetition == ActivityRepetition.open;
 
   // Query helpers
   bool isDoneOn(String date) {

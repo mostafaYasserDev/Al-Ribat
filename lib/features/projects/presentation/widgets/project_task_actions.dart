@@ -19,7 +19,7 @@ class ProjectTaskActions {
     final now = DateTime.now();
     final d =
         "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
-    final wasDone = task.repetition == ActivityRepetition.once
+    final wasDone = task.isSingleCompletion
         ? task.historyDates.isNotEmpty
         : task.isDoneOn(d);
     await ref.read(activitiesProvider.notifier).toggleDone(task, d);

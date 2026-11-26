@@ -26,7 +26,7 @@ class ProjectAggregate {
 
   static int _countDone(List<ActivityItem> items, String todayStr) {
     return items.where((a) {
-      return a.repetition == ActivityRepetition.once
+      return a.isSingleCompletion
           ? a.historyDates.isNotEmpty
           : a.isDoneOn(todayStr);
     }).length;

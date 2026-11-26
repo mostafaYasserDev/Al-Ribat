@@ -58,6 +58,8 @@ class _TaskPopoverBody extends StatelessWidget {
         return 'شهري';
       case ActivityRepetition.once:
         return 'مرة واحدة';
+      case ActivityRepetition.open:
+        return 'مفتوحة (حتى الإتمام)';
     }
   }
 
@@ -67,7 +69,7 @@ class _TaskPopoverBody extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final dividerColor = colorScheme.onSurface.withValues(alpha: 0.08);
 
-    final isDone = activity.repetition == ActivityRepetition.once
+    final isDone = activity.isSingleCompletion
         ? activity.historyDates.isNotEmpty
         : activity.isDoneOn(dateStr);
     final iconColor =

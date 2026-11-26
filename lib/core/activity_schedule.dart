@@ -38,6 +38,9 @@ bool activityVisibleOnDate(ActivityItem activity, DateTime date) {
       final target = activity.targetDate ??
           DateFormat('yyyy-MM-dd').format(activity.createdAt);
       return target == dateStr;
+    case ActivityRepetition.open:
+      if (activity.historyDates.isEmpty) return true;
+      return activity.historyDates.contains(dateStr);
     case ActivityRepetition.daily:
       return true;
     case ActivityRepetition.weekly:

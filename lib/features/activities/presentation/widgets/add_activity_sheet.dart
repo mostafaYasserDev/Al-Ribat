@@ -137,7 +137,10 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
     );
     _goalUnitController = TextEditingController(text: initial?.goalUnit ?? '');
 
-    _repetition = initial?.repetition ?? ActivityRepetition.daily;
+    _repetition = initial?.repetition ??
+        (widget.initialProject != null
+            ? ActivityRepetition.open
+            : ActivityRepetition.daily);
     _repeatDays.addAll(initial?.repeatDays ?? []);
 
     if (widget.isIndependentInitial) {
@@ -786,6 +789,19 @@ class _AddActivitySheetState extends ConsumerState<AddActivitySheet> {
   }
 
   Widget _buildRepetitionDetails(ThemeData theme) {
+    if (_repetition == ActivityRepetition.open) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 10),
+        child: Text(
+          'مهمة مفتوحة — تبقى ظاهرة يومياً حتى تُتمّها دون ارتباط بيوم',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.primary.withValues(alpha: 0.85),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
     if (_repetition == ActivityRepetition.once) {
       return Padding(
         padding: const EdgeInsets.only(top: 10),
@@ -1193,6 +1209,7 @@ class _RepetitionSegmentedBar extends StatelessWidget {
   final ValueChanged<ActivityRepetition> onChanged;
 
   static const _items = [
+    (value: ActivityRepetition.open, label: 'مفتوحة'),
     (value: ActivityRepetition.once, label: 'مرة'),
     (value: ActivityRepetition.daily, label: 'يومي'),
     (value: ActivityRepetition.weekly, label: 'أسبوعي'),
@@ -1207,7 +1224,9 @@ class _RepetitionSegmentedBar extends StatelessWidget {
         ? const Color(0xFF0A101D)
         : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7);
     final pillColor = isDark ? const Color(0xFF1D2C46) : Colors.white;
-    final idx = _items.indexWhere((e) => e.value == selected).clamp(0, 3);
+    final idx = _items
+        .indexWhere((e) => e.value == selected)
+        .clamp(0, _items.length - 1);
 
     return Container(
       height: 40,
