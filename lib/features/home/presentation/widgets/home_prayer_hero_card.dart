@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
 
-import '../../../../core/activity_schedule.dart';
 import '../../../../core/arabic_duration.dart';
 import '../../../../core/constants/prayer_phase.dart';
 import '../../../../domain/entities/activity_item.dart';
@@ -97,18 +96,6 @@ class HomePrayerHeroCard extends StatelessWidget {
     final intervalStr =
         formatPrayerInterval(activePrayer.time, nextOfActive.time);
 
-    // Daily tasks completion ring stats
-    final dueToday = activities.where((a) {
-      if (a.type == ActivityType.independent) {
-        return !a.isSingleCompletion || a.historyDates.isEmpty;
-      }
-      return activitiesForPhase(
-              activities, a.linkedPrayer ?? PrayerPhase.fajr, selectedDate)
-          .contains(a);
-    }).toList();
-    final totalDue = dueToday.length;
-    final doneDue = dueToday.where((a) => a.isDoneOn(todayStr)).length;
-
     return RepaintBoundary(
       child: Container(
         decoration: BoxDecoration(
@@ -183,12 +170,6 @@ class HomePrayerHeroCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (totalDue > 0)
-                  _DailyCompletionBadge(
-                    done: doneDue,
-                    total: totalDue,
-                    light: light,
-                  ),
               ],
             ),
             const SizedBox(height: 11),
@@ -291,66 +272,6 @@ class HomePrayerHeroCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _DailyCompletionBadge extends StatelessWidget {
-  const _DailyCompletionBadge({
-    required this.done,
-    required this.total,
-    required this.light,
-  });
-
-  final int done;
-  final int total;
-  final bool light;
-
-  @override
-  Widget build(BuildContext context) {
-    final ratio = total > 0 ? (done / total).clamp(0.0, 1.0) : 0.0;
-    final allDone = done >= total && total > 0;
-    final fg = allDone
-        ? const Color(0xFF34C759)
-        : (light ? Theme.of(context).colorScheme.primary : Colors.white);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: light
-            ? Colors.white.withValues(alpha: 0.78)
-            : Colors.black.withValues(alpha: 0.25),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 18,
-            height: 18,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0.0, end: ratio),
-              duration: const Duration(milliseconds: 420),
-              curve: Curves.easeOutCubic,
-              builder: (_, val, __) => CircularProgressIndicator(
-                value: val,
-                strokeWidth: 2.6,
-                backgroundColor: fg.withValues(alpha: 0.2),
-                valueColor: AlwaysStoppedAnimation<Color>(fg),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '$done/$total',
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
-              color: fg,
-            ),
-          ),
-        ],
       ),
     );
   }
