@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 
@@ -6,6 +9,7 @@ import '../../application/providers.dart';
 import '../../core/errors/error_reporter.dart';
 import '../../core/security/app_security.dart';
 import '../../domain/entities/app_settings.dart';
+import '../../features/settings/presentation/widgets/settings_ui_components.dart';
 
 part 'app_lock_wrapper_state.dart';
 part 'app_lock_wrapper_auth.dart';

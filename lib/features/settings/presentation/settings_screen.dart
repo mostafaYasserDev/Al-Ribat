@@ -28,6 +28,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _introController;
+  final _lockTileKey = GlobalKey();
   bool _hasPin = AppSecurity.hasPinSet();
 
   @override
@@ -197,26 +198,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                             onTap: () =>
                                 _pushPage(const SyncBackupSettingsPage()),
                           ),
-                          SettingsNavTile(
-                            icon: Icons.lock_rounded,
-                            iconColor: const Color(0xFF5856D6),
-                            title: 'قفل التطبيق برمز مرور',
-                            subtitle: 'حماية بياناتك برمز من 4 أرقام',
-                            trailingWidget: SettingsStatusPill(
-                              label: _hasPin ? 'مفعّل' : 'غير مفعّل',
-                              color: _hasPin
-                                  ? const Color(0xFF34C759)
-                                  : theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.45),
-                            ),
-                            onTap: () async {
-                              await showAppLockSheet(context);
-                              if (mounted) {
-                                setState(
-                                  () => _hasPin = AppSecurity.hasPinSet(),
+                          KeyedSubtree(
+                            key: _lockTileKey,
+                            child: SettingsNavTile(
+                              icon: Icons.lock_rounded,
+                              iconColor: const Color(0xFF5856D6),
+                              title: 'قفل التطبيق برمز مرور',
+                              subtitle: 'حماية بياناتك برمز من 4 أرقام',
+                              trailingWidget: SettingsStatusPill(
+                                label: _hasPin ? 'مفعّل' : 'غير مفعّل',
+                                color: _hasPin
+                                    ? const Color(0xFF34C759)
+                                    : theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.45),
+                              ),
+                              onTap: () async {
+                                await showAppLockSheet(
+                                  context,
+                                  anchorKey: _lockTileKey,
                                 );
-                              }
-                            },
+                                if (mounted) {
+                                  setState(
+                                    () => _hasPin = AppSecurity.hasPinSet(),
+                                  );
+                                }
+                              },
+                            ),
                           ),
                         ],
                       ),

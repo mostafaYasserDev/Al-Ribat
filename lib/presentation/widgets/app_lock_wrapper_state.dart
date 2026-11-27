@@ -1,9 +1,16 @@
 part of 'app_lock_wrapper.dart';
 
 abstract class _AppLockWrapperAuthBase extends ConsumerState<AppLockWrapper>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   bool _isLocked = false;
-  final TextEditingController _pinController = TextEditingController();
+  String _pinInput = '';
+  String? _errorText;
+  int _failedAttempts = 0;
+  int _cooldownSeconds = 0;
+  Timer? _cooldownTimer;
+
+  late final AnimationController _shakeController;
+  final FocusNode _keyboardFocusNode = FocusNode();
   final LocalAuthentication auth = LocalAuthentication();
   bool _canCheckBiometrics = false;
   DateTime? _lastPausedTime;
@@ -15,6 +22,10 @@ class _AppLockWrapperState extends _AppLockWrapperAuthBase
   @override
   void initState() {
     super.initState();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    );
     WidgetsBinding.instance.addObserver(this);
     _checkLock();
   }
@@ -22,7 +33,9 @@ class _AppLockWrapperState extends _AppLockWrapperAuthBase
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _pinController.dispose();
+    _cooldownTimer?.cancel();
+    _shakeController.dispose();
+    _keyboardFocusNode.dispose();
     super.dispose();
   }
 
@@ -42,7 +55,8 @@ class _AppLockWrapperState extends _AppLockWrapperAuthBase
         if (AppSecurity.hasPinSet() && !_isLocked) {
           setState(() {
             _isLocked = true;
-            _pinController.clear();
+            _pinInput = '';
+            _errorText = null;
           });
           if (_canCheckBiometrics && settings.biometricLockEnabled) {
             _authenticateBiometric();
@@ -53,6 +67,29 @@ class _AppLockWrapperState extends _AppLockWrapperAuthBase
   }
 
   @override
-  Widget build(BuildContext context) =>
-      _isLocked ? _buildLockedScreen(context) : widget.child;
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 340),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, anim) {
+        return FadeTransition(
+          opacity: anim,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.97, end: 1.0).animate(anim),
+            child: child,
+          ),
+        );
+      },
+      child: _isLocked
+          ? KeyedSubtree(
+              key: const ValueKey('locked_screen'),
+              child: _buildLockedScreen(context),
+            )
+          : KeyedSubtree(
+              key: const ValueKey('unlocked_app'),
+              child: widget.child,
+            ),
+    );
+  }
 }

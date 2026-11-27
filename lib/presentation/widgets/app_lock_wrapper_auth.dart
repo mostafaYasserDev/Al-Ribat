@@ -32,8 +32,12 @@ mixin _AppLockWrapperAuth on _AppLockWrapperAuthBase {
         persistAcrossBackgrounding: true,
       );
       if (authenticated && mounted) {
+        HapticFeedback.mediumImpact();
         setState(() {
           _isLocked = false;
+          _pinInput = '';
+          _errorText = null;
+          _failedAttempts = 0;
         });
       }
     } catch (e) {
@@ -44,19 +48,78 @@ mixin _AppLockWrapperAuth on _AppLockWrapperAuthBase {
     }
   }
 
+  void _appendDigit(String digit) {
+    if (_cooldownSeconds > 0 || _pinInput.length >= 4) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _errorText = null;
+      _pinInput += digit;
+    });
+    if (_pinInput.length == 4) {
+      Future.delayed(const Duration(milliseconds: 90), () {
+        if (mounted && _pinInput.length == 4) {
+          _verifyPin();
+        }
+      });
+    }
+  }
+
+  void _backspace() {
+    if (_cooldownSeconds > 0 || _pinInput.isEmpty) return;
+    HapticFeedback.selectionClick();
+    setState(() {
+      _pinInput = _pinInput.substring(0, _pinInput.length - 1);
+    });
+  }
+
   void _verifyPin() {
-    final entered = _pinController.text.trim();
-    if (AppSecurity.verifyPin(entered)) {
+    if (_cooldownSeconds > 0) return;
+    if (AppSecurity.verifyPin(_pinInput)) {
+      HapticFeedback.mediumImpact();
       setState(() {
         _isLocked = false;
+        _pinInput = '';
+        _errorText = null;
+        _failedAttempts = 0;
       });
-      _pinController.clear();
       _lastPausedTime = null;
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('الرمز غير صحيح')),
-      );
-      _pinController.clear();
+      HapticFeedback.heavyImpact();
+      _shakeController.forward(from: 0);
+      _failedAttempts++;
+      if (_failedAttempts >= 5) {
+        _startCooldown(30);
+      } else {
+        setState(() {
+          _pinInput = '';
+          _errorText = 'رمز المرور غير صحيح';
+        });
+      }
     }
+  }
+
+  void _startCooldown(int seconds) {
+    _cooldownTimer?.cancel();
+    setState(() {
+      _pinInput = '';
+      _cooldownSeconds = seconds;
+      _errorText = 'محاولات كثيرة، انتظر $_cooldownSeconds ثانية';
+    });
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _cooldownSeconds--;
+        if (_cooldownSeconds <= 0) {
+          timer.cancel();
+          _failedAttempts = 0;
+          _errorText = null;
+        } else {
+          _errorText = 'محاولات كثيرة، انتظر $_cooldownSeconds ثانية';
+        }
+      });
+    });
   }
 }

@@ -11,8 +11,22 @@ import '../../../../domain/entities/app_settings.dart';
 import 'settings_ui_components.dart';
 
 /// Shows a frosted Apple/Telegram-style dialog to set, change, or remove
-/// the 4-digit app lock PIN. Returns `true` if PIN state changed.
-Future<bool?> showAppLockSheet(BuildContext context) {
+/// the 4-digit app lock PIN. Expands from [anchorKey] and collapses back into it.
+Future<bool?> showAppLockSheet(
+  BuildContext context, {
+  GlobalKey? anchorKey,
+}) {
+  final screenSize = MediaQuery.sizeOf(context);
+  var scaleAlignment = Alignment.center;
+  final renderBox = anchorKey?.currentContext?.findRenderObject() as RenderBox?;
+  if (renderBox != null && renderBox.hasSize) {
+    final center = renderBox.localToGlobal(Offset.zero) +
+        renderBox.size.center(Offset.zero);
+    final ax = (center.dx / screenSize.width * 2 - 1).clamp(-1.0, 1.0);
+    final ay = (center.dy / screenSize.height * 2 - 1).clamp(-1.0, 1.0);
+    scaleAlignment = Alignment(ax, ay);
+  }
+
   return showGeneralDialog<bool>(
     context: context,
     barrierDismissible: true,
@@ -29,17 +43,13 @@ Future<bool?> showAppLockSheet(BuildContext context) {
         curve: Curves.easeOutCubic,
         reverseCurve: Curves.easeInCubic,
       );
-      final scaleAnim = Tween<double>(begin: 0.88, end: 1.0).animate(
+      final scaleAnim = Tween<double>(begin: 0.25, end: 1.0).animate(
         CurvedAnimation(
           parent: animation,
           curve: Curves.easeOutBack,
           reverseCurve: Curves.easeInCubic,
         ),
       );
-      final slideAnim = Tween<Offset>(
-        begin: const Offset(0, 0.06),
-        end: Offset.zero,
-      ).animate(curved);
 
       return Stack(
         children: [
@@ -60,12 +70,10 @@ Future<bool?> showAppLockSheet(BuildContext context) {
           ),
           FadeTransition(
             opacity: curved,
-            child: SlideTransition(
-              position: slideAnim,
-              child: ScaleTransition(
-                scale: scaleAnim,
-                child: child,
-              ),
+            child: ScaleTransition(
+              scale: scaleAnim,
+              alignment: scaleAlignment,
+              child: child,
             ),
           ),
         ],
@@ -81,7 +89,8 @@ class _AppLockDialog extends ConsumerStatefulWidget {
   ConsumerState<_AppLockDialog> createState() => _AppLockDialogState();
 }
 
-class _AppLockDialogState extends ConsumerState<_AppLockDialog> {
+class _AppLockDialogState extends ConsumerState<_AppLockDialog>
+    with SingleTickerProviderStateMixin {
   final _currentPinController = TextEditingController();
   final _newPinController = TextEditingController();
   final _confirmPinController = TextEditingController();
@@ -90,8 +99,10 @@ class _AppLockDialogState extends ConsumerState<_AppLockDialog> {
   final _newFocus = FocusNode();
   final _confirmFocus = FocusNode();
 
+  late final AnimationController _shakeController;
   bool _saving = false;
   bool _obscure = true;
+  String? _errorText;
 
   static const _timeoutOptions = [
     SegmentOption<int>(value: 0, label: 'فوري'),
@@ -101,7 +112,17 @@ class _AppLockDialogState extends ConsumerState<_AppLockDialog> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+    );
+  }
+
+  @override
   void dispose() {
+    _shakeController.dispose();
     _currentPinController.dispose();
     _newPinController.dispose();
     _confirmPinController.dispose();
@@ -111,11 +132,18 @@ class _AppLockDialogState extends ConsumerState<_AppLockDialog> {
     super.dispose();
   }
 
+  void _showInlineError(String message) {
+    HapticFeedback.heavyImpact();
+    setState(() => _errorText = message);
+    _shakeController.forward(from: 0);
+  }
+
   Future<void> _savePin(bool hasPin) async {
+    setState(() => _errorText = null);
     if (hasPin) {
       final curr = _currentPinController.text.trim();
       if (!AppSecurity.verifyPin(curr)) {
-        appSnack(context, 'الرمز الحالي غير صحيح.');
+        _showInlineError('الرمز الحالي غير صحيح.');
         return;
       }
     }
@@ -124,15 +152,15 @@ class _AppLockDialogState extends ConsumerState<_AppLockDialog> {
     final confirmPin = _confirmPinController.text.trim();
 
     if (newPin.isEmpty) {
-      appSnack(context, 'يرجى إدخال الرمز الجديد أو الضغط على إلغاء القفل.');
+      _showInlineError('يرجى إدخال الرمز الجديد أو الضغط على إلغاء القفل.');
       return;
     }
     if (newPin.length != 4 || int.tryParse(newPin) == null) {
-      appSnack(context, 'يجب أن يتكون الرمز من 4 أرقام.');
+      _showInlineError('يجب أن يتكون الرمز من 4 أرقام.');
       return;
     }
     if (newPin != confirmPin) {
-      appSnack(context, 'الرمزان غير متطابقين.');
+      _showInlineError('الرمزان غير متطابقين.');
       return;
     }
 
@@ -140,22 +168,23 @@ class _AppLockDialogState extends ConsumerState<_AppLockDialog> {
     await AppSecurity.setPin(newPin);
     HapticFeedback.mediumImpact();
     if (!mounted) return;
-    appSnack(context, 'تم حفظ رمز المرور بنجاح.');
     Navigator.pop(context, true);
+    appSnack(context, 'تم حفظ رمز المرور بنجاح.');
   }
 
   Future<void> _removePin() async {
+    setState(() => _errorText = null);
     final curr = _currentPinController.text.trim();
     if (!AppSecurity.verifyPin(curr)) {
-      appSnack(context, 'الرمز الحالي غير صحيح.');
+      _showInlineError('الرمز الحالي غير صحيح.');
       return;
     }
     setState(() => _saving = true);
     await AppSecurity.removePin();
     HapticFeedback.mediumImpact();
     if (!mounted) return;
-    appSnack(context, 'تم إلغاء قفل التطبيق بنجاح.');
     Navigator.pop(context, true);
+    appSnack(context, 'تم إلغاء قفل التطبيق بنجاح.');
   }
 
   @override
@@ -208,35 +237,88 @@ class _AppLockDialogState extends ConsumerState<_AppLockDialog> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildHeader(theme, isDark, hasPin),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutCubic,
+                        child: _errorText != null
+                            ? Container(
+                                margin: const EdgeInsets.only(top: 12),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 9,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFF3B30)
+                                      .withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.error_outline_rounded,
+                                      size: 18,
+                                      color: Color(0xFFFF3B30),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _errorText!,
+                                        style:
+                                            theme.textTheme.bodySmall?.copyWith(
+                                          color: const Color(0xFFFF3B30),
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
                       const SizedBox(height: 16),
-                      SettingsGroupCard(
-                        margin: EdgeInsets.zero,
-                        dividerIndent: 16,
-                        children: [
-                          if (hasPin)
+                      AnimatedBuilder(
+                        animation: _shakeController,
+                        builder: (context, child) {
+                          final t = _shakeController.value;
+                          final dx = t == 0
+                              ? 0.0
+                              : (1 - t) *
+                                  10 *
+                                  ((t * 16).floor().isEven ? 1 : -1);
+                          return Transform.translate(
+                            offset: Offset(dx, 0),
+                            child: child,
+                          );
+                        },
+                        child: SettingsGroupCard(
+                          margin: EdgeInsets.zero,
+                          dividerIndent: 16,
+                          children: [
+                            if (hasPin)
+                              _PasscodeRow(
+                                label: 'الرمز الحالي',
+                                controller: _currentPinController,
+                                focusNode: _currentFocus,
+                                nextFocus: _newFocus,
+                                obscure: _obscure,
+                              ),
                             _PasscodeRow(
-                              label: 'الرمز الحالي',
-                              controller: _currentPinController,
-                              focusNode: _currentFocus,
-                              nextFocus: _newFocus,
+                              label:
+                                  hasPin ? 'الرمز الجديد' : 'رمز المرور الجديد',
+                              controller: _newPinController,
+                              focusNode: _newFocus,
+                              nextFocus: _confirmFocus,
                               obscure: _obscure,
                             ),
-                          _PasscodeRow(
-                            label:
-                                hasPin ? 'الرمز الجديد' : 'رمز المرور الجديد',
-                            controller: _newPinController,
-                            focusNode: _newFocus,
-                            nextFocus: _confirmFocus,
-                            obscure: _obscure,
-                          ),
-                          _PasscodeRow(
-                            label: 'تأكيد الرمز',
-                            controller: _confirmPinController,
-                            focusNode: _confirmFocus,
-                            obscure: _obscure,
-                            onCompleted: () => _savePin(hasPin),
-                          ),
-                        ],
+                            _PasscodeRow(
+                              label: 'تأكيد الرمز',
+                              controller: _confirmPinController,
+                              focusNode: _confirmFocus,
+                              obscure: _obscure,
+                              onCompleted: () => _savePin(hasPin),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 14),
                       SettingsGroupCard(
