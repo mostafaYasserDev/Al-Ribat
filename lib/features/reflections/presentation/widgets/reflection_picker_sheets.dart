@@ -1,35 +1,126 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_moods.dart';
+import '../../../settings/presentation/widgets/settings_action_sheet.dart';
+import '../../../settings/presentation/widgets/settings_ui_components.dart';
 
-/// Telegram x Apple-style multi-select mood picker bottom sheet.
+/// Compact Telegram x Apple-style multi-select mood popover anchored to [anchorKey].
 Future<List<String>?> showMoodPickerSheet(
   BuildContext context, {
   required List<String> initialMoods,
+  GlobalKey? anchorKey,
 }) {
-  return showModalBottomSheet<List<String>>(
+  final screenSize = MediaQuery.sizeOf(context);
+  final padding = MediaQuery.paddingOf(context);
+  final renderBox = anchorKey?.currentContext?.findRenderObject() as RenderBox?;
+
+  Rect anchorRect;
+  if (renderBox != null && renderBox.hasSize) {
+    final topLeft = renderBox.localToGlobal(Offset.zero);
+    anchorRect = topLeft & renderBox.size;
+  } else {
+    anchorRect = Rect.fromCenter(
+      center: Offset(screenSize.width / 2, screenSize.height - 72),
+      width: 48,
+      height: 48,
+    );
+  }
+
+  const horizontalMargin = 14.0;
+  final menuWidth =
+      (screenSize.width - horizontalMargin * 2).clamp(280.0, 350.0);
+  final spaceAbove = anchorRect.top - padding.top;
+  final spaceBelow = screenSize.height - padding.bottom - anchorRect.bottom;
+  final showAbove = spaceAbove >= 240 || spaceAbove >= spaceBelow;
+
+  final left = (anchorRect.center.dx - menuWidth / 2).clamp(
+    horizontalMargin,
+    screenSize.width - menuWidth - horizontalMargin,
+  );
+  final double? bottom =
+      showAbove ? (screenSize.height - anchorRect.top + 8) : null;
+  final double? top = showAbove ? null : (anchorRect.bottom + 8);
+  final relX =
+      ((anchorRect.center.dx - left) / menuWidth * 2 - 1).clamp(-1.0, 1.0);
+  final scaleAlignment = Alignment(relX, showAbove ? 1.0 : -1.0);
+
+  return showGeneralDialog<List<String>>(
     context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (_) => Directionality(
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.transparent,
+    transitionDuration: const Duration(milliseconds: 250),
+    pageBuilder: (ctx, _, __) => Directionality(
       textDirection: TextDirection.rtl,
-      child: _MoodPickerSheet(initialMoods: initialMoods),
+      child: Stack(
+        children: [
+          Positioned(
+            left: left,
+            top: top,
+            bottom: bottom,
+            width: menuWidth,
+            child: _MoodPickerCard(initialMoods: initialMoods),
+          ),
+        ],
+      ),
     ),
+    transitionBuilder: (ctx, anim, _, child) {
+      final curved = CurvedAnimation(
+        parent: anim,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      final scaleAnim = Tween<double>(begin: 0.36, end: 1.0).animate(
+        CurvedAnimation(
+          parent: anim,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInCubic,
+        ),
+      );
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => Navigator.of(ctx).pop(),
+              child: FadeTransition(
+                opacity: curved,
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                  child: Container(
+                    color: Colors.black.withValues(alpha: 0.22),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          FadeTransition(
+            opacity: curved,
+            child: ScaleTransition(
+              scale: scaleAnim,
+              alignment: scaleAlignment,
+              child: child,
+            ),
+          ),
+        ],
+      );
+    },
   );
 }
 
-class _MoodPickerSheet extends StatefulWidget {
-  const _MoodPickerSheet({required this.initialMoods});
+class _MoodPickerCard extends StatefulWidget {
+  const _MoodPickerCard({required this.initialMoods});
 
   final List<String> initialMoods;
 
   @override
-  State<_MoodPickerSheet> createState() => _MoodPickerSheetState();
+  State<_MoodPickerCard> createState() => _MoodPickerCardState();
 }
 
-class _MoodPickerSheetState extends State<_MoodPickerSheet> {
+class _MoodPickerCardState extends State<_MoodPickerCard> {
   late final Set<String> _selected = Set<String>.from(widget.initialMoods);
 
   void _toggle(String label) {
@@ -47,32 +138,37 @@ class _MoodPickerSheetState extends State<_MoodPickerSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final sheetBg = theme.cardTheme.color ??
-        (isDark ? const Color(0xFF111B2E) : Colors.white);
+    final cardBg = isDark
+        ? const Color(0xFF162238).withValues(alpha: 0.96)
+        : Colors.white.withValues(alpha: 0.97);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: Material(
-        color: sheetBg,
-        borderRadius: BorderRadius.circular(24),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: theme.colorScheme.onSurface
+                .withValues(alpha: isDark ? 0.12 : 0.08),
+            width: 0.7,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.16),
+              blurRadius: 28,
+              spreadRadius: -4,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
         clipBehavior: Clip.antiAlias,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 10),
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+              padding: const EdgeInsets.fromLTRB(14, 12, 12, 10),
               child: Row(
                 children: [
                   Expanded(
@@ -81,17 +177,19 @@ class _MoodPickerSheetState extends State<_MoodPickerSheet> {
                       children: [
                         Text(
                           'اختر مشاعرك',
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w800,
+                            fontSize: 14.5,
                           ),
                         ),
                         Text(
                           _selected.isEmpty
-                              ? 'يمكنك اختيار أكثر من شعور'
+                              ? 'اختر شعوراً أو أكثر'
                               : 'تم اختيار ${_selected.length} من ${AppMoods.options.length}',
                           style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 11.5,
                             color: theme.colorScheme.onSurface
-                                .withValues(alpha: 0.58),
+                                .withValues(alpha: 0.56),
                           ),
                         ),
                       ],
@@ -103,24 +201,43 @@ class _MoodPickerSheetState extends State<_MoodPickerSheet> {
                         HapticFeedback.selectionClick();
                         setState(() => _selected.clear());
                       },
-                      child: const Text('مسح'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      child: const Text('مسح', style: TextStyle(fontSize: 12)),
                     ),
                   const SizedBox(width: 4),
-                  FilledButton(
-                    onPressed: () {
+                  PressableScale(
+                    onTap: () {
                       HapticFeedback.lightImpact();
                       Navigator.pop(context, _selected.toList());
                     },
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                    child: Material(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(12),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          Navigator.pop(context, _selected.toList());
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 7,
+                          ),
+                          child: Text(
+                            'تم',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    child: const Text('تم'),
                   ),
                 ],
               ),
@@ -130,30 +247,27 @@ class _MoodPickerSheetState extends State<_MoodPickerSheet> {
               thickness: 0.6,
               color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
             ),
-            Flexible(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.all(14),
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1.18,
-                  ),
-                  itemCount: AppMoods.options.length,
-                  itemBuilder: (context, index) {
-                    final opt = AppMoods.options[index];
-                    final isSelected = _selected.contains(opt.label);
-                    return _MoodGridTile(
-                      option: opt,
-                      isSelected: isSelected,
-                      onTap: () => _toggle(opt.label),
-                    );
-                  },
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 7,
+                  crossAxisSpacing: 7,
+                  childAspectRatio: 2.25,
                 ),
+                itemCount: AppMoods.options.length,
+                itemBuilder: (context, index) {
+                  final opt = AppMoods.options[index];
+                  final isSelected = _selected.contains(opt.label);
+                  return _CompactMoodTile(
+                    option: opt,
+                    isSelected: isSelected,
+                    onTap: () => _toggle(opt.label),
+                  );
+                },
               ),
             ),
           ],
@@ -163,8 +277,8 @@ class _MoodPickerSheetState extends State<_MoodPickerSheet> {
   }
 }
 
-class _MoodGridTile extends StatefulWidget {
-  const _MoodGridTile({
+class _CompactMoodTile extends StatelessWidget {
+  const _CompactMoodTile({
     required this.option,
     required this.isSelected,
     required this.onTap,
@@ -175,82 +289,48 @@ class _MoodGridTile extends StatefulWidget {
   final VoidCallback onTap;
 
   @override
-  State<_MoodGridTile> createState() => _MoodGridTileState();
-}
-
-class _MoodGridTileState extends State<_MoodGridTile> {
-  bool _pressed = false;
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final opt = widget.option;
-    final selected = widget.isSelected;
 
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _pressed ? 0.94 : 1.0,
-        duration: const Duration(milliseconds: 90),
-        curve: Curves.easeOutCubic,
+    return PressableScale(
+      onTap: onTap,
+      child: GestureDetector(
+        onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
+          duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: selected
-                ? opt.color.withValues(alpha: isDark ? 0.22 : 0.13)
+            color: isSelected
+                ? option.color.withValues(alpha: isDark ? 0.24 : 0.14)
                 : theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: isDark ? 0.35 : 0.45),
-            borderRadius: BorderRadius.circular(16),
+                    .withValues(alpha: isDark ? 0.28 : 0.45),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: selected
-                  ? opt.color
-                  : theme.colorScheme.onSurface.withValues(alpha: 0.06),
-              width: selected ? 1.5 : 0.7,
+              color: isSelected
+                  ? option.color.withValues(alpha: 0.7)
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+              width: isSelected ? 1.2 : 0.6,
             ),
           ),
-          child: Stack(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: opt.color.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(opt.icon, color: opt.color, size: 20),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      opt.label,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight:
-                            selected ? FontWeight.w700 : FontWeight.w600,
-                        fontSize: 12.5,
-                        color: selected ? opt.color : null,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (selected)
-                PositionedDirectional(
-                  top: 6,
-                  end: 6,
-                  child: Icon(
-                    Icons.check_circle_rounded,
-                    size: 16,
-                    color: opt.color,
+              Icon(option.icon, color: option.color, size: 15),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  option.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                    fontSize: 11.5,
+                    color: isSelected ? option.color : null,
                   ),
                 ),
+              ),
             ],
           ),
         ),
@@ -259,145 +339,41 @@ class _MoodGridTileState extends State<_MoodGridTile> {
   }
 }
 
-/// Telegram x Apple-style project picker bottom sheet.
+/// Telegram x Apple-style anchored project picker popover.
 /// Returns `null` if dismissed, or `({String? projectTag})` on selection/clear.
 Future<({String? projectTag})?> showProjectPickerSheet(
   BuildContext context, {
   required List<String> projectNames,
   String? currentProjectTag,
-}) {
-  return showModalBottomSheet<({String? projectTag})>(
+  GlobalKey? anchorKey,
+}) async {
+  final options = <AnchoredMenuOption<({String? projectTag})>>[
+    for (final proj in projectNames)
+      AnchoredMenuOption(
+        value: (projectTag: 'مشروع: $proj'),
+        title: proj,
+        subtitle: currentProjectTag == 'مشروع: $proj' ? 'مرتبط حالياً' : null,
+        icon: currentProjectTag == 'مشروع: $proj'
+            ? Icons.check_circle_rounded
+            : Icons.folder_rounded,
+        color: currentProjectTag == 'مشروع: $proj'
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.secondary,
+      ),
+    if (currentProjectTag != null)
+      const AnchoredMenuOption(
+        value: (projectTag: null),
+        title: 'إلغاء الربط بالمشروع',
+        icon: Icons.link_off_rounded,
+        isDestructive: true,
+      ),
+  ];
+
+  final key = anchorKey ?? GlobalKey();
+  return showAnchoredSettingsMenu<({String? projectTag})>(
     context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      final theme = Theme.of(ctx);
-      final isDark = theme.brightness == Brightness.dark;
-      final sheetBg = theme.cardTheme.color ??
-          (isDark ? const Color(0xFF111B2E) : Colors.white);
-
-      return Directionality(
-        textDirection: TextDirection.rtl,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: Material(
-            color: sheetBg,
-            borderRadius: BorderRadius.circular(24),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 10),
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
-                  child: Text(
-                    'ربط الخاطرة بمشروع',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                Divider(
-                  height: 0.6,
-                  thickness: 0.6,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
-                ),
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    itemCount: projectNames.length +
-                        (currentProjectTag != null ? 1 : 0),
-                    separatorBuilder: (_, __) => Divider(
-                      height: 0.6,
-                      thickness: 0.6,
-                      indent: 56,
-                      color:
-                          theme.colorScheme.onSurface.withValues(alpha: 0.07),
-                    ),
-                    itemBuilder: (_, index) {
-                      if (currentProjectTag != null &&
-                          index == projectNames.length) {
-                        return ListTile(
-                          leading: Icon(
-                            Icons.link_off_rounded,
-                            color: theme.colorScheme.error,
-                          ),
-                          title: Text(
-                            'إلغاء الربط بالمشروع',
-                            style: TextStyle(
-                              color: theme.colorScheme.error,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            Navigator.pop(ctx, (projectTag: null));
-                          },
-                        );
-                      }
-
-                      final proj = projectNames[index];
-                      final tag = 'مشروع: $proj';
-                      final isSelected = currentProjectTag == tag;
-
-                      return ListTile(
-                        leading: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.secondary
-                                .withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(9),
-                          ),
-                          child: Icon(
-                            Icons.folder_rounded,
-                            size: 18,
-                            color: theme.colorScheme.secondary,
-                          ),
-                        ),
-                        title: Text(
-                          proj,
-                          style: TextStyle(
-                            fontWeight:
-                                isSelected ? FontWeight.w700 : FontWeight.w500,
-                            color:
-                                isSelected ? theme.colorScheme.primary : null,
-                          ),
-                        ),
-                        trailing: isSelected
-                            ? Icon(
-                                Icons.check_circle_rounded,
-                                color: theme.colorScheme.primary,
-                              )
-                            : null,
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          Navigator.pop(ctx, (projectTag: tag));
-                        },
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 6),
-              ],
-            ),
-          ),
-        ),
-      );
-    },
+    anchorKey: key,
+    title: 'ربط الخاطرة بمشروع',
+    options: options,
   );
 }

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,8 @@ import 'package:al_ribat/application/providers.dart';
 import 'package:al_ribat/core/theme/app_moods.dart';
 import 'package:al_ribat/core/ui_feedback.dart';
 import 'package:al_ribat/features/prayer/domain/prayer_phase.dart';
+import '../../settings/presentation/widgets/settings_action_sheet.dart';
+import '../../settings/presentation/widgets/settings_ui_components.dart';
 import '../domain/reflection_entry.dart';
 import 'widgets/apple_morph_route.dart';
 import 'widgets/reflection_dialogs.dart';
@@ -49,6 +53,9 @@ class _ReflectionEditorScreenState
     extends ConsumerState<ReflectionEditorScreen> {
   late final TextEditingController _titleController;
   late final TextEditingController _bodyController;
+  final _moreBtnKey = GlobalKey();
+  final _moodBtnKey = GlobalKey();
+  final _projectBtnKey = GlobalKey();
   late bool _isPinned;
   late List<String> _selectedMoods;
   String? _linkedContextTitle;
@@ -174,6 +181,7 @@ class _ReflectionEditorScreenState
     final picked = await showMoodPickerSheet(
       context,
       initialMoods: _selectedMoods,
+      anchorKey: _moodBtnKey,
     );
     if (picked != null && mounted) {
       setState(() => _selectedMoods = picked);
@@ -186,9 +194,42 @@ class _ReflectionEditorScreenState
       context,
       projectNames: projectNames,
       currentProjectTag: _linkedContextTitle,
+      anchorKey: _projectBtnKey,
     );
     if (res != null && mounted) {
       setState(() => _linkedContextTitle = res.projectTag);
+    }
+  }
+
+  Future<void> _showMoreMenu(ReflectionEntry existing) async {
+    HapticFeedback.lightImpact();
+    final action = await showAnchoredSettingsMenu<String>(
+      context: context,
+      anchorKey: _moreBtnKey,
+      title: 'خيارات الخاطرة',
+      options: [
+        if (existing.editHistory.isNotEmpty)
+          const AnchoredMenuOption(
+            value: 'history',
+            title: 'سجل التعديلات',
+            subtitle: 'عرض النسخ السابقة للخاطرة',
+            icon: Icons.history_rounded,
+            color: Color(0xFF007AFF),
+          ),
+        const AnchoredMenuOption(
+          value: 'delete',
+          title: 'حذف الخاطرة',
+          subtitle: 'إزالة الخاطرة نهائياً',
+          icon: Icons.delete_outline_rounded,
+          isDestructive: true,
+        ),
+      ],
+    );
+    if (action == null || !mounted) return;
+    if (action == 'history') {
+      ReflectionDialogs.showEditHistory(context, existing);
+    } else if (action == 'delete') {
+      await _deleteAndExit();
     }
   }
 
@@ -253,114 +294,121 @@ class _ReflectionEditorScreenState
             ),
             actions: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  decoration: BoxDecoration(
-                    color: _isPinned
-                        ? colorScheme.primary.withValues(alpha: 0.14)
-                        : Colors.transparent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      _isPinned
-                          ? Icons.push_pin_rounded
-                          : Icons.push_pin_outlined,
-                      size: 20,
+                padding: const EdgeInsetsDirectional.only(end: 4),
+                child: PressableScale(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _isPinned = !_isPinned);
+                  },
+                  child: Tooltip(
+                    message: _isPinned ? 'إلغاء التثبيت' : 'تثبيت في الأعلى',
+                    child: Material(
                       color: _isPinned
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
+                          ? colorScheme.primary.withValues(alpha: 0.14)
+                          : colorScheme.onSurface.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(11),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() => _isPinned = !_isPinned);
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Icon(
+                            _isPinned
+                                ? Icons.push_pin_rounded
+                                : Icons.push_pin_outlined,
+                            size: 18,
+                            color: _isPinned
+                                ? colorScheme.primary
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
                     ),
-                    tooltip: _isPinned ? 'إلغاء التثبيت' : 'تثبيت في الأعلى',
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _isPinned = !_isPinned);
-                    },
                   ),
                 ),
               ),
               if (existing != null)
-                PopupMenuButton<String>(
-                  icon: Icon(
-                    Icons.more_vert_rounded,
-                    size: 20,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  onSelected: (val) {
-                    if (val == 'history') {
-                      ReflectionDialogs.showEditHistory(context, existing);
-                    } else if (val == 'delete') {
-                      _deleteAndExit();
-                    }
-                  },
-                  itemBuilder: (ctx) => [
-                    if (existing.editHistory.isNotEmpty)
-                      const PopupMenuItem(
-                        value: 'history',
-                        child: Row(
-                          children: [
-                            Icon(Icons.history_rounded, size: 18),
-                            SizedBox(width: 8),
-                            Text('سجل التعديلات'),
-                          ],
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 4),
+                  child: KeyedSubtree(
+                    key: _moreBtnKey,
+                    child: PressableScale(
+                      onTap: () => _showMoreMenu(existing),
+                      child: Material(
+                        color: colorScheme.onSurface.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(11),
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => _showMoreMenu(existing),
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Icon(
+                              Icons.more_horiz_rounded,
+                              size: 18,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
                         ),
                       ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.delete_outline_rounded,
-                            size: 18,
-                            color: colorScheme.error,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'حذف الخاطرة',
-                            style: TextStyle(color: colorScheme.error),
-                          ),
-                        ],
-                      ),
                     ),
-                  ],
+                  ),
                 ),
               Padding(
-                padding: const EdgeInsets.only(left: 10, right: 2),
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
-                  child: FilledButton.tonalIcon(
-                    key: ValueKey(_hasChanges),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _hasChanges
-                          ? colorScheme.primary
-                          : colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.55),
-                      foregroundColor: _hasChanges
-                          ? colorScheme.onPrimary
-                          : colorScheme.onSurfaceVariant,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      minimumSize: const Size(0, 34),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
+                padding: const EdgeInsetsDirectional.only(end: 12, start: 2),
+                child: PressableScale(
+                  enabled: !_isSaving,
+                  onTap: _saveAndExit,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    decoration: BoxDecoration(
+                      color: _hasChanges
+                          ? colorScheme.primary.withValues(alpha: 0.15)
+                          : colorScheme.onSurface.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    onPressed: _isSaving ? null : _saveAndExit,
-                    icon: _isSaving
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.check_rounded, size: 16),
-                    label: const Text(
-                      'تم',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.bold,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: _isSaving ? null : _saveAndExit,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_isSaving)
+                              const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            else
+                              Icon(
+                                Icons.check_rounded,
+                                size: 16,
+                                color: _hasChanges
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                              ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'تم',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                color: _hasChanges
+                                    ? colorScheme.primary
+                                    : colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -456,6 +504,8 @@ class _ReflectionEditorScreenState
                 ),
               ),
               _TelegramBottomComposeBar(
+                moodBtnKey: _moodBtnKey,
+                projectBtnKey: _projectBtnKey,
                 moodCount: _selectedMoods.length,
                 hasProject: _linkedContextTitle != null,
                 showProjectAction: projectNames.isNotEmpty,
@@ -473,6 +523,8 @@ class _ReflectionEditorScreenState
 
 class _TelegramBottomComposeBar extends StatelessWidget {
   const _TelegramBottomComposeBar({
+    required this.moodBtnKey,
+    required this.projectBtnKey,
     required this.moodCount,
     required this.hasProject,
     required this.showProjectAction,
@@ -481,6 +533,8 @@ class _TelegramBottomComposeBar extends StatelessWidget {
     required this.onPickProject,
   });
 
+  final GlobalKey moodBtnKey;
+  final GlobalKey projectBtnKey;
   final int moodCount;
   final bool hasProject;
   final bool showProjectAction;
@@ -492,52 +546,84 @@ class _TelegramBottomComposeBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final barBg = theme.cardTheme.color ??
-        (isDark ? const Color(0xFF111B2E) : Colors.white);
+    final barBg = (theme.cardTheme.color ??
+            (isDark ? const Color(0xFF111B2E) : Colors.white))
+        .withValues(alpha: 0.88);
 
-    return SafeArea(
-      top: false,
-      child: Container(
-        decoration: BoxDecoration(
-          color: barBg,
-          border: Border(
-            top: BorderSide(
-              color: theme.colorScheme.onSurface
-                  .withValues(alpha: isDark ? 0.09 : 0.07),
-              width: 0.6,
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: barBg,
+            border: Border(
+              top: BorderSide(
+                color: theme.colorScheme.onSurface
+                    .withValues(alpha: isDark ? 0.09 : 0.07),
+                width: 0.6,
+              ),
             ),
           ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Row(
-          children: [
-            _BottomActionButton(
-              icon: Icons.mood_rounded,
-              label: moodCount > 0 ? 'المشاعر ($moodCount)' : 'إضافة شعور',
-              isActive: moodCount > 0,
-              onTap: onPickMoods,
-            ),
-            if (showProjectAction) ...[
-              const SizedBox(width: 8),
-              _BottomActionButton(
-                icon: Icons.folder_outlined,
-                label: hasProject ? 'المشروع ✓' : 'ربط بمشروع',
-                isActive: hasProject,
-                onTap: onPickProject,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Row(
+                children: [
+                  KeyedSubtree(
+                    key: moodBtnKey,
+                    child: _BottomActionButton(
+                      icon: Icons.mood_rounded,
+                      label:
+                          moodCount > 0 ? 'المشاعر ($moodCount)' : 'إضافة شعور',
+                      color: theme.colorScheme.primary,
+                      isActive: moodCount > 0,
+                      onTap: onPickMoods,
+                    ),
+                  ),
+                  if (showProjectAction) ...[
+                    const SizedBox(width: 8),
+                    KeyedSubtree(
+                      key: projectBtnKey,
+                      child: _BottomActionButton(
+                        icon: Icons.folder_rounded,
+                        label: hasProject ? 'المشروع ✓' : 'ربط بمشروع',
+                        color: const Color(0xFF007AFF),
+                        isActive: hasProject,
+                        onTap: onPickProject,
+                      ),
+                    ),
+                  ],
+                  const Spacer(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: hasChanges
+                              ? const Color(0xFFFF9500)
+                              : const Color(0xFF34C759),
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        hasChanges ? 'تعديل…' : 'محفوظ',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.56),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-            const Spacer(),
-            Text(
-              hasChanges ? 'غير محفوظ' : 'محفوظ تلقائياً',
-              style: theme.textTheme.labelSmall?.copyWith(
-                fontSize: 11,
-                color: hasChanges
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -548,50 +634,56 @@ class _BottomActionButton extends StatelessWidget {
   const _BottomActionButton({
     required this.icon,
     required this.label,
+    required this.color,
     required this.isActive,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
+  final Color color;
   final bool isActive;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: isActive
-          ? colorScheme.primary.withValues(alpha: 0.12)
-          : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isActive
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
-                  color: isActive
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final bg = isActive
+        ? color.withValues(alpha: isDark ? 0.22 : 0.12)
+        : theme.colorScheme.onSurface.withValues(alpha: isDark ? 0.08 : 0.05);
+    final fg =
+        isActive ? color : theme.colorScheme.onSurface.withValues(alpha: 0.72);
+
+    return PressableScale(
+      onTap: onTap,
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            onTap();
+          },
+          splashColor: color.withValues(alpha: 0.12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: fg),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                    color: fg,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
