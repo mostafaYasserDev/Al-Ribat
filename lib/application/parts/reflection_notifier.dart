@@ -13,7 +13,7 @@ class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
     return ref.watch(reflectionRepositoryProvider).loadAll();
   }
 
-  Future<void> add(
+  Future<ReflectionEntry> add(
     String text, {
     String? title,
     bool isPinned = false,
@@ -40,9 +40,10 @@ class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
     );
     await _repo.add(entry);
     state = AsyncData(await _repo.loadAll());
+    return entry;
   }
 
-  Future<void> updateReflection(
+  Future<ReflectionEntry> updateReflection(
     ReflectionEntry oldEntry,
     String newText, {
     String? title,
@@ -90,6 +91,7 @@ class ReflectionNotifier extends AsyncNotifier<List<ReflectionEntry>> {
 
     await _repo.update(updatedEntry);
     state = AsyncData(await _repo.loadAll());
+    return updatedEntry;
   }
 
   Future<void> togglePin(ReflectionEntry entry) async {

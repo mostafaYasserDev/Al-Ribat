@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -6,9 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import 'package:al_ribat/application/providers.dart';
+import 'package:al_ribat/core/theme/app_icons.dart';
 import 'package:al_ribat/core/theme/app_moods.dart';
 import 'package:al_ribat/core/ui_feedback.dart';
 import 'package:al_ribat/features/prayer/domain/prayer_phase.dart';
+import '../../projects/data/project_metadata_service.dart';
 import '../../settings/presentation/widgets/settings_action_sheet.dart';
 import '../../settings/presentation/widgets/settings_ui_components.dart';
 import '../domain/reflection_entry.dart';
@@ -56,6 +59,8 @@ class _ReflectionEditorScreenState
   final _moreBtnKey = GlobalKey();
   final _moodBtnKey = GlobalKey();
   final _projectBtnKey = GlobalKey();
+  ReflectionEntry? _savedEntry;
+  Timer? _autoSaveTimer;
   late bool _isPinned;
   late List<String> _selectedMoods;
   String? _linkedContextTitle;
@@ -66,6 +71,7 @@ class _ReflectionEditorScreenState
   void initState() {
     super.initState();
     final e = widget.entry;
+    _savedEntry = e;
     _titleController = TextEditingController(text: e?.title ?? '');
     _bodyController = TextEditingController(text: e?.text ?? '');
     _isPinned = e?.isPinned ?? false;
@@ -79,11 +85,24 @@ class _ReflectionEditorScreenState
   }
 
   void _onTextChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    _scheduleAutoSave();
+  }
+
+  void _scheduleAutoSave() {
+    _autoSaveTimer?.cancel();
+    if (!_hasChanges || !_hasContent) return;
+    _autoSaveTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted && !_didExit) {
+        _persistNow();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _autoSaveTimer?.cancel();
     _titleController.removeListener(_onTextChanged);
     _bodyController.removeListener(_onTextChanged);
     _titleController.dispose();
@@ -98,13 +117,13 @@ class _ReflectionEditorScreenState
   }
 
   bool get _moodsChanged {
-    final original = widget.entry?.moods ?? const <String>[];
+    final original = _savedEntry?.moods ?? const <String>[];
     if (original.length != _selectedMoods.length) return true;
     return !original.every(_selectedMoods.contains);
   }
 
   bool get _hasChanges {
-    final e = widget.entry;
+    final e = _savedEntry;
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
     if (e == null) return _hasContent;
@@ -115,26 +134,21 @@ class _ReflectionEditorScreenState
         e.linkedContextTitle != _linkedContextTitle;
   }
 
-  Future<void> _saveAndExit() async {
-    if (_didExit || _isSaving) return;
-    _didExit = true;
-
-    if (!_hasChanges || !_hasContent) {
-      if (mounted) Navigator.of(context).pop();
-      return;
-    }
+  Future<void> _persistNow() async {
+    _autoSaveTimer?.cancel();
+    if (_isSaving || !_hasChanges || !_hasContent) return;
 
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
 
-    setState(() => _isSaving = true);
+    if (mounted) setState(() => _isSaving = true);
     try {
       final notifier = ref.read(reflectionsProvider.notifier);
-      final existing = widget.entry;
+      final existing = _savedEntry;
       if (existing == null) {
         final prayerName =
             ref.read(dayStateProvider).currentPrayerPhase.arabicName;
-        await notifier.add(
+        final created = await notifier.add(
           body,
           title: title,
           isPinned: _isPinned,
@@ -142,8 +156,9 @@ class _ReflectionEditorScreenState
           prayerPhaseName: prayerName,
           linkedContextTitle: _linkedContextTitle,
         );
+        _savedEntry = created;
       } else {
-        await notifier.updateReflection(
+        final updated = await notifier.updateReflection(
           existing,
           body,
           title: title,
@@ -153,12 +168,24 @@ class _ReflectionEditorScreenState
           linkedContextTitle: _linkedContextTitle,
           clearLinkedContext: _linkedContextTitle == null,
         );
+        _savedEntry = updated;
       }
-      lightSuccessHaptic();
     } finally {
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<void> _saveAndExit() async {
+    if (_didExit) return;
+    _didExit = true;
+    _autoSaveTimer?.cancel();
+
+    if (_hasChanges && _hasContent) {
+      await _persistNow();
+      lightSuccessHaptic();
+    }
+    if (mounted) {
+      Navigator.of(context).pop();
     }
   }
 
@@ -185,6 +212,7 @@ class _ReflectionEditorScreenState
     );
     if (picked != null && mounted) {
       setState(() => _selectedMoods = picked);
+      _persistNow();
     }
   }
 
@@ -198,6 +226,7 @@ class _ReflectionEditorScreenState
     );
     if (res != null && mounted) {
       setState(() => _linkedContextTitle = res.projectTag);
+      _persistNow();
     }
   }
 
@@ -299,6 +328,7 @@ class _ReflectionEditorScreenState
                   onTap: () {
                     HapticFeedback.selectionClick();
                     setState(() => _isPinned = !_isPinned);
+                    _persistNow();
                   },
                   child: Tooltip(
                     message: _isPinned ? 'إلغاء التثبيت' : 'تثبيت في الأعلى',
@@ -454,15 +484,39 @@ class _ReflectionEditorScreenState
                           runSpacing: 6,
                           children: [
                             if (_linkedContextTitle != null)
-                              _EditorBadge(
-                                icon: _linkedContextTitle!.startsWith('تركيز:')
-                                    ? Icons.timer_outlined
-                                    : Icons.folder_outlined,
-                                label: _linkedContextTitle!,
-                                color: colorScheme.secondary,
-                                onRemove: () =>
-                                    setState(() => _linkedContextTitle = null),
-                              ),
+                              () {
+                                final ctxTitle = _linkedContextTitle!;
+                                IconData badgeIcon =
+                                    ctxTitle.startsWith('تركيز:')
+                                        ? Icons.timer_outlined
+                                        : Icons.folder_outlined;
+                                Color badgeColor = colorScheme.secondary;
+                                if (ctxTitle.startsWith('مشروع: ')) {
+                                  final pName =
+                                      ctxTitle.substring('مشروع: '.length);
+                                  final info =
+                                      ProjectGroupsService.getProjectInfo(
+                                          pName);
+                                  if (info?.iconName != null) {
+                                    badgeIcon =
+                                        AppIcons.getIconData(info!.iconName);
+                                  }
+                                  if (info?.colorHex != null) {
+                                    badgeColor =
+                                        AppIcons.parseColor(info!.colorHex) ??
+                                            colorScheme.secondary;
+                                  }
+                                }
+                                return _EditorBadge(
+                                  icon: badgeIcon,
+                                  label: ctxTitle,
+                                  color: badgeColor,
+                                  onRemove: () {
+                                    setState(() => _linkedContextTitle = null);
+                                    _persistNow();
+                                  },
+                                );
+                              }(),
                             for (final mood in _selectedMoods)
                               MoodDisplayChip(
                                 mood: mood,
@@ -510,6 +564,7 @@ class _ReflectionEditorScreenState
                 hasProject: _linkedContextTitle != null,
                 showProjectAction: projectNames.isNotEmpty,
                 hasChanges: _hasChanges,
+                isSaving: _isSaving,
                 onPickMoods: _openMoodPicker,
                 onPickProject: () => _openProjectPicker(projectNames),
               ),
@@ -529,6 +584,7 @@ class _TelegramBottomComposeBar extends StatelessWidget {
     required this.hasProject,
     required this.showProjectAction,
     required this.hasChanges,
+    required this.isSaving,
     required this.onPickMoods,
     required this.onPickProject,
   });
@@ -539,6 +595,7 @@ class _TelegramBottomComposeBar extends StatelessWidget {
   final bool hasProject;
   final bool showProjectAction;
   final bool hasChanges;
+  final bool isSaving;
   final VoidCallback onPickMoods;
   final VoidCallback onPickProject;
 
@@ -603,14 +660,20 @@ class _TelegramBottomComposeBar extends StatelessWidget {
                         height: 6,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: hasChanges
-                              ? const Color(0xFFFF9500)
-                              : const Color(0xFF34C759),
+                          color: isSaving
+                              ? const Color(0xFF007AFF)
+                              : hasChanges
+                                  ? const Color(0xFFFF9500)
+                                  : const Color(0xFF34C759),
                         ),
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        hasChanges ? 'تعديل…' : 'محفوظ',
+                        isSaving
+                            ? 'جاري الحفظ…'
+                            : hasChanges
+                                ? 'تعديل…'
+                                : 'محفوظ',
                         style: theme.textTheme.labelSmall?.copyWith(
                           fontSize: 11,
                           color: theme.colorScheme.onSurface

@@ -3,7 +3,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/theme/app_icons.dart';
 import '../../../../core/theme/app_moods.dart';
+import '../../../projects/data/project_metadata_service.dart';
 import '../../../settings/presentation/widgets/settings_action_sheet.dart';
 import '../../../settings/presentation/widgets/settings_ui_components.dart';
 
@@ -349,17 +351,23 @@ Future<({String? projectTag})?> showProjectPickerSheet(
 }) async {
   final options = <AnchoredMenuOption<({String? projectTag})>>[
     for (final proj in projectNames)
-      AnchoredMenuOption(
-        value: (projectTag: 'مشروع: $proj'),
-        title: proj,
-        subtitle: currentProjectTag == 'مشروع: $proj' ? 'مرتبط حالياً' : null,
-        icon: currentProjectTag == 'مشروع: $proj'
-            ? Icons.check_circle_rounded
-            : Icons.folder_rounded,
-        color: currentProjectTag == 'مشروع: $proj'
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.secondary,
-      ),
+      () {
+        final info = ProjectGroupsService.getProjectInfo(proj);
+        final icon = info?.iconName != null
+            ? AppIcons.getIconData(info!.iconName)
+            : Icons.folder_rounded;
+        final color = info?.colorHex != null
+            ? AppIcons.parseColor(info!.colorHex)
+            : Theme.of(context).colorScheme.secondary;
+        final isSelected = currentProjectTag == 'مشروع: $proj';
+        return AnchoredMenuOption<({String? projectTag})>(
+          value: (projectTag: 'مشروع: $proj'),
+          title: proj,
+          subtitle: isSelected ? 'مرتبط حالياً ✓' : null,
+          icon: icon,
+          color: color,
+        );
+      }(),
     if (currentProjectTag != null)
       const AnchoredMenuOption(
         value: (projectTag: null),
