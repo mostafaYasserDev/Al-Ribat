@@ -83,7 +83,7 @@ void main() {
 
     expect(find.text('التأملات والخواطر'), findsOneWidget);
     expect(find.byType(ReflectionQuickComposeCard), findsOneWidget);
-    expect(find.text('مثبتة'), findsOneWidget);
+    expect(find.text('مثبتة'), findsNWidgets(2));
     expect(find.text('أخرى'), findsOneWidget);
     expect(find.text('خاطرة الفجر'), findsOneWidget);
     expect(find.text('إنجاز مشروع مهم بفضل الله'), findsOneWidget);
@@ -122,7 +122,24 @@ void main() {
 
     expect(find.text('إلغاء التثبيت'), findsOneWidget);
     expect(find.text('نسخ النص'), findsOneWidget);
+    expect(find.text('مشاركة الخاطرة'), findsOneWidget);
     expect(find.text('حذف'), findsOneWidget);
+  });
+
+  testWidgets('Quick filter bar filters pinned reflections', (tester) async {
+    await tester.pumpWidget(buildTestApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('الكل'), findsOneWidget);
+    await tester.tap(find.text('مثبتة').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('خاطرة الفجر'), findsOneWidget);
+    expect(find.text('إنجاز مشروع مهم بفضل الله'), findsNothing);
+
+    await tester.tap(find.text('الكل'));
+    await tester.pumpAndSettle();
+    expect(find.text('إنجاز مشروع مهم بفضل الله'), findsOneWidget);
   });
 
   testWidgets('Editor has no color picker and supports multiple moods',

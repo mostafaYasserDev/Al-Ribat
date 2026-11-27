@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
+import 'package:share_plus/share_plus.dart';
 
 import 'package:al_ribat/core/theme/app_moods.dart';
 import 'package:al_ribat/core/ui_feedback.dart';
+import '../../../settings/presentation/widgets/settings_action_sheet.dart';
 import '../../domain/reflection_colors.dart';
 import '../../domain/reflection_entry.dart';
 
@@ -28,107 +30,74 @@ class ReflectionEntryCard extends StatefulWidget {
 }
 
 class _ReflectionEntryCardState extends State<ReflectionEntryCard> {
+  final _cardKey = GlobalKey();
   bool _pressed = false;
 
-  void _showActionsSheet(BuildContext context) {
+  Future<void> _showActionsSheet(BuildContext context) async {
     HapticFeedback.mediumImpact();
     final entry = widget.entry;
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final sheetBg = theme.cardTheme.color ??
-        (isDark ? const Color(0xFF111B2E) : Colors.white);
+    final hasText = entry.text.trim().isNotEmpty ||
+        (entry.title?.trim().isNotEmpty ?? false);
 
-    showModalBottomSheet<void>(
+    final action = await showAnchoredSettingsMenu<String>(
       context: context,
-      backgroundColor: Colors.transparent,
-      useSafeArea: true,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: Material(
-            color: sheetBg,
-            borderRadius: BorderRadius.circular(20),
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 10),
-                Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ListTile(
-                  leading: Icon(
-                    entry.isPinned
-                        ? Icons.push_pin_outlined
-                        : Icons.push_pin_rounded,
-                    color: theme.colorScheme.primary,
-                  ),
-                  title:
-                      Text(entry.isPinned ? 'إلغاء التثبيت' : 'تثبيت الخاطرة'),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    HapticFeedback.selectionClick();
-                    widget.onTogglePin();
-                  },
-                ),
-                if (entry.text.trim().isNotEmpty ||
-                    (entry.title?.trim().isNotEmpty ?? false))
-                  ListTile(
-                    leading: Icon(
-                      Icons.copy_rounded,
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
-                    ),
-                    title: const Text('نسخ النص'),
-                    onTap: () async {
-                      Navigator.pop(ctx);
-                      final buffer = [
-                        if (entry.title != null &&
-                            entry.title!.trim().isNotEmpty)
-                          entry.title!.trim(),
-                        if (entry.text.trim().isNotEmpty) entry.text.trim(),
-                      ].join('\n');
-                      await Clipboard.setData(ClipboardData(text: buffer));
-                      if (context.mounted) {
-                        appSnack(context, 'تم نسخ الخاطرة.');
-                      }
-                    },
-                  ),
-                Divider(
-                  height: 0.6,
-                  thickness: 0.6,
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.08),
-                ),
-                ListTile(
-                  leading: Icon(
-                    Icons.delete_outline_rounded,
-                    color: theme.colorScheme.error,
-                  ),
-                  title: Text(
-                    'حذف',
-                    style: TextStyle(
-                      color: theme.colorScheme.error,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    widget.onDelete();
-                  },
-                ),
-                const SizedBox(height: 6),
-              ],
-            ),
-          ),
+      anchorKey: _cardKey,
+      title: entry.title?.trim().isNotEmpty == true
+          ? entry.title!.trim()
+          : 'خيارات الخاطرة',
+      options: [
+        AnchoredMenuOption(
+          value: 'pin',
+          title: entry.isPinned ? 'إلغاء التثبيت' : 'تثبيت الخاطرة',
+          icon:
+              entry.isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+          color: Theme.of(context).colorScheme.primary,
         ),
-      ),
+        if (hasText) ...[
+          const AnchoredMenuOption(
+            value: 'copy',
+            title: 'نسخ النص',
+            icon: Icons.copy_rounded,
+            color: Color(0xFF007AFF),
+          ),
+          const AnchoredMenuOption(
+            value: 'share',
+            title: 'مشاركة الخاطرة',
+            icon: Icons.ios_share_rounded,
+            color: Color(0xFF5856D6),
+          ),
+        ],
+        const AnchoredMenuOption(
+          value: 'delete',
+          title: 'حذف',
+          icon: Icons.delete_outline_rounded,
+          isDestructive: true,
+        ),
+      ],
     );
+
+    if (action == null || !context.mounted) return;
+    final fullText = [
+      if (entry.title != null && entry.title!.trim().isNotEmpty)
+        entry.title!.trim(),
+      if (entry.text.trim().isNotEmpty) entry.text.trim(),
+    ].join('\n');
+
+    if (action == 'pin') {
+      widget.onTogglePin();
+    } else if (action == 'copy') {
+      await Clipboard.setData(ClipboardData(text: fullText));
+      if (context.mounted) appSnack(context, 'تم نسخ الخاطرة.');
+    } else if (action == 'share') {
+      try {
+        await Share.share(fullText);
+      } catch (_) {
+        await Clipboard.setData(ClipboardData(text: fullText));
+        if (context.mounted) appSnack(context, 'تم نسخ الخاطرة للمشاركة.');
+      }
+    } else if (action == 'delete') {
+      widget.onDelete();
+    }
   }
 
   @override
@@ -146,6 +115,7 @@ class _ReflectionEntryCardState extends State<ReflectionEntryCard> {
     final hasBody = entry.text.trim().isNotEmpty;
 
     return RepaintBoundary(
+      key: _cardKey,
       child: AnimatedScale(
         scale: _pressed ? 0.975 : 1.0,
         duration: const Duration(milliseconds: 95),

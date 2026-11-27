@@ -1,8 +1,11 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../application/providers.dart';
+import '../../../core/theme/app_moods.dart';
 import '../../../core/ui/error_view.dart';
 import '../../../core/ui_feedback.dart';
 import '../domain/reflection_entry.dart';
@@ -24,6 +27,7 @@ class _ReflectionHistoryScreenState
     extends ConsumerState<ReflectionHistoryScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  String _activeFilter = 'الكل';
   bool _isGridView = true;
 
   @override
@@ -63,14 +67,34 @@ class _ReflectionHistoryScreenState
     );
   }
 
-  Future<void> _handleDelete(String id) async {
+  Future<void> _handleDelete(ReflectionEntry entry) async {
     final confirmed = await ReflectionDialogs.confirmDelete(context);
     if (!confirmed || !mounted) return;
-    await ref.read(reflectionsProvider.notifier).delete(id);
+    await ref.read(reflectionsProvider.notifier).delete(entry.id);
     lightSuccessHaptic();
-    if (mounted) {
-      appSnack(context, 'تم حذف الخاطرة.');
-    }
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        content: const Text('تم حذف الخاطرة.'),
+        action: SnackBarAction(
+          label: 'تراجع',
+          onPressed: () {
+            ref.read(reflectionsProvider.notifier).add(
+                  entry.text,
+                  title: entry.title,
+                  isPinned: entry.isPinned,
+                  colorKey: entry.colorKey,
+                  moods: entry.moods,
+                  prayerPhaseName: entry.prayerPhaseName,
+                  linkedContextTitle: entry.linkedContextTitle,
+                  createdAt: entry.createdAt,
+                );
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -112,11 +136,17 @@ class _ReflectionHistoryScreenState
     ThemeData theme,
     bool isDark,
   ) {
-    final filtered = _searchQuery.isEmpty
-        ? entries
-        : entries
-            .where((e) => ReflectionSearch.matches(e, _searchQuery))
-            .toList();
+    final filtered = entries.where((e) {
+      if (_searchQuery.isNotEmpty &&
+          !ReflectionSearch.matches(e, _searchQuery)) {
+        return false;
+      }
+      if (_activeFilter == 'مثبتة') return e.isPinned;
+      if (_activeFilter != 'الكل') {
+        return e.moods.contains(_activeFilter);
+      }
+      return true;
+    }).toList();
 
     final pinned = filtered.where((e) => e.isPinned).toList();
     final others = filtered.where((e) => !e.isPinned).toList();
@@ -132,7 +162,8 @@ class _ReflectionHistoryScreenState
           expandedHeight: 96,
           elevation: 0,
           scrolledUnderElevation: 0,
-          backgroundColor: theme.scaffoldBackgroundColor,
+          backgroundColor:
+              theme.scaffoldBackgroundColor.withValues(alpha: 0.78),
           actions: [
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 12),
@@ -145,17 +176,22 @@ class _ReflectionHistoryScreenState
               ),
             ),
           ],
-          flexibleSpace: FlexibleSpaceBar(
-            titlePadding: const EdgeInsetsDirectional.only(
-              start: 20,
-              bottom: 14,
-              end: 72,
-            ),
-            centerTitle: false,
-            title: Text(
-              'التأملات والخواطر',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
+          flexibleSpace: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: FlexibleSpaceBar(
+                titlePadding: const EdgeInsetsDirectional.only(
+                  start: 20,
+                  bottom: 14,
+                  end: 72,
+                ),
+                centerTitle: false,
+                title: Text(
+                  'التأملات والخواطر',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ),
           ),
@@ -173,8 +209,12 @@ class _ReflectionHistoryScreenState
           sliver: SliverList(
             delegate: SliverChildListDelegate([
               _buildSearchBar(theme, isDark, filtered.length),
+              if (entries.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _buildFilterBar(theme, isDark, entries),
+              ],
               const SizedBox(height: 12),
-              if (_searchQuery.isEmpty) ...[
+              if (_searchQuery.isEmpty && _activeFilter == 'الكل') ...[
                 ReflectionQuickComposeCard(
                   onCompose: (ctx, color, {initialMood}) => _openNewEditor(
                     sourceContext: ctx,
@@ -289,6 +329,94 @@ class _ReflectionHistoryScreenState
     );
   }
 
+  Widget _buildFilterBar(
+    ThemeData theme,
+    bool isDark,
+    List<ReflectionEntry> entries,
+  ) {
+    final usedMoods = <String>{};
+    for (final e in entries) {
+      usedMoods.addAll(e.moods);
+    }
+    final hasPinned = entries.any((e) => e.isPinned);
+    final options = <String>[
+      'الكل',
+      if (hasPinned) 'مثبتة',
+      ...usedMoods,
+    ];
+
+    return SizedBox(
+      height: 34,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: options.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final label = options[index];
+          final selected = _activeFilter == label;
+          final mood = AppMoods.find(label);
+          final accent = mood?.color ?? theme.colorScheme.primary;
+
+          return GestureDetector(
+            onTap: () {
+              if (selected) return;
+              HapticFeedback.selectionClick();
+              setState(() => _activeFilter = label);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: selected
+                    ? accent.withValues(alpha: isDark ? 0.24 : 0.14)
+                    : (isDark
+                        ? Colors.white.withValues(alpha: 0.06)
+                        : theme.colorScheme.surfaceContainerHighest
+                            .withValues(alpha: 0.55)),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: selected
+                      ? accent.withValues(alpha: 0.45)
+                      : Colors.transparent,
+                  width: 0.8,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (mood != null) ...[
+                    Icon(mood.icon, size: 14, color: accent),
+                    const SizedBox(width: 5),
+                  ] else if (label == 'مثبتة') ...[
+                    Icon(
+                      Icons.push_pin_rounded,
+                      size: 13,
+                      color: selected
+                          ? accent
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    label,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 12.5,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected
+                          ? accent
+                          : theme.colorScheme.onSurface.withValues(alpha: 0.72),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildNotesLayout(List<ReflectionEntry> items) {
     if (!_isGridView) {
       return Column(
@@ -302,7 +430,7 @@ class _ReflectionHistoryScreenState
                 onTap: (ctx, bg) => _openEditEditor(entry, ctx, bg),
                 onTogglePin: () =>
                     ref.read(reflectionsProvider.notifier).togglePin(entry),
-                onDelete: () => _handleDelete(entry.id),
+                onDelete: () => _handleDelete(entry),
               ),
             ),
         ],
@@ -334,7 +462,7 @@ class _ReflectionHistoryScreenState
                     onTap: (ctx, bg) => _openEditEditor(entry, ctx, bg),
                     onTogglePin: () =>
                         ref.read(reflectionsProvider.notifier).togglePin(entry),
-                    onDelete: () => _handleDelete(entry.id),
+                    onDelete: () => _handleDelete(entry),
                   ),
                 ),
             ],
@@ -353,7 +481,7 @@ class _ReflectionHistoryScreenState
                     onTap: (ctx, bg) => _openEditEditor(entry, ctx, bg),
                     onTogglePin: () =>
                         ref.read(reflectionsProvider.notifier).togglePin(entry),
-                    onDelete: () => _handleDelete(entry.id),
+                    onDelete: () => _handleDelete(entry),
                   ),
                 ),
             ],

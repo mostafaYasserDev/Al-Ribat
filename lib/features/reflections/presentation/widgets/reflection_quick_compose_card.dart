@@ -24,8 +24,23 @@ class ReflectionQuickComposeCard extends StatefulWidget {
 class _ReflectionQuickComposeCardState
     extends State<ReflectionQuickComposeCard> {
   bool _pressed = false;
+  late int _promptIndex;
 
   static const _quickMoods = ['سعيد', 'هادئ', 'ممتن', 'متحمس'];
+  static const _dailyPrompts = [
+    'ما أكثر نعمة تشكر الله عليها اليوم؟',
+    'ما اللحظة التي شعرت فيها بالسكينة بين الصلوات؟',
+    'ما الذي تعلمته اليوم وتود أن تتذكره دائماً؟',
+    'ما الدعاء الذي يشغل قلبك هذه الأيام؟',
+    'كيف يمكنك أن تجعل غدك أقرب لرضى الله؟',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final dayOfYear = DateTime.now().difference(DateTime(2026, 1, 1)).inDays;
+    _promptIndex = dayOfYear.abs() % _dailyPrompts.length;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +128,63 @@ class _ReflectionQuickComposeCardState
                   height: 0.6,
                   thickness: 0.6,
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.07),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 14,
+                        color: theme.colorScheme.primary.withValues(alpha: 0.8),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            widget.onCompose(cardCtx, cardColor);
+                          },
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            child: Align(
+                              key: ValueKey(_promptIndex),
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
+                                _dailyPrompts[_promptIndex],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.62),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          setState(() {
+                            _promptIndex =
+                                (_promptIndex + 1) % _dailyPrompts.length;
+                          });
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.refresh_rounded,
+                            size: 15,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.45),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(
