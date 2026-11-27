@@ -51,4 +51,5 @@ app.*.map.json
 .cursor/
 
 # Firebase
+google-services.json
 android/app/google-services.json

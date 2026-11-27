@@ -14,6 +14,8 @@ import '../../../../core/ui_feedback.dart';
 import '../../../../domain/entities/app_settings.dart';
 import '../../../../services/backup/local_auto_backup_service.dart';
 import '../../../../services/backup_export_service.dart';
+import '../../../../services/calendar/google_calendar_sync_service.dart';
+import '../../../../services/calendar/ics_export_service.dart';
 import '../../../../services/cloud_sync_service.dart';
 import '../widgets/settings_action_sheet.dart';
 import '../widgets/settings_ui_components.dart';
@@ -31,6 +33,7 @@ class _SyncBackupSettingsPageState
   bool _busy = false;
   final _importTileKey = GlobalKey();
   final _locationBtnKey = GlobalKey();
+  final _cloudRestoreBtnKey = GlobalKey();
   final _resetTileKey = GlobalKey();
 
   Future<void> _run(Future<void> Function() action, String successMsg) async {
@@ -80,6 +83,82 @@ class _SyncBackupSettingsPageState
         ),
       ],
     );
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _busy = true);
+    try {
+      final cred = await CloudSyncService.signInWithGoogle();
+      if (cred != null && mounted) {
+        appSnack(context, 'تم تسجيل الدخول بنجاح.');
+      }
+    } catch (e) {
+      if (mounted) appError(context, e);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirmAndCloudRestore() async {
+    final mode = await _askRestoreMode(
+      anchorKey: _cloudRestoreBtnKey,
+      title: 'استعادة من Google Drive',
+    );
+    if (mode == null || !mounted) return;
+    await _run(() async {
+      await CloudSyncService.downloadBackup(mode: mode);
+      _invalidateAll();
+    },
+        mode == BackupRestoreMode.merge
+            ? 'تم دمج البيانات من السحابة بنجاح.'
+            : 'تمت الاستعادة من السحابة بنجاح.');
+  }
+
+  Future<void> _syncGoogleCalendar(AppSettings settings) async {
+    setState(() => _busy = true);
+    try {
+      final schedule = await ref.read(todayPrayerScheduleProvider.future);
+      final activities = await ref.read(activityRepositoryProvider).loadAll();
+      final res = await GoogleCalendarSyncService.syncTodaySchedule(
+        schedule: schedule,
+        activities: activities,
+        settings: settings,
+      );
+      if (mounted) {
+        appSnack(
+          context,
+          'تمت مزامنة ${res.syncedEvents} حدث مع تقويم الرباط في Google.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        appError(context, e, fallback: 'تعذر المزامنة مع Google Calendar.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _exportIcsSchedule(AppSettings settings) async {
+    setState(() => _busy = true);
+    try {
+      final schedule = await ref.read(todayPrayerScheduleProvider.future);
+      final activities = await ref.read(activityRepositoryProvider).loadAll();
+      final exported = await IcsExportService.exportInteractive(
+        schedule: schedule,
+        activities: activities,
+        settings: settings,
+      );
+      if (exported && mounted) {
+        appSnack(context, 'تم تجهيز ملف التقويم (.ics).');
+      }
+    } catch (e) {
+      if (mounted) {
+        appError(context, e, fallback: 'تعذر تصدير ملف التقويم.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _confirmAndImport() async {
@@ -381,10 +460,7 @@ class _SyncBackupSettingsPageState
                                     onPressed:
                                         _busy || !AppStartup.isFirebaseReady
                                             ? null
-                                            : () => _run(() async {
-                                                  await CloudSyncService
-                                                      .signInWithGoogle();
-                                                }, 'تم تسجيل الدخول.'),
+                                            : _signInWithGoogle,
                                     icon: const Icon(Icons.login_rounded),
                                     label: const Text('تسجيل الدخول بـ Google'),
                                     style: FilledButton.styleFrom(
@@ -405,12 +481,12 @@ class _SyncBackupSettingsPageState
                                               : () => _run(() async {
                                                     await CloudSyncService
                                                         .uploadBackup();
-                                                  }, 'تم رفع النسخة السحابية.'),
+                                                  }, 'تم رفع النسخة إلى Google Drive.'),
                                           icon: const Icon(
                                             Icons.cloud_upload_outlined,
                                             size: 18,
                                           ),
-                                          label: const Text('رفع للسحابة'),
+                                          label: const Text('رفع لـ Drive'),
                                           style: FilledButton.styleFrom(
                                             padding: const EdgeInsets.symmetric(
                                                 vertical: 11),
@@ -423,25 +499,25 @@ class _SyncBackupSettingsPageState
                                       ),
                                       const SizedBox(width: 8),
                                       Expanded(
-                                        child: OutlinedButton.icon(
-                                          onPressed: _busy
-                                              ? null
-                                              : () => _run(() async {
-                                                    await CloudSyncService
-                                                        .downloadBackup();
-                                                    _invalidateAll();
-                                                  }, 'تم استعادة البيانات من السحابة.'),
-                                          icon: const Icon(
-                                            Icons.cloud_download_outlined,
-                                            size: 18,
-                                          ),
-                                          label: const Text('استعادة'),
-                                          style: OutlinedButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 11),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
+                                        child: KeyedSubtree(
+                                          key: _cloudRestoreBtnKey,
+                                          child: OutlinedButton.icon(
+                                            onPressed: _busy
+                                                ? null
+                                                : _confirmAndCloudRestore,
+                                            icon: const Icon(
+                                              Icons.cloud_download_outlined,
+                                              size: 18,
+                                            ),
+                                            label: const Text('استعادة'),
+                                            style: OutlinedButton.styleFrom(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      vertical: 11),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -465,6 +541,34 @@ class _SyncBackupSettingsPageState
                                 ],
                               ],
                             ),
+                          ),
+                        ],
+                      ),
+                      const SettingsSectionHeader(
+                        title: 'التكامل مع التقويم',
+                      ),
+                      SettingsGroupCard(
+                        children: [
+                          SettingsNavTile(
+                            icon: Icons.event_available_rounded,
+                            iconColor: const Color(0xFF007AFF),
+                            title: 'مزامنة أوقات اليوم مع Google Calendar',
+                            subtitle: signedIn
+                                ? 'يُنشئ تقويم «الرباط — أوقات الصلاة» دون إزعاج تقويمك'
+                                : 'يتطلب تسجيل الدخول بحساب Google أولاً',
+                            onTap: _busy || !signedIn
+                                ? null
+                                : () => _syncGoogleCalendar(settings),
+                          ),
+                          SettingsNavTile(
+                            icon: Icons.calendar_month_rounded,
+                            iconColor: const Color(0xFF5856D6),
+                            title: 'تصدير جدول اليوم (.ics)',
+                            subtitle:
+                                'يعمل مع Apple Calendar وOutlook وGoogle Calendar بدون تسجيل',
+                            onTap: _busy
+                                ? null
+                                : () => _exportIcsSchedule(settings),
                           ),
                         ],
                       ),

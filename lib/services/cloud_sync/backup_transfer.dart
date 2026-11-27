@@ -10,37 +10,30 @@ Future<User> _signedInUser() {
   return Future.value(user);
 }
 
-Future<FirebaseFirestore> _firestoreOrThrow() {
-  final firestore = CloudSyncService._firestore;
-  if (firestore == null) {
-    throw Exception(CloudSyncService.notConfiguredMessage);
-  }
-  return Future.value(firestore);
-}
-
 Future<void> _uploadBackup() async {
-  final user = await _signedInUser();
-  final firestore = await _firestoreOrThrow();
-  final json = await BackupExportService.buildJsonString();
-  final data = jsonDecode(json) as Map<String, dynamic>;
-
-  await firestore.collection('users').doc(user.uid).set({
-    'backup': data,
-    'updatedAt': FieldValue.serverTimestamp(),
-    'email': user.email,
-    'displayName': user.displayName,
-  });
+  await _signedInUser();
+  await GoogleDriveBackupService.uploadBackup();
 }
 
-Future<void> _downloadBackup() async {
+Future<void> _downloadBackup({
+  BackupRestoreMode mode = BackupRestoreMode.replace,
+}) async {
   final user = await _signedInUser();
-  final firestore = await _firestoreOrThrow();
-  final doc = await firestore.collection('users').doc(user.uid).get();
-  final backup = doc.data()?['backup'];
-  if (backup == null) {
-    throw Exception('لا توجد نسخة سحابية محفوظة لهذا الحساب.');
+  final restoredFromDrive =
+      await GoogleDriveBackupService.downloadBackup(mode: mode);
+  if (restoredFromDrive) return;
+
+  // Read-only legacy Firestore fallback for older backups (planned for removal).
+  final firestore = CloudSyncService._firestore;
+  if (firestore != null) {
+    final doc = await firestore.collection('users').doc(user.uid).get();
+    final backup = doc.data()?['backup'];
+    if (backup != null) {
+      final json = const JsonEncoder().convert(backup);
+      await BackupExportService.restoreFromJsonString(json, mode: mode);
+      return;
+    }
   }
 
-  final json = const JsonEncoder().convert(backup);
-  await BackupExportService.restoreFromJsonString(json);
+  throw Exception('لا توجد نسخة سحابية محفوظة لهذا الحساب.');
 }
