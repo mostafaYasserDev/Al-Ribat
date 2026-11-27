@@ -1136,10 +1136,9 @@ class _ProjectStatsSection extends ConsumerWidget {
       );
     }
 
-    final current = projects.firstWhere(
-      (p) => p.name == selectedProjectName,
-      orElse: () => projects.first,
-    );
+    final current =
+        projects.where((p) => p.name == selectedProjectName).firstOrNull ??
+            projects.first;
     final snap = buildProjectStats(current.name, activities);
     final rate = snap.completionRateThisWeek.clamp(0.0, 1.0);
     final totalGroupDone =
@@ -1395,10 +1394,8 @@ class _ActivityStatsSection extends ConsumerWidget {
             .toList();
 
     final current = filtered.isNotEmpty
-        ? filtered.firstWhere(
-            (a) => a.id == selectedActivityId,
-            orElse: () => filtered.first,
-          )
+        ? (filtered.where((a) => a.id == selectedActivityId).firstOrNull ??
+            filtered.first)
         : allActivities.first;
 
     final snap = buildActivityStats(current);

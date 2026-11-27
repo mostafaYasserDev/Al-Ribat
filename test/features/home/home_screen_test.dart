@@ -14,6 +14,7 @@ import 'package:al_ribat/features/home/presentation/home_screen.dart';
 import 'package:al_ribat/features/home/presentation/widgets/home_date_pill.dart';
 import 'package:al_ribat/features/home/presentation/widgets/home_prayer_hero_card.dart';
 import 'package:al_ribat/presentation/stats/stats_screen.dart';
+import 'package:al_ribat/features/activities/data/activity_item_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -295,6 +296,39 @@ void main() {
     await tester.tap(find.text('الأنشطة'));
     await tester.pumpAndSettle();
     expect(find.text('ورد التلاوة اليومي'), findsWidgets);
+  });
+
+  testWidgets(
+      'StatsScreen activities tab handles runtime List<ActivityItemModel>',
+      (tester) async {
+    final now = DateTime.now();
+    await tester.pumpWidget(
+      buildTestApp(
+        initialActivities: <ActivityItemModel>[
+          ActivityItemModel(
+            id: 'a_model_1',
+            title: 'نشاط نموذج بيانات',
+            createdAt: DateTime(now.year, now.month, now.day, 12),
+            repetition: ActivityRepetition.daily,
+            type: ActivityType.afterPrayer,
+            linkedPrayer: PrayerPhase.fajr,
+            projectName: 'مشروع اختبار',
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.insights_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('الأنشطة'));
+    await tester.pumpAndSettle();
+    expect(find.text('نشاط نموذج بيانات'), findsWidgets);
+
+    await tester.tap(find.text('المشاريع'));
+    await tester.pumpAndSettle();
+    expect(find.text('مشروع اختبار'), findsWidgets);
   });
 
   test('ActivityRepetition.open stays visible every day until completed', () {
