@@ -89,7 +89,8 @@ void main() {
     expect(find.text('إنجاز مشروع مهم بفضل الله'), findsOneWidget);
   });
 
-  testWidgets('Search filters entries and toggles between grid and list view',
+  testWidgets(
+      'Search filters entries and switches between view modes via anchored menu',
       (tester) async {
     await tester.pumpWidget(buildTestApp());
     await tester.pumpAndSettle();
@@ -106,10 +107,21 @@ void main() {
 
     expect(find.text('إنجاز مشروع مهم بفضل الله'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.view_agenda_outlined));
+    await tester.tap(find.byIcon(Icons.grid_view_rounded));
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.grid_view_rounded), findsOneWidget);
+    expect(find.text('طريقة عرض التأملات'), findsOneWidget);
+    await tester.tap(find.text('الخط الزمني'));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.timeline_rounded), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.timeline_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('مضغوط'));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.format_list_bulleted_rounded), findsOneWidget);
   });
 
   testWidgets('Long press opens Telegram/Apple bottom action sheet',

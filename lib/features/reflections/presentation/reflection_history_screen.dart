@@ -8,12 +8,15 @@ import '../../../application/providers.dart';
 import '../../../core/theme/app_moods.dart';
 import '../../../core/ui/error_view.dart';
 import '../../../core/ui_feedback.dart';
+import '../../settings/presentation/widgets/settings_action_sheet.dart';
+import '../../settings/presentation/widgets/settings_ui_components.dart';
 import '../domain/reflection_entry.dart';
 import '../domain/reflection_search.dart';
 import 'reflection_editor_screen.dart';
 import 'widgets/reflection_dialogs.dart';
 import 'widgets/reflection_entry_card.dart';
 import 'widgets/reflection_quick_compose_card.dart';
+import 'widgets/reflection_view_modes.dart';
 
 class ReflectionHistoryScreen extends ConsumerStatefulWidget {
   const ReflectionHistoryScreen({super.key});
@@ -26,9 +29,10 @@ class ReflectionHistoryScreen extends ConsumerStatefulWidget {
 class _ReflectionHistoryScreenState
     extends ConsumerState<ReflectionHistoryScreen> {
   final _searchController = TextEditingController();
+  final _viewModeBtnKey = GlobalKey();
   String _searchQuery = '';
   String _activeFilter = 'الكل';
-  bool _isGridView = true;
+  ReflectionViewMode _viewMode = ReflectionViewMode.grid;
 
   @override
   void dispose() {
@@ -65,6 +69,34 @@ class _ReflectionHistoryScreenState
       sourceColor: bgColor,
       sourceRadius: 17,
     );
+  }
+
+  Future<void> _pickViewMode() async {
+    HapticFeedback.lightImpact();
+    final chosen = await showAnchoredSettingsMenu<ReflectionViewMode>(
+      context: context,
+      anchorKey: _viewModeBtnKey,
+      title: 'طريقة عرض التأملات',
+      options: [
+        for (final mode in ReflectionViewMode.values)
+          AnchoredMenuOption(
+            value: mode,
+            title: mode.label,
+            subtitle: _viewMode == mode ? '${mode.subtitle} ✓' : mode.subtitle,
+            icon: mode.icon,
+            color: _viewMode == mode
+                ? Theme.of(context).colorScheme.primary
+                : Theme.of(context)
+                    .colorScheme
+                    .onSurface
+                    .withValues(alpha: 0.65),
+          ),
+      ],
+    );
+    if (chosen != null && chosen != _viewMode && mounted) {
+      HapticFeedback.selectionClick();
+      setState(() => _viewMode = chosen);
+    }
   }
 
   Future<void> _handleDelete(ReflectionEntry entry) async {
@@ -167,12 +199,12 @@ class _ReflectionHistoryScreenState
           actions: [
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 12),
-              child: _ViewModePill(
-                isGridView: _isGridView,
-                onToggle: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _isGridView = !_isGridView);
-                },
+              child: KeyedSubtree(
+                key: _viewModeBtnKey,
+                child: _ViewModePill(
+                  viewMode: _viewMode,
+                  onTap: _pickViewMode,
+                ),
               ),
             ),
           ],
@@ -233,12 +265,17 @@ class _ReflectionHistoryScreenState
                 if (pinned.isNotEmpty) ...[
                   _sectionLabel(context, 'مثبتة', pinned.length),
                   const SizedBox(height: 8),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    switchInCurve: Curves.easeOutCubic,
-                    child: KeyedSubtree(
-                      key: ValueKey('pinned_$_isGridView'),
-                      child: _buildNotesLayout(pinned),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 340),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 240),
+                      switchInCurve: Curves.easeOutCubic,
+                      child: KeyedSubtree(
+                        key: ValueKey('pinned_${_viewMode.name}'),
+                        child: _buildNotesLayout(pinned),
+                      ),
                     ),
                   ),
                   if (others.isNotEmpty) const SizedBox(height: 18),
@@ -248,12 +285,17 @@ class _ReflectionHistoryScreenState
                     _sectionLabel(context, 'أخرى', others.length),
                     const SizedBox(height: 8),
                   ],
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    switchInCurve: Curves.easeOutCubic,
-                    child: KeyedSubtree(
-                      key: ValueKey('others_$_isGridView'),
-                      child: _buildNotesLayout(others),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 340),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 240),
+                      switchInCurve: Curves.easeOutCubic,
+                      child: KeyedSubtree(
+                        key: ValueKey('others_${_viewMode.name}'),
+                        child: _buildNotesLayout(others),
+                      ),
                     ),
                   ),
                 ],
@@ -418,32 +460,56 @@ class _ReflectionHistoryScreenState
   }
 
   Widget _buildNotesLayout(List<ReflectionEntry> items) {
-    if (!_isGridView) {
+    if (_viewMode == ReflectionViewMode.timeline) {
+      return ReflectionTimelineView(
+        entries: items,
+        onTap: (entry, ctx, bg) => _openEditEditor(entry, ctx, bg),
+        onTogglePin: (entry) =>
+            ref.read(reflectionsProvider.notifier).togglePin(entry),
+        onDelete: _handleDelete,
+      );
+    }
+
+    if (_viewMode == ReflectionViewMode.compact) {
+      return ReflectionCompactView(
+        entries: items,
+        onTap: (entry, ctx, bg) => _openEditEditor(entry, ctx, bg),
+        onTogglePin: (entry) =>
+            ref.read(reflectionsProvider.notifier).togglePin(entry),
+        onDelete: _handleDelete,
+      );
+    }
+
+    if (_viewMode == ReflectionViewMode.list) {
       return Column(
         children: [
-          for (final entry in items)
+          for (var i = 0; i < items.length; i++)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: ReflectionEntryCard(
-                entry: entry,
-                isGrid: false,
-                onTap: (ctx, bg) => _openEditEditor(entry, ctx, bg),
-                onTogglePin: () =>
-                    ref.read(reflectionsProvider.notifier).togglePin(entry),
-                onDelete: () => _handleDelete(entry),
+              child: StaggeredReflectionItem(
+                index: i,
+                child: ReflectionEntryCard(
+                  entry: items[i],
+                  isGrid: false,
+                  onTap: (ctx, bg) => _openEditEditor(items[i], ctx, bg),
+                  onTogglePin: () => ref
+                      .read(reflectionsProvider.notifier)
+                      .togglePin(items[i]),
+                  onDelete: () => _handleDelete(items[i]),
+                ),
               ),
             ),
         ],
       );
     }
 
-    final rightCol = <ReflectionEntry>[];
-    final leftCol = <ReflectionEntry>[];
+    final rightCol = <({int index, ReflectionEntry entry})>[];
+    final leftCol = <({int index, ReflectionEntry entry})>[];
     for (var i = 0; i < items.length; i++) {
       if (i.isEven) {
-        rightCol.add(items[i]);
+        rightCol.add((index: i, entry: items[i]));
       } else {
-        leftCol.add(items[i]);
+        leftCol.add((index: i, entry: items[i]));
       }
     }
 
@@ -453,16 +519,20 @@ class _ReflectionHistoryScreenState
         Expanded(
           child: Column(
             children: [
-              for (final entry in rightCol)
+              for (final item in rightCol)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: ReflectionEntryCard(
-                    entry: entry,
-                    isGrid: true,
-                    onTap: (ctx, bg) => _openEditEditor(entry, ctx, bg),
-                    onTogglePin: () =>
-                        ref.read(reflectionsProvider.notifier).togglePin(entry),
-                    onDelete: () => _handleDelete(entry),
+                  child: StaggeredReflectionItem(
+                    index: item.index,
+                    child: ReflectionEntryCard(
+                      entry: item.entry,
+                      isGrid: true,
+                      onTap: (ctx, bg) => _openEditEditor(item.entry, ctx, bg),
+                      onTogglePin: () => ref
+                          .read(reflectionsProvider.notifier)
+                          .togglePin(item.entry),
+                      onDelete: () => _handleDelete(item.entry),
+                    ),
                   ),
                 ),
             ],
@@ -472,16 +542,20 @@ class _ReflectionHistoryScreenState
         Expanded(
           child: Column(
             children: [
-              for (final entry in leftCol)
+              for (final item in leftCol)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: ReflectionEntryCard(
-                    entry: entry,
-                    isGrid: true,
-                    onTap: (ctx, bg) => _openEditEditor(entry, ctx, bg),
-                    onTogglePin: () =>
-                        ref.read(reflectionsProvider.notifier).togglePin(entry),
-                    onDelete: () => _handleDelete(entry),
+                  child: StaggeredReflectionItem(
+                    index: item.index,
+                    child: ReflectionEntryCard(
+                      entry: item.entry,
+                      isGrid: true,
+                      onTap: (ctx, bg) => _openEditEditor(item.entry, ctx, bg),
+                      onTogglePin: () => ref
+                          .read(reflectionsProvider.notifier)
+                          .togglePin(item.entry),
+                      onDelete: () => _handleDelete(item.entry),
+                    ),
                   ),
                 ),
             ],
@@ -592,34 +666,66 @@ class _ReflectionHistoryScreenState
 
 class _ViewModePill extends StatelessWidget {
   const _ViewModePill({
-    required this.isGridView,
-    required this.onToggle,
+    required this.viewMode,
+    required this.onTap,
   });
 
-  final bool isGridView;
-  final VoidCallback onToggle;
+  final ReflectionViewMode viewMode;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    return Material(
-      color: isDark
-          ? const Color(0xFF152036)
-          : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onToggle,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            child: Icon(
-              isGridView ? Icons.view_agenda_outlined : Icons.grid_view_rounded,
-              key: ValueKey(isGridView),
-              size: 20,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.8),
+    return PressableScale(
+      onTap: onTap,
+      child: Material(
+        color: isDark
+            ? const Color(0xFF152036)
+            : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(13),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(13),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 240),
+                  transitionBuilder: (child, anim) => RotationTransition(
+                    turns: Tween(begin: 0.85, end: 1.0).animate(anim),
+                    child: ScaleTransition(scale: anim, child: child),
+                  ),
+                  child: Icon(
+                    viewMode.icon,
+                    key: ValueKey(viewMode),
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: Text(
+                    viewMode.label,
+                    key: ValueKey(viewMode.label),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color:
+                          theme.colorScheme.onSurface.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 15,
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.55),
+                ),
+              ],
             ),
           ),
         ),
