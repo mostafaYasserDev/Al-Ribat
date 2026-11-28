@@ -15,6 +15,7 @@ import '../../../domain/entities/day_state.dart';
 import '../../../domain/entities/prayer_schedule.dart';
 import '../../../domain/entities/prayer_time.dart';
 import '../../../presentation/stats/stats_screen.dart';
+import '../../ai_assistant/presentation/ai_chat_screen.dart';
 import '../../../presentation/widgets/add_activity_sheet.dart';
 import '../../../services/motivation_quotes.dart';
 import 'widgets/home_activities_sections.dart';
@@ -227,6 +228,26 @@ class HomeScreenState extends ConsumerState<HomeScreen>
           scrolledUnderElevation: 0,
           backgroundColor: theme.scaffoldBackgroundColor,
           actions: [
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 6),
+              child: Builder(
+                builder: (aiBtnCtx) => _HomeHeaderPillButton(
+                  icon: Icons.auto_awesome_rounded,
+                  tooltip: 'المساعد الذكي (RibatAI)',
+                  color: const Color(0xFF5856D6),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    AiChatScreen.open(
+                      context,
+                      sourceContext: aiBtnCtx,
+                      sourceColor: isDark
+                          ? const Color(0xFF1D1B38)
+                          : const Color(0xFF5856D6).withValues(alpha: 0.14),
+                    );
+                  },
+                ),
+              ),
+            ),
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 6),
               child: Builder(

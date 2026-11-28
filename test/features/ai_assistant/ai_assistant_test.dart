@@ -1,0 +1,230 @@
+import 'dart:io';
+
+import 'package:al_ribat/core/constants/prayer_phase.dart';
+import 'package:al_ribat/domain/entities/activity_item.dart';
+import 'package:al_ribat/domain/entities/prayer_schedule.dart';
+import 'package:al_ribat/domain/entities/prayer_time.dart';
+import 'package:al_ribat/domain/entities/reflection_entry.dart';
+import 'package:al_ribat/domain/entities/work_session_item.dart';
+import 'package:al_ribat/features/ai_assistant/data/ai_conversation_hive_repo.dart';
+import 'package:al_ribat/features/ai_assistant/data/ai_settings_hive_repo.dart';
+import 'package:al_ribat/features/ai_assistant/data/local_context_builder.dart';
+import 'package:al_ribat/features/ai_assistant/data/local_reflection_summarizer.dart';
+import 'package:al_ribat/features/ai_assistant/domain/ai_local_model_spec.dart';
+import 'package:al_ribat/features/ai_assistant/domain/ai_message.dart';
+import 'package:al_ribat/features/ai_assistant/domain/ai_permissions.dart';
+import 'package:al_ribat/features/ai_assistant/domain/ai_provider_config.dart';
+import 'package:al_ribat/features/ai_assistant/presentation/ai_chat_screen.dart';
+import 'package:al_ribat/features/ai_assistant/presentation/ai_settings_page.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    final dir = await Directory.systemTemp.createTemp('al_ribat_ai_');
+    Hive.init(dir.path);
+    await Hive.openBox<String>('meta_box');
+  });
+
+  tearDown(() async {
+    await Hive.box<String>('meta_box').clear();
+  });
+
+  test('LocalModelSpec catalog contains exactly 3 curated models', () {
+    expect(LocalModelSpec.catalog.length, 3);
+    expect(LocalModelSpec.catalog.map((m) => m.id), [
+      'qwen-0.5b-q4',
+      'gemma3-1b-int4',
+      'llama32-3b-q4',
+    ]);
+  });
+
+  test('LocalReflectionSummarizer extracts moods and themes without raw text',
+      () {
+    final now = DateTime(2026, 11, 28, 20, 0);
+    const summarizer = LocalReflectionSummarizer();
+    final entries = [
+      ReflectionEntry(
+        id: 'r1',
+        text: 'ضغط العمل اليوم كان كبيراً جداً وأحتاج لتنظيم الوقت',
+        createdAt: now.subtract(const Duration(days: 1)),
+        moods: const ['متوتر'],
+        prayerPhaseName: 'العشاء',
+      ),
+      ReflectionEntry(
+        id: 'r2',
+        text: 'أشعر بتحسن رغم ضغط العمل وتعلمت الصبر',
+        createdAt: now.subtract(const Duration(days: 2)),
+        moods: const ['ممتن', 'متوتر'],
+        prayerPhaseName: 'العشاء',
+      ),
+    ];
+
+    final summary = summarizer.summarize(entries, now: now);
+    expect(summary.count, 2);
+    expect(summary.topMoods.first, 'متوتر (2×)');
+    expect(summary.recurringThemes, containsAll(['ضغط', 'العمل']));
+    expect(summary.peakPrayerTime, 'العشاء');
+
+    final readable = summary.toReadableArabic();
+    expect(readable, isNot(contains('تعلمت الصبر')));
+    expect(readable, isNot(contains('أشعر بتحسن')));
+  });
+
+  test('LocalContextBuilder respects granular AiPermissions flags', () {
+    final now = DateTime(2026, 11, 28, 12, 0);
+    const builder = LocalContextBuilder();
+    final activities = [
+      ActivityItem(
+        id: 'a1',
+        title: 'مراجعة القرآن',
+        createdAt: now,
+        repetition: ActivityRepetition.daily,
+        type: ActivityType.afterPrayer,
+        linkedPrayer: PrayerPhase.maghrib,
+        projectName: 'ختمة',
+      ),
+    ];
+    final schedule = PrayerSchedule(
+      today: [
+        PrayerTime(
+          phase: PrayerPhase.fajr,
+          time: DateTime(2026, 11, 28, 5, 0),
+        ),
+        PrayerTime(
+          phase: PrayerPhase.maghrib,
+          time: DateTime(2026, 11, 28, 17, 0),
+        ),
+        PrayerTime(
+          phase: PrayerPhase.isha,
+          time: DateTime(2026, 11, 28, 18, 20),
+        ),
+      ],
+      tomorrowFajr: PrayerTime(
+        phase: PrayerPhase.fajr,
+        time: DateTime(2026, 11, 29, 5, 0),
+      ),
+      todaySunrise: DateTime(2026, 11, 28, 6, 20),
+    );
+    final reflections = [
+      ReflectionEntry(
+        id: 'r1',
+        text: 'نص تأمل خاص جداً',
+        createdAt: now.subtract(const Duration(hours: 2)),
+        moods: const ['هادئ'],
+      ),
+    ];
+    final sessions = [
+      WorkSessionItem(
+        id: 'w1',
+        name: 'برمجة',
+        plannedMinutes: 25,
+        startedAt: now.subtract(const Duration(hours: 3)),
+        endedAt: now.subtract(const Duration(hours: 2, minutes: 35)),
+      ),
+    ];
+
+    // All disabled -> empty privacy-safe prompt
+    final noneSnapshot = builder.build(
+      permissions: const AiPermissions(
+        allowActivities: false,
+        allowPrayer: false,
+        allowProjects: false,
+        allowReflections: false,
+        allowReflectionSummary: false,
+        allowWorkSessions: false,
+      ),
+      activities: activities,
+      prayerSchedule: schedule,
+      reflections: reflections,
+      workSessions: sessions,
+      now: now,
+    );
+    expect(noneSnapshot.toPromptText(), contains('لم يمنح المستخدم صلاحية'));
+
+    // Summary enabled & approved, full reflections disabled
+    final summarySnapshot = builder.build(
+      permissions: const AiPermissions(
+        allowActivities: true,
+        allowPrayer: true,
+        allowProjects: true,
+        allowReflections: false,
+        allowReflectionSummary: true,
+        allowWorkSessions: true,
+      ),
+      activities: activities,
+      prayerSchedule: schedule,
+      reflections: reflections,
+      workSessions: sessions,
+      reflectionSummaryApproved: true,
+      now: now,
+    );
+    final prompt = summarySnapshot.toPromptText();
+    expect(prompt, contains('مراجعة القرآن'));
+    expect(prompt, contains('بين المغرب والعشاء'));
+    expect(prompt, contains('المدة ~80 د'));
+    expect(prompt, contains('ختمة'));
+    expect(prompt, contains('ملخص التأملات'));
+    expect(prompt, isNot(contains('نص تأمل خاص جداً')));
+  });
+
+  test('AiSettingsHiveRepo and AiConversationHiveRepo persist state', () async {
+    final box = Hive.box<String>('meta_box');
+    final settingsRepo = AiSettingsHiveRepo(box);
+    final chatRepo = AiConversationHiveRepo(box);
+
+    await settingsRepo.saveConfig(
+      const AiProviderConfig(
+        type: AiProviderType.groqCloud,
+        groqApiKey: 'gsk_test_123',
+        hasCompletedOnboarding: true,
+      ),
+    );
+    await settingsRepo.savePermissions(
+      const AiPermissions(allowReflections: true, allowProjects: false),
+    );
+    await chatRepo.saveAll([
+      AiMessage(
+        id: 'm1',
+        role: AiRole.user,
+        content: 'مرحبا',
+        createdAt: DateTime(2026, 11, 28),
+      ),
+    ]);
+
+    expect(settingsRepo.loadConfig().groqApiKey, 'gsk_test_123');
+    expect(settingsRepo.loadConfig().isConfigured, isTrue);
+    expect(settingsRepo.loadPermissions().allowReflections, isTrue);
+    expect(settingsRepo.loadPermissions().allowProjects, isFalse);
+    expect(chatRepo.loadAll().length, 1);
+    expect(chatRepo.loadAll().first.content, 'مرحبا');
+  });
+
+  testWidgets('AiChatScreen shows setup onboarding and AiSettingsPage works',
+      (tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: AiChatScreen(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('مرحباً بك في RibatAI'), findsOneWidget);
+    expect(find.text('حفظ المفتاح والبدء'), findsOneWidget);
+
+    await tester.tap(find.text('خيارات المزوِّد والصلاحيات الكاملة'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('المساعد الذكي (RibatAI)'), findsOneWidget);
+    expect(find.text('صلاحيات الوصول للبيانات'), findsOneWidget);
+    expect(find.byType(AiSettingsPage), findsOneWidget);
+  });
+}

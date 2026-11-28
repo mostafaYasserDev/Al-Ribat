@@ -8,6 +8,7 @@ import '../../../core/app_startup.dart';
 import '../../../core/security/app_security.dart';
 import '../../../domain/entities/app_settings.dart';
 import '../../../services/cloud_sync_service.dart';
+import '../../ai_assistant/presentation/ai_settings_page.dart';
 import 'pages/about_app_screen.dart';
 import 'pages/notifications_timing_settings_page.dart';
 import 'pages/prayer_location_settings_page.dart';
@@ -190,6 +191,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen>
                       const SettingsSectionHeader(title: 'البيانات والأمان'),
                       SettingsGroupCard(
                         children: [
+                          SettingsNavTile(
+                            icon: Icons.auto_awesome_rounded,
+                            iconColor: const Color(0xFF5856D6),
+                            title: 'المساعد الذكي (RibatAI)',
+                            subtitle: 'إعداد المزوِّد وصلاحيات الخصوصية',
+                            onTap: () => _pushPage(const AiSettingsPage()),
+                          ),
                           SettingsNavTile(
                             icon: Icons.cloud_sync_rounded,
                             iconColor: const Color(0xFF007AFF),
