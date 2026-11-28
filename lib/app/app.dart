@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/providers.dart';
 import '../domain/entities/app_settings.dart';
 import '../core/theme/app_theme.dart';
+import '../features/ai_assistant/presentation/widgets/ai_download_floating_pill.dart';
 import '../presentation/shell/app_shell.dart';
 import '../presentation/widgets/app_lock_wrapper.dart';
 
@@ -28,12 +29,23 @@ class AlRibatApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: mode,
-      home: const Directionality(
+      builder: (context, child) => Directionality(
         textDirection: TextDirection.rtl,
-        child: AppLockWrapper(
-          child: WithForegroundTask(
-            child: AppShell(),
-          ),
+        child: Stack(
+          children: [
+            if (child != null) child,
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: AiDownloadFloatingPill(),
+            ),
+          ],
+        ),
+      ),
+      home: const AppLockWrapper(
+        child: WithForegroundTask(
+          child: AppShell(),
         ),
       ),
     );

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
@@ -51,6 +53,88 @@ final downloadedModelsProvider =
   }
   return result;
 });
+
+class AiModelDownloadState {
+  const AiModelDownloadState({
+    this.activeSpec,
+    this.progress =
+        const ModelDownloadProgress(status: ModelDownloadStatus.idle),
+  });
+
+  final LocalModelSpec? activeSpec;
+  final ModelDownloadProgress progress;
+
+  bool get isDownloading => progress.status == ModelDownloadStatus.downloading;
+}
+
+final aiModelDownloadProvider =
+    NotifierProvider<AiModelDownloadNotifier, AiModelDownloadState>(
+  AiModelDownloadNotifier.new,
+);
+
+class AiModelDownloadNotifier extends Notifier<AiModelDownloadState> {
+  StreamSubscription<ModelDownloadProgress>? _sub;
+  bool _cancelled = false;
+
+  @override
+  AiModelDownloadState build() {
+    ref.onDispose(() {
+      _cancelled = true;
+      _sub?.cancel();
+    });
+    return const AiModelDownloadState();
+  }
+
+  void startDownload(LocalModelSpec spec) {
+    if (state.isDownloading) return;
+    _cancelled = false;
+    _sub?.cancel();
+
+    state = AiModelDownloadState(
+      activeSpec: spec,
+      progress: const ModelDownloadProgress(
+        status: ModelDownloadStatus.downloading,
+      ),
+    );
+
+    final manager = ref.read(modelDownloadManagerProvider);
+    _sub = manager
+        .downloadModel(spec, isCancelled: () => _cancelled)
+        .listen((p) async {
+      state = AiModelDownloadState(activeSpec: spec, progress: p);
+      if (p.status == ModelDownloadStatus.completed && p.filePath != null) {
+        final current = ref.read(aiConfigProvider);
+        await ref.read(aiConfigProvider.notifier).updateConfig(
+              current.copyWith(
+                type: AiProviderType.localLlm,
+                localModelId: spec.id,
+                localModelPath: p.filePath,
+                hasCompletedOnboarding: true,
+              ),
+            );
+        ref.invalidate(downloadedModelsProvider);
+        Future.delayed(const Duration(seconds: 4), () {
+          if (state.progress.status == ModelDownloadStatus.completed &&
+              state.activeSpec?.id == spec.id) {
+            state = const AiModelDownloadState();
+          }
+        });
+      }
+    });
+  }
+
+  void cancelDownload() {
+    _cancelled = true;
+    _sub?.cancel();
+    state = const AiModelDownloadState();
+  }
+
+  void clearStatus() {
+    if (!state.isDownloading) {
+      state = const AiModelDownloadState();
+    }
+  }
+}
 
 final aiConfigProvider =
     NotifierProvider<AiConfigNotifier, AiProviderConfig>(AiConfigNotifier.new);

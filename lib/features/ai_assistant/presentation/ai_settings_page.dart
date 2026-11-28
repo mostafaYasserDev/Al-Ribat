@@ -84,7 +84,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
         ),
         slivers: [
           const FrostedSettingsSliverAppBar(
-            title: 'المساعد الذكي (RibatAI)',
+            title: 'المساعد الذكي',
           ),
           SliverToBoxAdapter(
             child: Column(
@@ -413,6 +413,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
   ) {
     final downloaded =
         ref.watch(downloadedModelsProvider).valueOrNull ?? const {};
+    final dlState = ref.watch(aiModelDownloadProvider);
 
     return Column(
       key: const ValueKey('local_section'),
@@ -427,6 +428,9 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                 builder: (_) {
                   final path = downloaded[spec.id];
                   final isDownloaded = path != null;
+                  final isThisDownloading = dlState.isDownloading &&
+                      dlState.activeSpec?.id == spec.id;
+                  final dlPct = (dlState.progress.fraction * 100).round();
                   final isSelected = isDownloaded &&
                       config.localModelId == spec.id &&
                       config.type == AiProviderType.localLlm;
@@ -490,7 +494,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'الحجم: ${spec.sizeMb} MB · RAM: ${(spec.requiredRamMb / 1000).toStringAsFixed(1)} GB · العربية: ${spec.arabicQualityLabel} · ${spec.speedNote}',
+                                    'الحجم: ${spec.sizeMb} ميجابايت · الذاكرة: ${(spec.requiredRamMb / 1000).toStringAsFixed(1)} جيجابايت · العربية: ${spec.arabicQualityLabel} · ${spec.speedNote}',
                                     style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
@@ -540,9 +544,11 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                                     child: Text(
                                       isSelected
                                           ? 'مفعّل حالياً ✓'
-                                          : (isDownloaded
-                                              ? 'تفعيل هذا النموذج'
-                                              : 'تنزيل (${spec.sizeMb} MB)'),
+                                          : isThisDownloading
+                                              ? 'جاري التنزيل ($dlPct%)…'
+                                              : (isDownloaded
+                                                  ? 'تفعيل هذا النموذج'
+                                                  : 'تنزيل · ${spec.sizeMb} ميجابايت'),
                                       style: TextStyle(
                                         fontSize: 12.5,
                                         fontWeight: FontWeight.w700,
@@ -623,16 +629,16 @@ class _ProviderComparisonBox extends StatelessWidget {
     final tint = isCloud ? const Color(0xFF007AFF) : const Color(0xFF5856D6);
     final lines = isCloud
         ? const [
-            '• مجاني تماماً بمفتاحك الشخصي من Groq (بدون بطاقة).',
-            '• Groq لا يستخدم بياناتك لتدريب نماذجه.',
-            '• سرعة فائقة وجودة عالية جداً بالعربية على أي جهاز.',
-            '• يتطلب اتصالاً بالإنترنت.',
+            '• مجاني بمفتاحك الشخصي بدون بطاقة ائتمان',
+            '• لا تُستخدم بياناتك لتدريب النماذج السحابية',
+            '• سرعة فائقة وجودة عالية جداً باللغة العربية',
+            '• يتطلب اتصالاً بالإنترنت',
           ]
         : const [
-            '• خصوصية مطلقة: لا بيانات تغادر جهازك نهائياً.',
-            '• يعمل بدون إنترنت بعد تنزيل النموذج.',
-            '• يستهلك مساحة تخزين وذاكرة RAM أعلى أثناء التشغيل.',
-            '• يُفعَّل محرك التنزيل والتشغيل في المرحلة 4.',
+            '• خصوصية مطلقة: لا شيء يغادر جهازك نهائياً',
+            '• يعمل بدون إنترنت بعد تنزيل النموذج',
+            '• يستهلك مساحة تخزين وذاكرة عشوائية أعلى أثناء التشغيل',
+            '• يُشغَّل النموذج محلياً بالكامل داخل التطبيق',
           ];
 
     return Container(

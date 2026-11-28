@@ -15,6 +15,7 @@ import 'package:al_ribat/features/ai_assistant/data/local_context_builder.dart';
 import 'package:al_ribat/features/ai_assistant/data/local_llm_client.dart';
 import 'package:al_ribat/features/ai_assistant/data/local_reflection_summarizer.dart';
 import 'package:al_ribat/features/ai_assistant/data/model_download_manager.dart';
+import 'package:al_ribat/features/ai_assistant/presentation/widgets/ai_download_floating_pill.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_chat_session.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_context_snapshot.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_local_model_spec.dart';
@@ -296,7 +297,7 @@ void main() {
     await tester.tap(find.text('كافة الصلاحيات والإعدادات'));
     await tester.pumpAndSettle();
 
-    expect(find.text('المساعد الذكي (RibatAI)'), findsOneWidget);
+    expect(find.text('المساعد الذكي'), findsOneWidget);
     expect(find.text('صلاحيات الوصول للبيانات'), findsOneWidget);
     expect(find.byType(AiSettingsPage), findsOneWidget);
   });
@@ -472,4 +473,51 @@ void main() {
     expect(loaded.first.id, 's1');
     expect(repo.getActiveSessionId(), 's1');
   });
+
+  testWidgets('AiDownloadFloatingPill shows progress while downloading',
+      (tester) async {
+    final spec = LocalModelSpec.catalog.first;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          aiModelDownloadProvider.overrideWith(
+            () => _FakeDownloadNotifier(
+              AiModelDownloadState(
+                activeSpec: spec,
+                progress: const ModelDownloadProgress(
+                  status: ModelDownloadStatus.downloading,
+                  receivedBytes: 45 * 1024 * 1024,
+                  totalBytes: 100 * 1024 * 1024,
+                  bytesPerSecond: 1.5 * 1024 * 1024,
+                ),
+              ),
+            ),
+          ),
+        ],
+        child: const MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: Scaffold(
+              body: Stack(
+                children: [AiDownloadFloatingPill()],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('جاري تنزيل ${spec.displayName}'), findsOneWidget);
+    expect(find.textContaining('45%'), findsOneWidget);
+  });
+}
+
+class _FakeDownloadNotifier extends AiModelDownloadNotifier {
+  _FakeDownloadNotifier(this._initial);
+  final AiModelDownloadState _initial;
+
+  @override
+  AiModelDownloadState build() => _initial;
 }
