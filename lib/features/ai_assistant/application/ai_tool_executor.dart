@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../application/providers.dart';
 import '../../../core/constants/prayer_phase.dart';
+import '../../../core/errors/app_failure.dart';
 import '../../activities/domain/activity_item.dart';
 import '../../projects/data/project_metadata_service.dart';
 import '../domain/ai_tool_call.dart';
@@ -25,6 +26,32 @@ class AiToolExecutor {
         );
         await ref.read(activitiesProvider.notifier).addActivity(activity);
 
+      case EditActivityToolCall():
+        final target = _findByTitle(ref, call.targetTitle);
+        if (target == null) {
+          throw ValidationFailure(
+              'لم يُعثر على نشاط باسم "${call.targetTitle}".');
+        }
+        final updated = target.copyWith(
+          title: call.newTitle?.isNotEmpty == true ? call.newTitle : null,
+          repetition: call.newRepetition != null
+              ? _parseRepetition(call.newRepetition!)
+              : null,
+          type: call.newType != null ? _parseType(call.newType!) : null,
+          linkedPrayer: call.newLinkedPrayer != null
+              ? _parsePrayer(call.newLinkedPrayer)
+              : null,
+        );
+        await ref.read(activitiesProvider.notifier).updateActivity(updated);
+
+      case DeleteActivityToolCall():
+        final target = _findByTitle(ref, call.targetTitle);
+        if (target == null) {
+          throw ValidationFailure(
+              'لم يُعثر على نشاط باسم "${call.targetTitle}".');
+        }
+        await ref.read(activitiesProvider.notifier).deleteActivity(target.id);
+
       case CreateProjectToolCall():
         await ProjectGroupsService.saveProjectInfo(
           call.name,
@@ -46,6 +73,13 @@ class AiToolExecutor {
               .addMultipleActivities(items);
         }
     }
+  }
+
+  ActivityItem? _findByTitle(Ref ref, String title) {
+    final list = ref.read(activitiesProvider).valueOrNull ?? const [];
+    final q = title.trim().toLowerCase();
+    return list.where((a) => a.title.trim().toLowerCase() == q).firstOrNull ??
+        list.where((a) => a.title.trim().toLowerCase().contains(q)).firstOrNull;
   }
 
   ActivityRepetition _parseRepetition(String value) => switch (value) {

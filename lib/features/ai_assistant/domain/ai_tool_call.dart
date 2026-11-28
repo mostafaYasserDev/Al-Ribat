@@ -15,6 +15,16 @@ sealed class AiToolCall {
           linkedPrayer: (json['linkedPrayer'] as String?)?.trim(),
           type: json['type'] as String? ?? 'independent',
         ),
+      'edit_activity' => EditActivityToolCall(
+          targetTitle: (json['targetTitle'] as String? ?? '').trim(),
+          newTitle: (json['newTitle'] as String?)?.trim(),
+          newRepetition: (json['newRepetition'] as String?)?.trim(),
+          newType: (json['newType'] as String?)?.trim(),
+          newLinkedPrayer: (json['newLinkedPrayer'] as String?)?.trim(),
+        ),
+      'delete_activity' => DeleteActivityToolCall(
+          targetTitle: (json['targetTitle'] as String? ?? '').trim(),
+        ),
       'create_project' => CreateProjectToolCall(
           name: (json['name'] as String? ?? '').trim(),
           description: (json['description'] as String?)?.trim(),
@@ -52,6 +62,44 @@ class AddActivityToolCall extends AiToolCall {
         'projectName': projectName,
         'linkedPrayer': linkedPrayer,
         'type': type,
+      };
+}
+
+class EditActivityToolCall extends AiToolCall {
+  const EditActivityToolCall({
+    required this.targetTitle,
+    this.newTitle,
+    this.newRepetition,
+    this.newType,
+    this.newLinkedPrayer,
+  });
+
+  final String targetTitle;
+  final String? newTitle;
+  final String? newRepetition;
+  final String? newType;
+  final String? newLinkedPrayer;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'action': 'edit_activity',
+        'targetTitle': targetTitle,
+        'newTitle': newTitle,
+        'newRepetition': newRepetition,
+        'newType': newType,
+        'newLinkedPrayer': newLinkedPrayer,
+      };
+}
+
+class DeleteActivityToolCall extends AiToolCall {
+  const DeleteActivityToolCall({required this.targetTitle});
+
+  final String targetTitle;
+
+  @override
+  Map<String, dynamic> toJson() => {
+        'action': 'delete_activity',
+        'targetTitle': targetTitle,
       };
 }
 

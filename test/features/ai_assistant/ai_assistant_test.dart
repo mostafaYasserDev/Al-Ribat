@@ -15,6 +15,7 @@ import 'package:al_ribat/features/ai_assistant/data/local_context_builder.dart';
 import 'package:al_ribat/features/ai_assistant/data/local_llm_client.dart';
 import 'package:al_ribat/features/ai_assistant/data/local_reflection_summarizer.dart';
 import 'package:al_ribat/features/ai_assistant/data/model_download_manager.dart';
+import 'package:al_ribat/features/ai_assistant/domain/ai_chat_session.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_context_snapshot.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_local_model_spec.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_message.dart';
@@ -419,5 +420,56 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('إدارة النماذج والإعدادات'), findsOneWidget);
+  });
+
+  test('AiToolParser parses edit_activity and delete_activity actions', () {
+    const parser = AiToolParser();
+    const raw = '''
+تم تجهيز التعديل والحذف:
+```ribat_action
+{"action":"edit_activity","targetTitle":"ورد القرآن","newTitle":"ورد التلاوة","newLinkedPrayer":"fajr","newType":"afterPrayer"}
+```
+```ribat_action
+{"action":"delete_activity","targetTitle":"مهمة قديمة"}
+```
+''';
+    final parsed = parser.parse(raw, messageId: 'm2');
+    expect(parsed.cleanText, 'تم تجهيز التعديل والحذف:');
+    expect(parsed.actions.length, 2);
+    expect(parsed.actions[0].call, isA<EditActivityToolCall>());
+    expect(parsed.actions[1].call, isA<DeleteActivityToolCall>());
+  });
+
+  test('AiConversationHiveRepo saves and loads multiple chat sessions',
+      () async {
+    final box = Hive.box<String>('meta_box');
+    final repo = AiConversationHiveRepo(box);
+    final sessions = [
+      AiChatSession(
+        id: 's1',
+        title: 'تنظيم الفجر',
+        updatedAt: DateTime(2026, 11, 28, 9, 0),
+        messages: [
+          AiMessage(
+            id: 'm1',
+            role: AiRole.user,
+            content: 'رتب وقتي بعد الفجر',
+            createdAt: DateTime(2026, 11, 28, 9, 0),
+          ),
+        ],
+      ),
+      AiChatSession(
+        id: 's2',
+        title: 'خطة الأسبوع',
+        updatedAt: DateTime(2026, 11, 28, 8, 0),
+      ),
+    ];
+    await repo.saveSessions(sessions);
+    await repo.setActiveSessionId('s1');
+
+    final loaded = repo.loadSessions();
+    expect(loaded.length, 2);
+    expect(loaded.first.id, 's1');
+    expect(repo.getActiveSessionId(), 's1');
   });
 }

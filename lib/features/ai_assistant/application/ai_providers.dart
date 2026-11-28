@@ -11,6 +11,7 @@ import '../data/local_context_builder.dart';
 import '../data/local_llm_client.dart';
 import '../data/local_reflection_summarizer.dart';
 import '../data/model_download_manager.dart';
+import '../domain/ai_chat_session.dart';
 import '../domain/ai_context_snapshot.dart';
 import '../domain/ai_local_model_spec.dart';
 import '../domain/ai_message.dart';
@@ -120,6 +121,20 @@ final aiReflectionSummaryApprovedProvider = StateProvider<bool>((ref) => false);
 
 final aiIsStreamingProvider = StateProvider<bool>((ref) => false);
 
+final aiSessionsProvider = StateProvider<List<AiChatSession>>((ref) {
+  return ref.read(aiConversationRepoProvider).loadSessions();
+});
+
+final aiActiveSessionIdProvider = StateProvider<String?>((ref) {
+  final repo = ref.read(aiConversationRepoProvider);
+  final sessions = ref.read(aiSessionsProvider);
+  final savedId = repo.getActiveSessionId();
+  if (savedId != null && sessions.any((s) => s.id == savedId)) {
+    return savedId;
+  }
+  return sessions.firstOrNull?.id;
+});
+
 final aiChatProvider =
     AsyncNotifierProvider<AiChatNotifier, List<AiMessage>>(AiChatNotifier.new);
 
@@ -129,9 +144,91 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
   static const _toolParser = AiToolParser();
   static const _toolExecutor = AiToolExecutor();
 
+  bool _cancelRequested = false;
+
   @override
   Future<List<AiMessage>> build() async {
-    return ref.read(aiConversationRepoProvider).loadAll();
+    final sessions = ref.read(aiSessionsProvider);
+    final activeId = ref.read(aiActiveSessionIdProvider);
+    final active = sessions.where((s) => s.id == activeId).firstOrNull;
+    return active?.messages ?? const [];
+  }
+
+  void stopGeneration() {
+    _cancelRequested = true;
+  }
+
+  Future<void> startNewSession() async {
+    if (ref.read(aiIsStreamingProvider)) return;
+    final id = 's_${DateTime.now().microsecondsSinceEpoch}';
+    final session = AiChatSession(
+      id: id,
+      title: 'محادثة جديدة',
+      updatedAt: DateTime.now(),
+    );
+    final next = [session, ...ref.read(aiSessionsProvider)];
+    ref.read(aiSessionsProvider.notifier).state = next;
+    ref.read(aiActiveSessionIdProvider.notifier).state = id;
+    await ref.read(aiConversationRepoProvider).saveSessions(next);
+    await ref.read(aiConversationRepoProvider).setActiveSessionId(id);
+    state = const AsyncData([]);
+  }
+
+  Future<void> switchSession(String sessionId) async {
+    if (ref.read(aiIsStreamingProvider)) return;
+    final sessions = ref.read(aiSessionsProvider);
+    final target = sessions.where((s) => s.id == sessionId).firstOrNull;
+    if (target == null) return;
+    ref.read(aiActiveSessionIdProvider.notifier).state = sessionId;
+    await ref.read(aiConversationRepoProvider).setActiveSessionId(sessionId);
+    state = AsyncData(target.messages);
+  }
+
+  Future<void> _persistMessages(List<AiMessage> messages) async {
+    final repo = ref.read(aiConversationRepoProvider);
+    var sessions = ref.read(aiSessionsProvider);
+    var activeId = ref.read(aiActiveSessionIdProvider);
+
+    if (activeId == null || !sessions.any((s) => s.id == activeId)) {
+      activeId = 's_${DateTime.now().microsecondsSinceEpoch}';
+      final firstUser =
+          messages.where((m) => m.role == AiRole.user).firstOrNull?.content ??
+              'محادثة جديدة';
+      final title =
+          firstUser.length > 34 ? '${firstUser.substring(0, 34)}…' : firstUser;
+      sessions = [
+        AiChatSession(
+          id: activeId,
+          title: title,
+          updatedAt: DateTime.now(),
+          messages: messages,
+        ),
+        ...sessions,
+      ];
+      ref.read(aiActiveSessionIdProvider.notifier).state = activeId;
+      await repo.setActiveSessionId(activeId);
+    } else {
+      final firstUser =
+          messages.where((m) => m.role == AiRole.user).firstOrNull?.content;
+      sessions = [
+        for (final s in sessions)
+          if (s.id == activeId)
+            s.copyWith(
+              title: (s.title == 'محادثة جديدة' && firstUser != null)
+                  ? (firstUser.length > 34
+                      ? '${firstUser.substring(0, 34)}…'
+                      : firstUser)
+                  : s.title,
+              updatedAt: DateTime.now(),
+              messages: messages,
+            )
+          else
+            s,
+      ];
+    }
+
+    ref.read(aiSessionsProvider.notifier).state = sessions;
+    await repo.saveSessions(sessions);
   }
 
   Future<void> executeProposedAction(String messageId, String actionId) async {
@@ -173,7 +270,7 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
           msg,
     ];
     state = AsyncData(next);
-    await ref.read(aiConversationRepoProvider).saveAll(next);
+    await _persistMessages(next);
   }
 
   ReflectionSummary previewReflectionSummary() {
@@ -182,8 +279,15 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
   }
 
   Future<void> clearHistory() async {
+    final activeId = ref.read(aiActiveSessionIdProvider);
+    final nextSessions =
+        ref.read(aiSessionsProvider).where((s) => s.id != activeId).toList();
+    ref.read(aiSessionsProvider.notifier).state = nextSessions;
+    ref.read(aiActiveSessionIdProvider.notifier).state =
+        nextSessions.firstOrNull?.id;
+    await ref.read(aiConversationRepoProvider).saveSessions(nextSessions);
     await ref.read(aiConversationRepoProvider).clear();
-    state = const AsyncData([]);
+    state = AsyncData(nextSessions.firstOrNull?.messages ?? const []);
   }
 
   Future<void> sendMessage(String rawText) async {
@@ -217,6 +321,7 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
 
     final withUser = [...currentList, userMsg];
     state = AsyncData([...withUser, placeholder]);
+    _cancelRequested = false;
     ref.read(aiIsStreamingProvider.notifier).state = true;
 
     try {
@@ -234,10 +339,12 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
               modelPath: config.localModelPath!,
               systemPrompt: systemPrompt,
               history: withUser,
+              isCancelled: () => _cancelRequested,
             ),
       };
 
       await for (final token in tokenStream) {
+        if (_cancelRequested) break;
         buffer.write(token);
         final updated = placeholder.copyWith(content: buffer.toString());
         state = AsyncData([...withUser, updated]);
@@ -248,7 +355,9 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
         messageId: assistantId,
       );
       final finalContent = parsed.cleanText.isEmpty && parsed.actions.isEmpty
-          ? 'لم يصل رد من المساعد. حاول صياغة طلبك مرة أخرى.'
+          ? (_cancelRequested
+              ? 'تم إيقاف التوليد.'
+              : 'لم يصل رد من المساعد. حاول صياغة طلبك مرة أخرى.')
           : (parsed.cleanText.isEmpty
               ? 'جهّزت لك الإجراء التالي للموافقة:'
               : parsed.cleanText);
@@ -258,7 +367,7 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
       );
       final saved = [...withUser, finalMsg];
       state = AsyncData(saved);
-      await ref.read(aiConversationRepoProvider).saveAll(saved);
+      await _persistMessages(saved);
     } catch (e) {
       final failure = AppFailure.from(e);
       final errMsg = placeholder.copyWith(
@@ -267,8 +376,9 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
       );
       final saved = [...withUser, errMsg];
       state = AsyncData(saved);
-      await ref.read(aiConversationRepoProvider).saveAll(saved);
+      await _persistMessages(saved);
     } finally {
+      _cancelRequested = false;
       ref.read(aiIsStreamingProvider.notifier).state = false;
     }
   }
@@ -284,7 +394,7 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
     );
     final next = [...currentList, msg];
     state = AsyncData(next);
-    await ref.read(aiConversationRepoProvider).saveAll(next);
+    await _persistMessages(next);
   }
 
   String _buildSystemPrompt() {
@@ -310,10 +420,18 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
 1. تحدث باللغة العربية الفصحى السلسة والدافئة والمحترمة.
 2. استند في نصائحك إلى بيانات المستخدم الحقيقية المتاحة أدناه فقط، ولا تخترع بيانات غير موجودة.
 3. نبّه المستخدم بلطف إذا لاحظت ضغطاً في جدول المهام (مثلاً تكدس مهام كثيرة بين المغرب والعشاء أو تراجع الإنجاز).
-4. قدّم خطوات عملية مختصرة وقابلة للتنفيذ.
-5. عندما يطلب المستخدم إضافة مهمة أو إنشاء مشروع، أضف في نهاية ردك كتلة JSON بهذا الشكل الدقيق ليؤكدها المستخدم:
+4. نسّق ردودك بوضوح باستخدام Markdown (عناوين قصيرة، نقاط مرتبة، وخط عريض للعناصر المهمة) واجعل الأسلوب عملياً ومباشراً.
+5. عندما يطلب المستخدم إضافة أو تعديل أو حذف مهمة أو إنشاء مشروع، أضف في نهاية ردك كتلة JSON بهذا الشكل الدقيق ليؤكدها المستخدم:
 ```ribat_action
 {"action":"add_activity","title":"اسم المهمة","repetition":"daily|once|open","type":"afterPrayer|beforePrayer|independent","linkedPrayer":"fajr|dhuhr|asr|maghrib|isha","projectName":"اسم المشروع اختياري"}
+```
+أو لتعديل نشاط موجود:
+```ribat_action
+{"action":"edit_activity","targetTitle":"اسم النشاط الحالي","newTitle":"اختياري","newRepetition":"daily|once|open","newType":"afterPrayer|beforePrayer|independent","newLinkedPrayer":"fajr|dhuhr|asr|maghrib|isha"}
+```
+أو لحذف نشاط موجود:
+```ribat_action
+{"action":"delete_activity","targetTitle":"اسم النشاط"}
 ```
 أو لإنشاء مشروع:
 ```ribat_action

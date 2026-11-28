@@ -54,6 +54,8 @@ class AiToolParser {
 
   bool _isValidCall(AiToolCall call) => switch (call) {
         AddActivityToolCall(:final title) => title.isNotEmpty,
+        EditActivityToolCall(:final targetTitle) => targetTitle.isNotEmpty,
+        DeleteActivityToolCall(:final targetTitle) => targetTitle.isNotEmpty,
         CreateProjectToolCall(:final name) => name.isNotEmpty,
       };
 }

@@ -1,19 +1,20 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter_local_llm/flutter_local_llm.dart';
+import 'package:llamadart/llamadart.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../domain/ai_message.dart';
 
 class LocalLlmClient {
-  LocalLlmEngine? _engine;
+  LlamaEngine? _engine;
   String? _loadedModelPath;
 
   Stream<String> streamChat({
     required String modelPath,
     required String systemPrompt,
     required List<AiMessage> history,
+    bool Function()? isCancelled,
   }) async* {
     final file = File(modelPath);
     if (!await file.exists()) {
@@ -23,35 +24,40 @@ class LocalLlmClient {
     }
 
     try {
-      if (_engine == null ||
-          _engine!.isDisposed ||
-          _loadedModelPath != modelPath) {
-        _engine?.dispose();
-        _engine = await LocalLlmEngine.loadModel(
-          modelPath: modelPath,
-          params: const ModelParams(contextSize: 2048),
+      if (_engine == null || _loadedModelPath != modelPath) {
+        await _engine?.dispose();
+        _engine = await LlamaEngine.load(
+          LlamaModel(ModelSource.path(modelPath)),
         );
         _loadedModelPath = modelPath;
       }
 
-      final session = _engine!.createSession();
-      try {
-        final messages = <ChatMessage>[
-          ChatMessage.system(systemPrompt),
-          for (final m in history.where((m) => !m.isError).take(12))
-            if (m.role == AiRole.user)
-              ChatMessage.user(m.content)
-            else if (m.role == AiRole.assistant)
-              ChatMessage.assistant(m.content),
-        ];
+      final messages = <LlamaChatMessage>[
+        LlamaChatMessage.fromText(
+          role: LlamaChatRole.system,
+          text: systemPrompt,
+        ),
+        for (final m in history.where((m) => !m.isError).take(12))
+          if (m.role == AiRole.user)
+            LlamaChatMessage.fromText(
+              role: LlamaChatRole.user,
+              text: m.content,
+            )
+          else if (m.role == AiRole.assistant)
+            LlamaChatMessage.fromText(
+              role: LlamaChatRole.assistant,
+              text: m.content,
+            ),
+      ];
 
-        await for (final token in session.chat(messages)) {
-          if (token.isNotEmpty) yield token;
+      await for (final token in _engine!.create(messages).textDeltas()) {
+        if (isCancelled?.call() == true) {
+          _engine?.cancelGeneration();
+          break;
         }
-      } finally {
-        session.dispose();
+        if (token.isNotEmpty) yield token;
       }
-    } on LlmException catch (e) {
+    } on LlamaException catch (e) {
       throw UnknownFailure(
         fallback:
             'تعذر تشغيل النموذج المحلي على هذا الجهاز. جرّب نموذجاً أخف أو استخدم السحابي.',
@@ -65,8 +71,8 @@ class LocalLlmClient {
     }
   }
 
-  void dispose() {
-    _engine?.dispose();
+  Future<void> dispose() async {
+    await _engine?.dispose();
     _engine = null;
     _loadedModelPath = null;
   }

@@ -146,7 +146,23 @@ final aiProactiveAlertProvider = Provider<AiProactiveAlert?>((ref) {
   final now = DateTime.now();
   final todayToken =
       '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}_${alert.id}';
-  if (dismissed.contains(todayToken)) return null;
+  if (dismissed.contains(todayToken)) {
+    Future.microtask(() async {
+      try {
+        await ref.read(notificationServiceProvider).cancelProactiveAiReminder();
+      } catch (_) {}
+    });
+    return null;
+  }
+
+  Future.microtask(() async {
+    try {
+      await ref.read(notificationServiceProvider).scheduleProactiveAiReminder(
+            title: alert.title,
+            body: alert.body,
+          );
+    } catch (_) {}
+  });
 
   return alert;
 });

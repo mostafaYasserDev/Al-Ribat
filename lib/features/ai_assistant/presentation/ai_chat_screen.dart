@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../projects/presentation/widgets/anchored_popover.dart';
@@ -215,6 +216,8 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
 
   void _openMenu(BuildContext anchorContext) {
     HapticFeedback.selectionClick();
+    final sessions = ref.read(aiSessionsProvider);
+    final activeId = ref.read(aiActiveSessionIdProvider);
     showAnchoredPopover<void>(
       anchorContext,
       width: 245,
@@ -222,6 +225,25 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
       builder: (popCtx) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          PopoverActionRow(
+            icon: Icons.add_comment_outlined,
+            color: const Color(0xFF5856D6),
+            label: 'محادثة جديدة',
+            onTap: () {
+              Navigator.of(popCtx).pop();
+              ref.read(aiChatProvider.notifier).startNewSession();
+            },
+          ),
+          if (sessions.isNotEmpty)
+            PopoverActionRow(
+              icon: Icons.history_rounded,
+              color: const Color(0xFFFF9500),
+              label: 'المحادثات السابقة (${sessions.length})',
+              onTap: () {
+                Navigator.of(popCtx).pop();
+                _showSessionsSheet(sessions, activeId);
+              },
+            ),
           PopoverActionRow(
             icon: Icons.tune_rounded,
             color: const Color(0xFF007AFF),
@@ -254,7 +276,7 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
           PopoverActionRow(
             icon: Icons.delete_outline_rounded,
             color: const Color(0xFFFF3B30),
-            label: 'مسح سجل المحادثة',
+            label: 'حذف المحادثة الحالية',
             isDestructive: true,
             onTap: () {
               Navigator.of(popCtx).pop();
@@ -262,6 +284,79 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSessionsSheet(List<dynamic> sessions, String? activeId) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'المحادثات السابقة',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: sessions.length,
+                  separatorBuilder: (_, __) => Divider(
+                    height: 1,
+                    color: colorScheme.onSurface.withValues(alpha: 0.08),
+                  ),
+                  itemBuilder: (_, i) {
+                    final s = sessions[i];
+                    final isActive = s.id == activeId;
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(
+                        isActive
+                            ? Icons.chat_bubble_rounded
+                            : Icons.chat_bubble_outline_rounded,
+                        color: isActive
+                            ? colorScheme.primary
+                            : colorScheme.onSurface.withValues(alpha: 0.55),
+                        size: 19,
+                      ),
+                      title: Text(
+                        s.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontWeight:
+                              isActive ? FontWeight.w800 : FontWeight.w600,
+                        ),
+                      ),
+                      subtitle: Text('${s.messages.length} رسالة'),
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        ref.read(aiChatProvider.notifier).switchSession(s.id);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -481,20 +576,23 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
             ),
             const SizedBox(width: 8),
             PressableScale(
-              onTap: isStreaming ? null : () => _handleSend(),
+              onTap: isStreaming
+                  ? () {
+                      HapticFeedback.selectionClick();
+                      ref.read(aiChatProvider.notifier).stopGeneration();
+                    }
+                  : () => _handleSend(),
               child: Container(
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
                   color: isStreaming
-                      ? colorScheme.primary.withValues(alpha: 0.4)
+                      ? const Color(0xFFFF3B30)
                       : colorScheme.primary,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  isStreaming
-                      ? Icons.hourglass_top_rounded
-                      : Icons.send_rounded,
+                  isStreaming ? Icons.stop_rounded : Icons.send_rounded,
                   color: Colors.white,
                   size: 19,
                 ),
@@ -555,13 +653,94 @@ class _AiChatBubble extends StatelessWidget {
                   color: colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               )
-            : SelectableText(
-                message.content,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: textColor,
-                  height: 1.5,
-                ),
-              ),
+            : isUser || message.isError
+                ? SelectableText(
+                    message.content,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: textColor,
+                      height: 1.5,
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      MarkdownBody(
+                        data: message.content,
+                        selectable: true,
+                        styleSheet:
+                            MarkdownStyleSheet.fromTheme(theme).copyWith(
+                          p: theme.textTheme.bodyMedium?.copyWith(
+                            color: textColor,
+                            height: 1.55,
+                          ),
+                          h1: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: textColor,
+                          ),
+                          h2: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: textColor,
+                          ),
+                          h3: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: textColor,
+                          ),
+                          listBullet: theme.textTheme.bodyMedium?.copyWith(
+                            color: textColor,
+                          ),
+                        ),
+                      ),
+                      if (!isStreaming) ...[
+                        const SizedBox(height: 6),
+                        Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              Clipboard.setData(
+                                ClipboardData(text: message.content),
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('تم نسخ الرد'),
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.copy_rounded,
+                                    size: 13,
+                                    color: colorScheme.onSurface
+                                        .withValues(alpha: 0.48),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'نسخ',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.onSurface
+                                          .withValues(alpha: 0.48),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
       ),
     );
   }
@@ -590,6 +769,20 @@ class _ToolActionCard extends ConsumerWidget {
           call.projectName != null
               ? 'ضمن مشروع: ${call.projectName}'
               : 'مقترح من المساعد',
+        ),
+      EditActivityToolCall() => (
+          Icons.edit_calendar_rounded,
+          const Color(0xFF007AFF),
+          'تعديل نشاط: ${call.targetTitle}',
+          call.newTitle != null
+              ? 'الاسم الجديد: ${call.newTitle}'
+              : 'تحديث التوقيت أو التكرار',
+        ),
+      DeleteActivityToolCall() => (
+          Icons.delete_outline_rounded,
+          const Color(0xFFFF3B30),
+          'حذف نشاط: ${call.targetTitle}',
+          'يتطلب تأكيدك قبل الحذف النهائي',
         ),
       CreateProjectToolCall() => (
           Icons.create_new_folder_rounded,

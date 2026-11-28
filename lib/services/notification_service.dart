@@ -74,4 +74,43 @@ class NotificationService {
         sessionTitle: sessionTitle,
         body: body,
       );
+
+  static const int _proactiveAiNotificationId = 99001;
+
+  Future<void> scheduleProactiveAiReminder({
+    required String title,
+    required String body,
+  }) async {
+    if (!_notificationsSupported) return;
+    await _ready;
+    final scheduled = tz.TZDateTime.now(tz.local).add(const Duration(hours: 3));
+    await _plugin.zonedSchedule(
+      _proactiveAiNotificationId,
+      title,
+      body,
+      scheduled,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'ai_proactive_channel',
+          'تنبيهات RibatAI الذكية',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+        ),
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  Future<void> cancelProactiveAiReminder() async {
+    if (!_notificationsSupported) return;
+    await _ready;
+    await _plugin.cancel(_proactiveAiNotificationId);
+  }
 }
