@@ -34,18 +34,17 @@ class LocalModelSpec {
   /// Curated 3-model catalog for local on-device inference (GGUF).
   static const List<LocalModelSpec> catalog = [
     LocalModelSpec(
-      id: 'qwen-0.5b-q4',
-      displayName: 'Qwen 2.5 0.5B (Q4)',
+      id: 'qwen-1.5b-q4',
+      displayName: 'Qwen 2.5 1.5B (Q4)',
       badge: 'خفيف',
-      description:
-          'الأخف والأسرع على الأجهزة الاقتصادية، مناسب للاستفسارات السريعة.',
-      sizeMb: 400,
-      requiredRamMb: 1200,
-      arabicQuality: ArabicQuality.acceptable,
-      speedNote: 'سريع جداً',
-      fileName: 'qwen2.5-0.5b-instruct-q4_k_m.gguf',
+      description: 'أسرع نموذج يدعم العربية بوضوح ومناسب لمعظم الهواتف.',
+      sizeMb: 980,
+      requiredRamMb: 2200,
+      arabicQuality: ArabicQuality.good,
+      speedNote: 'سريع',
+      fileName: 'qwen2.5-1.5b-instruct-q4_k_m.gguf',
       downloadUrl:
-          'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf',
+          'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
     ),
     LocalModelSpec(
       id: 'gemma3-1b-int4',

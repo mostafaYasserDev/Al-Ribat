@@ -557,10 +557,13 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                 controller: _inputController,
                 minLines: 1,
                 maxLines: 4,
+                textDirection: TextDirection.rtl,
+                textAlign: TextAlign.start,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _handleSend(),
                 decoration: InputDecoration(
-                  hintText: 'اكتب رسالتك لـ RibatAI…',
+                  hintText: 'اكتب رسالتك للمساعد…',
+                  hintTextDirection: TextDirection.rtl,
                   filled: true,
                   fillColor: theme.cardColor,
                   contentPadding: const EdgeInsets.symmetric(
@@ -656,90 +659,97 @@ class _AiChatBubble extends StatelessWidget {
             : isUser || message.isError
                 ? SelectableText(
                     message.content,
+                    textDirection: TextDirection.rtl,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: textColor,
                       height: 1.5,
                     ),
                   )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      MarkdownBody(
-                        data: message.content,
-                        selectable: true,
-                        styleSheet:
-                            MarkdownStyleSheet.fromTheme(theme).copyWith(
-                          p: theme.textTheme.bodyMedium?.copyWith(
-                            color: textColor,
-                            height: 1.55,
-                          ),
-                          h1: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: textColor,
-                          ),
-                          h2: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: textColor,
-                          ),
-                          h3: theme.textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: textColor,
-                          ),
-                          listBullet: theme.textTheme.bodyMedium?.copyWith(
-                            color: textColor,
-                          ),
-                        ),
-                      ),
-                      if (!isStreaming) ...[
-                        const SizedBox(height: 6),
-                        Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              Clipboard.setData(
-                                ClipboardData(text: message.content),
-                              );
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('تم نسخ الرد'),
-                                  duration: Duration(seconds: 1),
-                                ),
-                              );
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.copy_rounded,
-                                    size: 13,
-                                    color: colorScheme.onSurface
-                                        .withValues(alpha: 0.48),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'نسخ',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: colorScheme.onSurface
-                                          .withValues(alpha: 0.48),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                : Directionality(
+                    textDirection: TextDirection.rtl,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        MarkdownBody(
+                          data: message.content,
+                          selectable: true,
+                          styleSheet:
+                              MarkdownStyleSheet.fromTheme(theme).copyWith(
+                            textAlign: WrapAlignment.start,
+                            unorderedListAlign: WrapAlignment.start,
+                            orderedListAlign: WrapAlignment.start,
+                            p: theme.textTheme.bodyMedium?.copyWith(
+                              color: textColor,
+                              height: 1.55,
+                            ),
+                            h1: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: textColor,
+                            ),
+                            h2: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: textColor,
+                            ),
+                            h3: theme.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: textColor,
+                            ),
+                            listBullet: theme.textTheme.bodyMedium?.copyWith(
+                              color: textColor,
                             ),
                           ),
                         ),
+                        if (!isStreaming) ...[
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: AlignmentDirectional.centerEnd,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                Clipboard.setData(
+                                  ClipboardData(text: message.content),
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('تم نسخ الرد'),
+                                    duration: Duration(seconds: 1),
+                                  ),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.copy_rounded,
+                                      size: 13,
+                                      color: colorScheme.onSurface
+                                          .withValues(alpha: 0.48),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'نسخ',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: colorScheme.onSurface
+                                            .withValues(alpha: 0.48),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
       ),
     );

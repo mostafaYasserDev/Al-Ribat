@@ -46,7 +46,7 @@ void main() {
   test('LocalModelSpec catalog contains exactly 3 curated models', () {
     expect(LocalModelSpec.catalog.length, 3);
     expect(LocalModelSpec.catalog.map((m) => m.id), [
-      'qwen-0.5b-q4',
+      'qwen-1.5b-q4',
       'gemma3-1b-int4',
       'llama32-3b-q4',
     ]);

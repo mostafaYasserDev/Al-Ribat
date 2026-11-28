@@ -325,7 +325,8 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
     ref.read(aiIsStreamingProvider.notifier).state = true;
 
     try {
-      final systemPrompt = _buildSystemPrompt();
+      final isLocal = config.type == AiProviderType.localLlm;
+      final systemPrompt = _buildSystemPrompt(isLocal: isLocal);
       final buffer = StringBuffer();
 
       final tokenStream = switch (config.type) {
@@ -397,7 +398,7 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
     await _persistMessages(next);
   }
 
-  String _buildSystemPrompt() {
+  String _buildSystemPrompt({bool isLocal = false}) {
     final perms = ref.read(aiPermissionsProvider);
     final summaryApproved = ref.read(aiReflectionSummaryApprovedProvider);
     final activities = ref.read(activitiesProvider).valueOrNull ?? const [];
@@ -413,6 +414,16 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
       workSessions: sessions,
       reflectionSummaryApproved: summaryApproved,
     );
+
+    if (isLocal) {
+      return '''
+أنت "رباط"، مساعد شخصي مسلم لطيف ومختصر تساعد في تنظيم الوقت حول الصلوات.
+أجب باللغة العربية الفصحى الواضحة والمختصرة بنقاط بسيطة بدون حشو.
+
+بيانات المستخدم:
+${snapshot.toPromptText()}
+''';
+    }
 
     return '''
 أنت "رباط"، مساعد شخصي ذكي مدمج في تطبيق "الرباط" لتنظيم حياة المسلم حول أوقات الصلاة.

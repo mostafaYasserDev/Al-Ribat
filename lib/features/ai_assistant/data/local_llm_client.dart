@@ -28,16 +28,26 @@ class LocalLlmClient {
         await _engine?.dispose();
         _engine = await LlamaEngine.load(
           LlamaModel(ModelSource.path(modelPath)),
+          params: const ModelParams(
+            contextSize: 1536,
+            numberOfThreads: 4,
+          ),
         );
         _loadedModelPath = modelPath;
       }
+
+      final validHistory =
+          history.where((m) => !m.isError && m.role != AiRole.system).toList();
+      final recentHistory = validHistory.length > 4
+          ? validHistory.sublist(validHistory.length - 4)
+          : validHistory;
 
       final messages = <LlamaChatMessage>[
         LlamaChatMessage.fromText(
           role: LlamaChatRole.system,
           text: systemPrompt,
         ),
-        for (final m in history.where((m) => !m.isError).take(12))
+        for (final m in recentHistory)
           if (m.role == AiRole.user)
             LlamaChatMessage.fromText(
               role: LlamaChatRole.user,
@@ -50,7 +60,19 @@ class LocalLlmClient {
             ),
       ];
 
-      await for (final token in _engine!.create(messages).textDeltas()) {
+      final stream = _engine!
+          .create(
+            messages,
+            params: const GenerationParams(
+              maxTokens: 320,
+              temp: 0.45,
+              topP: 0.85,
+              penalty: 1.15,
+            ),
+          )
+          .textDeltas();
+
+      await for (final token in stream) {
         if (isCancelled?.call() == true) {
           _engine?.cancelGeneration();
           break;
