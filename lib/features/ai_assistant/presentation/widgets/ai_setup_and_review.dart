@@ -9,6 +9,7 @@ import '../../domain/ai_context_snapshot.dart';
 import '../../domain/ai_local_model_spec.dart';
 import '../../domain/ai_provider_config.dart';
 import '../ai_settings_page.dart';
+import 'ai_model_download_sheet.dart';
 
 class AiSetupView extends ConsumerStatefulWidget {
   const AiSetupView({super.key});
@@ -186,20 +187,49 @@ class _AiSetupViewState extends ConsumerState<AiSetupView> {
               for (final spec in LocalModelSpec.catalog)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        '${spec.displayName} (${spec.badge})',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${spec.displayName} (${spec.badge})',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'الحجم: ${spec.sizeMb} MB · RAM: ${(spec.requiredRamMb / 1000).toStringAsFixed(1)} GB · العربية: ${spec.arabicQualityLabel}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurface
+                                    .withValues(alpha: 0.62),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'الحجم: ${spec.sizeMb} MB · RAM: ${(spec.requiredRamMb / 1000).toStringAsFixed(1)} GB · العربية: ${spec.arabicQualityLabel}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurface.withValues(alpha: 0.62),
+                      const SizedBox(width: 8),
+                      PressableScale(
+                        onTap: () => showModelDownloadSheet(context, spec),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 7,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'تنزيل',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ],

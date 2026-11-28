@@ -11,7 +11,9 @@ import 'package:al_ribat/features/ai_assistant/data/ai_conversation_hive_repo.da
 import 'package:al_ribat/features/ai_assistant/data/ai_settings_hive_repo.dart';
 import 'package:al_ribat/features/ai_assistant/data/ai_tool_parser.dart';
 import 'package:al_ribat/features/ai_assistant/data/local_context_builder.dart';
+import 'package:al_ribat/features/ai_assistant/data/local_llm_client.dart';
 import 'package:al_ribat/features/ai_assistant/data/local_reflection_summarizer.dart';
+import 'package:al_ribat/features/ai_assistant/data/model_download_manager.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_context_snapshot.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_local_model_spec.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_message.dart';
@@ -322,5 +324,34 @@ void main() {
 
     expect(find.text('جدولة مزدحمة بين المغرب والعشاء'), findsOneWidget);
     expect(find.text('ناقش المساعد لحلها'), findsOneWidget);
+  });
+
+  test('ModelDownloadManager detects and deletes local model files', () async {
+    final tempDir = await Directory.systemTemp.createTemp('al_ribat_models_');
+    final manager = ModelDownloadManager(baseDirProvider: () async => tempDir);
+    final spec = LocalModelSpec.catalog.first;
+
+    expect(await manager.getDownloadedModelPath(spec), isNull);
+
+    final dir = Directory('${tempDir.path}/ai_models')..createSync();
+    final file = File('${dir.path}/${spec.fileName}')
+      ..writeAsStringSync('gguf');
+    expect(await manager.getDownloadedModelPath(spec), file.path);
+
+    await manager.deleteModel(spec);
+    expect(await manager.getDownloadedModelPath(spec), isNull);
+  });
+
+  test('LocalLlmClient throws clear ValidationFailure when model is missing',
+      () async {
+    const client = LocalLlmClient();
+    await expectLater(
+      client.streamChat(
+        modelPath: '/nonexistent/model.gguf',
+        systemPrompt: 'sys',
+        history: const [],
+      ).toList(),
+      throwsException,
+    );
   });
 }

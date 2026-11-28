@@ -7,6 +7,7 @@ import '../../settings/presentation/widgets/settings_ui_components.dart';
 import '../application/ai_providers.dart';
 import '../domain/ai_local_model_spec.dart';
 import '../domain/ai_provider_config.dart';
+import 'widgets/ai_model_download_sheet.dart';
 
 class AiSettingsPage extends ConsumerStatefulWidget {
   const AiSettingsPage({super.key});
@@ -133,13 +134,13 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                       icon: Icons.notifications_active_outlined,
                       iconColor: const Color(0xFFFF9500),
                       title: 'التنبيهات الاستباقية الذكية',
-                      subtitle: 'تحليل محلي لتنبيهك عند ازدحام الجدول أو تراجع الالتزام',
+                      subtitle:
+                          'تحليل محلي لتنبيهك عند ازدحام الجدول أو تراجع الالتزام',
                       value: config.proactiveAlertsEnabled,
-                      onChanged: (v) => ref
-                          .read(aiConfigProvider.notifier)
-                          .updateConfig(
-                            config.copyWith(proactiveAlertsEnabled: v),
-                          ),
+                      onChanged: (v) =>
+                          ref.read(aiConfigProvider.notifier).updateConfig(
+                                config.copyWith(proactiveAlertsEnabled: v),
+                              ),
                     ),
                     SettingsSwitchTile(
                       icon: Icons.task_alt_rounded,
@@ -399,110 +400,198 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
     ColorScheme colorScheme,
     AiProviderConfig config,
   ) {
+    final downloaded =
+        ref.watch(downloadedModelsProvider).valueOrNull ?? const {};
+
     return Column(
       key: const ValueKey('local_section'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SettingsSectionHeader(
-            title: 'النماذج المحلية (قريباً في المرحلة 4)'),
+        const SettingsSectionHeader(title: 'النماذج المحلية على الجهاز'),
         SettingsGroupCard(
           dividerIndent: 16,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF9500).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.info_outline_rounded,
-                        size: 18, color: Color(0xFFFF9500)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'محرك التنزيل والتشغيل المحلي سيتم تفعيله في المرحلة القادمة. يمكنك استخدام Groq السحابي حالياً.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
             for (final spec in LocalModelSpec.catalog)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SettingsIconBadge(
-                      icon: Icons.memory_rounded,
-                      color: Color(0xFF5856D6),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  spec.displayName,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
+              Builder(
+                builder: (_) {
+                  final path = downloaded[spec.id];
+                  final isDownloaded = path != null;
+                  final isSelected = isDownloaded &&
+                      config.localModelId == spec.id &&
+                      config.type == AiProviderType.localLlm;
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SettingsIconBadge(
+                              icon: Icons.memory_rounded,
+                              color: Color(0xFF5856D6),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          spec.displayName,
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF5856D6)
+                                              .withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                        child: Text(
+                                          spec.badge,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF5856D6),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    spec.description,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurface
+                                          .withValues(alpha: 0.65),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'الحجم: ${spec.sizeMb} MB · RAM: ${(spec.requiredRamMb / 1000).toStringAsFixed(1)} GB · العربية: ${spec.arabicQualityLabel} · ${spec.speedNote}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: colorScheme.onSurface
+                                          .withValues(alpha: 0.55),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: PressableScale(
+                                onTap: () async {
+                                  if (isDownloaded) {
+                                    HapticFeedback.lightImpact();
+                                    await ref
+                                        .read(aiConfigProvider.notifier)
+                                        .updateConfig(
+                                          config.copyWith(
+                                            type: AiProviderType.localLlm,
+                                            localModelId: spec.id,
+                                            localModelPath: path,
+                                            hasCompletedOnboarding: true,
+                                          ),
+                                        );
+                                  } else {
+                                    await showModelDownloadSheet(context, spec);
+                                  }
+                                },
+                                child: Container(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 9),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? const Color(0xFF34C759)
+                                            .withValues(alpha: 0.14)
+                                        : colorScheme.primary
+                                            .withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      isSelected
+                                          ? 'مفعّل حالياً ✓'
+                                          : (isDownloaded
+                                              ? 'تفعيل هذا النموذج'
+                                              : 'تنزيل (${spec.sizeMb} MB)'),
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: isSelected
+                                            ? const Color(0xFF34C759)
+                                            : colorScheme.primary,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF5856D6)
-                                      .withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  spec.badge,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: Color(0xFF5856D6),
+                            ),
+                            if (isDownloaded) ...[
+                              const SizedBox(width: 8),
+                              PressableScale(
+                                onTap: () async {
+                                  HapticFeedback.selectionClick();
+                                  await ref
+                                      .read(modelDownloadManagerProvider)
+                                      .deleteModel(spec);
+                                  if (config.localModelId == spec.id) {
+                                    await ref
+                                        .read(aiConfigProvider.notifier)
+                                        .updateConfig(
+                                          config.copyWith(
+                                            type: AiProviderType.groqCloud,
+                                            localModelId: null,
+                                            localModelPath: null,
+                                          ),
+                                        );
+                                  }
+                                  ref.invalidate(downloadedModelsProvider);
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 9,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFF3B30)
+                                        .withValues(alpha: 0.11),
+                                    borderRadius: BorderRadius.circular(11),
+                                  ),
+                                  child: const Text(
+                                    'حذف',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFFFF3B30),
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            spec.description,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color:
-                                  colorScheme.onSurface.withValues(alpha: 0.65),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'الحجم: ${spec.sizeMb} MB · RAM: ${(spec.requiredRamMb / 1000).toStringAsFixed(1)} GB · العربية: ${spec.arabicQualityLabel} · ${spec.speedNote}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color:
-                                  colorScheme.onSurface.withValues(alpha: 0.55),
-                            ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
           ],
         ),

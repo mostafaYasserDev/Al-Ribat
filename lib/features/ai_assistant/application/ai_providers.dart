@@ -8,8 +8,11 @@ import '../data/ai_settings_hive_repo.dart';
 import '../data/ai_tool_parser.dart';
 import '../data/groq_client.dart';
 import '../data/local_context_builder.dart';
+import '../data/local_llm_client.dart';
 import '../data/local_reflection_summarizer.dart';
+import '../data/model_download_manager.dart';
 import '../domain/ai_context_snapshot.dart';
+import '../domain/ai_local_model_spec.dart';
 import '../domain/ai_message.dart';
 import '../domain/ai_permissions.dart';
 import '../domain/ai_provider_config.dart';
@@ -25,6 +28,25 @@ final aiConversationRepoProvider = Provider<AiConversationHiveRepo>((ref) {
 });
 
 final groqClientProvider = Provider<GroqClient>((ref) => GroqClient());
+
+final localLlmClientProvider =
+    Provider<LocalLlmClient>((ref) => const LocalLlmClient());
+
+final modelDownloadManagerProvider =
+    Provider<ModelDownloadManager>((ref) => ModelDownloadManager());
+
+final downloadedModelsProvider =
+    FutureProvider<Map<String, String>>((ref) async {
+  final manager = ref.read(modelDownloadManagerProvider);
+  final result = <String, String>{};
+  for (final spec in LocalModelSpec.catalog) {
+    final path = await manager.getDownloadedModelPath(spec);
+    if (path != null) {
+      result[spec.id] = path;
+    }
+  }
+  return result;
+});
 
 final aiConfigProvider =
     NotifierProvider<AiConfigNotifier, AiProviderConfig>(AiConfigNotifier.new);
@@ -133,15 +155,11 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
     if (text.isEmpty || ref.read(aiIsStreamingProvider)) return;
 
     final config = ref.read(aiConfigProvider);
-    if (config.type == AiProviderType.localLlm) {
-      await _appendSystemNotice(
-        'الوضع المحلي قيد التجهيز للمرحلة القادمة. يمكنك حالياً التبديل إلى Groq السحابي من الإعدادات.',
-      );
-      return;
-    }
     if (!config.isConfigured) {
       await _appendSystemNotice(
-        'يرجى إكمال إعداد مفتاح Groq API أولاً لتتمكن من بدء المحادثة.',
+        config.type == AiProviderType.localLlm
+            ? 'يرجى تنزيل واختيار نموذج محلي من الإعدادات أولاً لبدء المحادثة.'
+            : 'يرجى إكمال إعداد مفتاح Groq API أولاً لتتمكن من بدء المحادثة.',
       );
       return;
     }
@@ -167,15 +185,23 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
 
     try {
       final systemPrompt = _buildSystemPrompt();
-      final client = ref.read(groqClientProvider);
       final buffer = StringBuffer();
 
-      await for (final token in client.streamChat(
-        apiKey: config.groqApiKey!,
-        model: config.groqModel,
-        systemPrompt: systemPrompt,
-        history: withUser,
-      )) {
+      final tokenStream = switch (config.type) {
+        AiProviderType.groqCloud => ref.read(groqClientProvider).streamChat(
+              apiKey: config.groqApiKey!,
+              model: config.groqModel,
+              systemPrompt: systemPrompt,
+              history: withUser,
+            ),
+        AiProviderType.localLlm => ref.read(localLlmClientProvider).streamChat(
+              modelPath: config.localModelPath!,
+              systemPrompt: systemPrompt,
+              history: withUser,
+            ),
+      };
+
+      await for (final token in tokenStream) {
         buffer.write(token);
         final updated = placeholder.copyWith(content: buffer.toString());
         state = AsyncData([...withUser, updated]);

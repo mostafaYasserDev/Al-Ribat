@@ -10,6 +10,8 @@ class LocalModelSpec {
     required this.requiredRamMb,
     required this.arabicQuality,
     required this.speedNote,
+    required this.fileName,
+    required this.downloadUrl,
   });
 
   final String id;
@@ -20,6 +22,8 @@ class LocalModelSpec {
   final int requiredRamMb;
   final ArabicQuality arabicQuality;
   final String speedNote;
+  final String fileName;
+  final String downloadUrl;
 
   String get arabicQualityLabel => switch (arabicQuality) {
         ArabicQuality.acceptable => 'مقبولة',
@@ -27,7 +31,7 @@ class LocalModelSpec {
         ArabicQuality.excellent => 'ممتازة',
       };
 
-  /// Curated 3-model catalog for Phase 4 local inference.
+  /// Curated 3-model catalog for local on-device inference (GGUF).
   static const List<LocalModelSpec> catalog = [
     LocalModelSpec(
       id: 'qwen-0.5b-q4',
@@ -39,16 +43,22 @@ class LocalModelSpec {
       requiredRamMb: 1200,
       arabicQuality: ArabicQuality.acceptable,
       speedNote: 'سريع جداً',
+      fileName: 'qwen2.5-0.5b-instruct-q4_k_m.gguf',
+      downloadUrl:
+          'https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf',
     ),
     LocalModelSpec(
       id: 'gemma3-1b-int4',
-      displayName: 'Gemma 3 1B (INT4)',
+      displayName: 'Gemma 3 1B (Q4)',
       badge: 'متوازن',
       description: 'توازن ممتاز بين السرعة وجودة العربية لمعظم الهواتف.',
       sizeMb: 530,
       requiredRamMb: 1800,
       arabicQuality: ArabicQuality.good,
       speedNote: 'سريع',
+      fileName: 'gemma-3-1b-it-Q4_K_M.gguf',
+      downloadUrl:
+          'https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf',
     ),
     LocalModelSpec(
       id: 'llama32-3b-q4',
@@ -60,6 +70,9 @@ class LocalModelSpec {
       requiredRamMb: 3500,
       arabicQuality: ArabicQuality.excellent,
       speedNote: 'متوسط',
+      fileName: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
+      downloadUrl:
+          'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
     ),
   ];
 }
