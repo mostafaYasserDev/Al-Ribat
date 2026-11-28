@@ -48,6 +48,7 @@ class ReflectionSummary {
 
 class AiContextSnapshot {
   const AiContextSnapshot({
+    this.currentTimeLabel,
     this.activitiesLines = const [],
     this.completedToday = 0,
     this.dueToday = 0,
@@ -60,6 +61,7 @@ class AiContextSnapshot {
     this.totalFocusMinutesWeek = 0,
   });
 
+  final String? currentTimeLabel;
   final List<String> activitiesLines;
   final int completedToday;
   final int dueToday;
@@ -72,7 +74,24 @@ class AiContextSnapshot {
   final int totalFocusMinutesWeek;
 
   String toPromptText() {
+    final hasAnyData = activitiesLines.isNotEmpty ||
+        dueToday > 0 ||
+        prayerLines.isNotEmpty ||
+        projectLines.isNotEmpty ||
+        fullReflectionLines.isNotEmpty ||
+        reflectionSummary != null ||
+        workSessionLines.isNotEmpty ||
+        totalFocusMinutesWeek > 0;
+    if (!hasAnyData) {
+      return 'لم يمنح المستخدم صلاحية مشاركة بيانات التطبيق بعد. قدّم نصائح عامة واحترم خصوصيته.';
+    }
+
     final buf = StringBuffer();
+
+    if (currentTimeLabel != null && currentTimeLabel!.isNotEmpty) {
+      buf.writeln('اللحظة الحالية: $currentTimeLabel');
+      buf.writeln();
+    }
 
     if (prayerLines.isNotEmpty) {
       buf.writeln('## أوقات الصلاة اليوم:');

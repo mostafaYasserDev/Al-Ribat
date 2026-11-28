@@ -81,6 +81,10 @@ class LocalContextBuilder {
         : const <String>[];
 
     return AiContextSnapshot(
+      currentTimeLabel: _buildCurrentTimeLabel(
+        current,
+        permissions.allowPrayer ? prayerSchedule : null,
+      ),
       activitiesLines: activitiesLines,
       completedToday: permissions.allowActivities ? completedTodayCount : 0,
       dueToday: permissions.allowActivities ? dueTodayList.length : 0,
@@ -176,6 +180,24 @@ class LocalContextBuilder {
           r.text.length > 220 ? '${r.text.substring(0, 220)}…' : r.text;
       return '$title$text$moods';
     }).toList();
+  }
+
+  String _buildCurrentTimeLabel(DateTime current, PrayerSchedule? schedule) {
+    final timeStr = _formatTime(current);
+    if (schedule == null || schedule.today.isEmpty) {
+      return timeStr;
+    }
+    String phaseLabel = 'بعد العشاء';
+    for (var i = 0; i < schedule.today.length; i++) {
+      final p = schedule.today[i];
+      if (current.isBefore(p.time)) {
+        phaseLabel = i == 0
+            ? 'قبل الفجر'
+            : 'بين ${schedule.today[i - 1].phase.arabicName} و${p.phase.arabicName}';
+        break;
+      }
+    }
+    return '$timeStr ($phaseLabel)';
   }
 
   String _formatDate(DateTime d) {
