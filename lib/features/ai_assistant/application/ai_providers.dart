@@ -5,6 +5,7 @@ import '../../../application/providers.dart';
 import '../../../core/errors/app_failure.dart';
 import '../data/ai_conversation_hive_repo.dart';
 import '../data/ai_settings_hive_repo.dart';
+import '../data/ai_tool_parser.dart';
 import '../data/groq_client.dart';
 import '../data/local_context_builder.dart';
 import '../data/local_reflection_summarizer.dart';
@@ -12,6 +13,8 @@ import '../domain/ai_context_snapshot.dart';
 import '../domain/ai_message.dart';
 import '../domain/ai_permissions.dart';
 import '../domain/ai_provider_config.dart';
+import '../domain/ai_tool_call.dart';
+import 'ai_tool_executor.dart';
 
 final aiSettingsRepoProvider = Provider<AiSettingsHiveRepo>((ref) {
   return AiSettingsHiveRepo(Hive.box<String>('meta_box'));
@@ -65,10 +68,54 @@ final aiChatProvider =
 class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
   static const _contextBuilder = LocalContextBuilder();
   static const _summarizer = LocalReflectionSummarizer();
+  static const _toolParser = AiToolParser();
+  static const _toolExecutor = AiToolExecutor();
 
   @override
   Future<List<AiMessage>> build() async {
     return ref.read(aiConversationRepoProvider).loadAll();
+  }
+
+  Future<void> executeProposedAction(String messageId, String actionId) async {
+    final currentList = state.valueOrNull ?? const <AiMessage>[];
+    AiToolCall? targetCall;
+    for (final msg in currentList) {
+      if (msg.id != messageId) continue;
+      final found =
+          msg.proposedActions.where((a) => a.id == actionId).firstOrNull;
+      if (found != null && found.status == ToolActionStatus.pending) {
+        targetCall = found.call;
+      }
+    }
+    if (targetCall == null) return;
+    await _toolExecutor.execute(ref, targetCall);
+    await _updateActionStatus(messageId, actionId, ToolActionStatus.executed);
+  }
+
+  Future<void> dismissProposedAction(String messageId, String actionId) async {
+    await _updateActionStatus(messageId, actionId, ToolActionStatus.dismissed);
+  }
+
+  Future<void> _updateActionStatus(
+    String messageId,
+    String actionId,
+    ToolActionStatus status,
+  ) async {
+    final currentList = state.valueOrNull ?? const <AiMessage>[];
+    final next = [
+      for (final msg in currentList)
+        if (msg.id == messageId)
+          msg.copyWith(
+            proposedActions: [
+              for (final a in msg.proposedActions)
+                if (a.id == actionId) a.copyWith(status: status) else a,
+            ],
+          )
+        else
+          msg,
+    ];
+    state = AsyncData(next);
+    await ref.read(aiConversationRepoProvider).saveAll(next);
   }
 
   ReflectionSummary previewReflectionSummary() {
@@ -134,11 +181,18 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
         state = AsyncData([...withUser, updated]);
       }
 
-      final finalContent = buffer.toString().trim();
+      final parsed = _toolParser.parse(
+        buffer.toString(),
+        messageId: assistantId,
+      );
+      final finalContent = parsed.cleanText.isEmpty && parsed.actions.isEmpty
+          ? 'لم يصل رد من المساعد. حاول صياغة طلبك مرة أخرى.'
+          : (parsed.cleanText.isEmpty
+              ? 'جهّزت لك الإجراء التالي للموافقة:'
+              : parsed.cleanText);
       final finalMsg = placeholder.copyWith(
-        content: finalContent.isEmpty
-            ? 'لم يصل رد من المساعد. حاول صياغة طلبك مرة أخرى.'
-            : finalContent,
+        content: finalContent,
+        proposedActions: parsed.actions,
       );
       final saved = [...withUser, finalMsg];
       state = AsyncData(saved);
@@ -195,6 +249,14 @@ class AiChatNotifier extends AsyncNotifier<List<AiMessage>> {
 2. استند في نصائحك إلى بيانات المستخدم الحقيقية المتاحة أدناه فقط، ولا تخترع بيانات غير موجودة.
 3. نبّه المستخدم بلطف إذا لاحظت ضغطاً في جدول المهام (مثلاً تكدس مهام كثيرة بين المغرب والعشاء أو تراجع الإنجاز).
 4. قدّم خطوات عملية مختصرة وقابلة للتنفيذ.
+5. عندما يطلب المستخدم إضافة مهمة أو إنشاء مشروع، أضف في نهاية ردك كتلة JSON بهذا الشكل الدقيق ليؤكدها المستخدم:
+```ribat_action
+{"action":"add_activity","title":"اسم المهمة","repetition":"daily|once|open","type":"afterPrayer|beforePrayer|independent","linkedPrayer":"fajr|dhuhr|asr|maghrib|isha","projectName":"اسم المشروع اختياري"}
+```
+أو لإنشاء مشروع:
+```ribat_action
+{"action":"create_project","name":"اسم المشروع","description":"وصف قصير","tasks":["مهمة 1","مهمة 2"]}
+```
 
 بيانات المستخدم المصرح لك بالاطلاع عليها:
 ${snapshot.toPromptText()}

@@ -9,6 +9,7 @@ import '../../settings/presentation/widgets/settings_ui_components.dart';
 import '../application/ai_providers.dart';
 import '../domain/ai_message.dart';
 import '../domain/ai_provider_config.dart';
+import '../domain/ai_tool_call.dart';
 import 'ai_settings_page.dart';
 import 'widgets/ai_setup_and_review.dart';
 
@@ -221,11 +222,21 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
                         itemBuilder: (_, index) {
                           final msg = messages[index];
                           final isLast = index == messages.length - 1;
-                          return _AiChatBubble(
-                            message: msg,
-                            isStreaming: isStreaming &&
-                                isLast &&
-                                msg.role == AiRole.assistant,
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _AiChatBubble(
+                                message: msg,
+                                isStreaming: isStreaming &&
+                                    isLast &&
+                                    msg.role == AiRole.assistant,
+                              ),
+                              for (final action in msg.proposedActions)
+                                _ToolActionCard(
+                                  messageId: msg.id,
+                                  action: action,
+                                ),
+                            ],
                           );
                         },
                       );
@@ -414,6 +425,164 @@ class _AiChatBubble extends StatelessWidget {
                   height: 1.5,
                 ),
               ),
+      ),
+    );
+  }
+}
+
+class _ToolActionCard extends ConsumerWidget {
+  const _ToolActionCard({
+    required this.messageId,
+    required this.action,
+  });
+
+  final String messageId;
+  final ProposedToolAction action;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final call = action.call;
+
+    final (icon, color, title, subtitle) = switch (call) {
+      AddActivityToolCall() => (
+          Icons.add_task_rounded,
+          const Color(0xFF34C759),
+          'إضافة نشاط: ${call.title}',
+          call.projectName != null
+              ? 'ضمن مشروع: ${call.projectName}'
+              : 'مقترح من المساعد',
+        ),
+      CreateProjectToolCall() => (
+          Icons.create_new_folder_rounded,
+          const Color(0xFFFF9500),
+          'إنشاء مشروع: ${call.name}',
+          call.tasks.isEmpty
+              ? (call.description ?? 'مشروع جديد')
+              : 'يتضمن ${call.tasks.length} مهام',
+        ),
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withValues(alpha: 0.30),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              SettingsIconBadge(icon: icon, color: color),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface.withValues(alpha: 0.62),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          switch (action.status) {
+            ToolActionStatus.pending => Row(
+                children: [
+                  Expanded(
+                    child: PressableScale(
+                      onTap: () => ref
+                          .read(aiChatProvider.notifier)
+                          .dismissProposedAction(messageId, action.id),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        decoration: BoxDecoration(
+                          color: colorScheme.onSurface.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'تجاهل',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: PressableScale(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        ref
+                            .read(aiChatProvider.notifier)
+                            .executeProposedAction(messageId, action.id);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'تأكيد وإضافة',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ToolActionStatus.executed => Row(
+                children: [
+                  Icon(Icons.check_circle_rounded, size: 16, color: color),
+                  const SizedBox(width: 6),
+                  Text(
+                    'تم التنفيذ والإضافة بنجاح',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            ToolActionStatus.dismissed => Text(
+                'تم تجاهل الاقتراح',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+          },
+        ],
       ),
     );
   }

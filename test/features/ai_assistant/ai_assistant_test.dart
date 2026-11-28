@@ -8,12 +8,14 @@ import 'package:al_ribat/domain/entities/reflection_entry.dart';
 import 'package:al_ribat/domain/entities/work_session_item.dart';
 import 'package:al_ribat/features/ai_assistant/data/ai_conversation_hive_repo.dart';
 import 'package:al_ribat/features/ai_assistant/data/ai_settings_hive_repo.dart';
+import 'package:al_ribat/features/ai_assistant/data/ai_tool_parser.dart';
 import 'package:al_ribat/features/ai_assistant/data/local_context_builder.dart';
 import 'package:al_ribat/features/ai_assistant/data/local_reflection_summarizer.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_local_model_spec.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_message.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_permissions.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_provider_config.dart';
+import 'package:al_ribat/features/ai_assistant/domain/ai_tool_call.dart';
 import 'package:al_ribat/features/ai_assistant/presentation/ai_chat_screen.dart';
 import 'package:al_ribat/features/ai_assistant/presentation/ai_settings_page.dart';
 import 'package:flutter/material.dart';
@@ -203,7 +205,32 @@ void main() {
     expect(chatRepo.loadAll().first.content, 'مرحبا');
   });
 
-  testWidgets('AiChatScreen shows setup onboarding and AiSettingsPage works',
+  test('AiToolParser extracts add_activity and create_project actions cleanly',
+      () {
+    const parser = AiToolParser();
+    const raw = '''
+ممتاز، سأضيف لك هذه المهمة الآن.
+```ribat_action
+{"action":"add_activity","title":"ورد المراجعة","repetition":"daily","type":"afterPrayer","linkedPrayer":"fajr","projectName":"حفظ القرآن"}
+```
+```ribat_action
+{"action":"create_project","name":"القراءة","description":"خطة شهرية","tasks":["قراءة 10 صفحات"]}
+```
+''';
+    final parsed = parser.parse(raw, messageId: 'm1');
+    expect(parsed.cleanText, 'ممتاز، سأضيف لك هذه المهمة الآن.');
+    expect(parsed.actions.length, 2);
+    expect(parsed.actions[0].call, isA<AddActivityToolCall>());
+    final add = parsed.actions[0].call as AddActivityToolCall;
+    expect(add.title, 'ورد المراجعة');
+    expect(add.linkedPrayer, 'fajr');
+    expect(parsed.actions[1].call, isA<CreateProjectToolCall>());
+    final proj = parsed.actions[1].call as CreateProjectToolCall;
+    expect(proj.name, 'القراءة');
+    expect(proj.tasks, ['قراءة 10 صفحات']);
+  });
+
+  testWidgets('AiChatScreen shows 4-step onboarding and opens AiSettingsPage',
       (tester) async {
     await tester.pumpWidget(
       const ProviderScope(
@@ -218,9 +245,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('مرحباً بك في RibatAI'), findsOneWidget);
-    expect(find.text('حفظ المفتاح والبدء'), findsOneWidget);
+    expect(find.text('ابدأ الإعداد (4 خطوات سريعة)'), findsOneWidget);
 
-    await tester.tap(find.text('خيارات المزوِّد والصلاحيات الكاملة'));
+    await tester.tap(find.text('ابدأ الإعداد (4 خطوات سريعة)'));
+    await tester.pumpAndSettle();
+    expect(find.text('اختر طريقة التشغيل المناسبة لك'), findsOneWidget);
+
+    await tester.tap(find.text('التالي'));
+    await tester.pumpAndSettle();
+    expect(find.text('أدخل مفتاح Groq المجاني'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'gsk_test_key');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('التالي'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('حدّد ما يطلع عليه RibatAI'), findsOneWidget);
+    await tester.tap(find.text('كافة الصلاحيات والإعدادات'));
     await tester.pumpAndSettle();
 
     expect(find.text('المساعد الذكي (RibatAI)'), findsOneWidget);
