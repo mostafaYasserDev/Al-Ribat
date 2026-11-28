@@ -344,13 +344,28 @@ class _AiSetupViewState extends ConsumerState<AiSetupView> {
   }
 
   Widget _buildStepPermissions(ThemeData theme, ColorScheme colorScheme) {
-    final perms = ref.watch(aiPermissionsProvider);
+    final isLocal = _selectedType == AiProviderType.localLlm;
+    final perms = isLocal
+        ? ref.watch(aiLocalPermissionsProvider)
+        : ref.watch(aiCloudPermissionsProvider);
+    Future<void> savePerms(dynamic next) {
+      return isLocal
+          ? ref
+              .read(aiLocalPermissionsProvider.notifier)
+              .updatePermissions(next)
+          : ref
+              .read(aiCloudPermissionsProvider.notifier)
+              .updatePermissions(next);
+    }
+
     return Column(
       key: const ValueKey('step_3_perms'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'حدّد ما يطلع عليه RibatAI',
+          isLocal
+              ? 'حدّد صلاحيات النموذج المحلي'
+              : 'حدّد صلاحيات النموذج السحابي',
           style: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w800,
           ),
@@ -363,36 +378,29 @@ class _AiSetupViewState extends ConsumerState<AiSetupView> {
               iconColor: const Color(0xFF34C759),
               title: 'المهام والأنشطة',
               value: perms.allowActivities,
-              onChanged: (v) => ref
-                  .read(aiPermissionsProvider.notifier)
-                  .updatePermissions(perms.copyWith(allowActivities: v)),
+              onChanged: (v) => savePerms(perms.copyWith(allowActivities: v)),
             ),
             SettingsSwitchTile(
               icon: Icons.mosque_rounded,
               iconColor: const Color(0xFF1F6F4A),
               title: 'أوقات الصلاة',
               value: perms.allowPrayer,
-              onChanged: (v) => ref
-                  .read(aiPermissionsProvider.notifier)
-                  .updatePermissions(perms.copyWith(allowPrayer: v)),
+              onChanged: (v) => savePerms(perms.copyWith(allowPrayer: v)),
             ),
             SettingsSwitchTile(
               icon: Icons.folder_rounded,
               iconColor: const Color(0xFFFF9500),
               title: 'المشاريع',
               value: perms.allowProjects,
-              onChanged: (v) => ref
-                  .read(aiPermissionsProvider.notifier)
-                  .updatePermissions(perms.copyWith(allowProjects: v)),
+              onChanged: (v) => savePerms(perms.copyWith(allowProjects: v)),
             ),
             SettingsSwitchTile(
               icon: Icons.shield_outlined,
               iconColor: const Color(0xFF007AFF),
               title: 'ملخص التأملات المحلي (بمراجعتك)',
               value: perms.allowReflectionSummary,
-              onChanged: (v) => ref
-                  .read(aiPermissionsProvider.notifier)
-                  .updatePermissions(perms.copyWith(allowReflectionSummary: v)),
+              onChanged: (v) =>
+                  savePerms(perms.copyWith(allowReflectionSummary: v)),
             ),
             SettingsNavTile(
               icon: Icons.tune_rounded,

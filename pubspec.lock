@@ -278,6 +278,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "4.0.0"
+  flutter_local_llm:
+    dependency: "direct main"
+    description:
+      name: flutter_local_llm
+      sha256: dfa3ac04ed325b3eed92b7197a8b506b8405b32060c4524199c9a8d492e0d625
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   flutter_local_notifications:
     dependency: "direct main"
     description:

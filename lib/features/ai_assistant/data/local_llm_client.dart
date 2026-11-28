@@ -1,15 +1,15 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter_local_llm/flutter_local_llm.dart';
 
 import '../../../core/errors/app_failure.dart';
 import '../domain/ai_message.dart';
 
 class LocalLlmClient {
-  const LocalLlmClient();
+  LocalLlmEngine? _engine;
+  String? _loadedModelPath;
 
-  /// Streams local inference from a downloaded GGUF file if `llama-cli` is
-  /// available on the host; otherwise returns a clear setup guidance error.
   Stream<String> streamChat({
     required String modelPath,
     required String systemPrompt,
@@ -22,61 +22,52 @@ class LocalLlmClient {
       );
     }
 
-    final binary = await _findLlamaCli();
-    if (binary == null) {
-      throw const ValidationFailure(
-        'ملف النموذج محمّل وجاهز، لكن محرك التشغيل المحلي (llama-cli) غير مثبّت على هذا الجهاز بعد. يمكنك التبديل إلى Groq السحابي أو تثبيت llama-cli.',
-      );
-    }
-
-    final prompt = _buildChatPrompt(systemPrompt, history);
-    final process = await Process.start(binary, [
-      '-m',
-      modelPath,
-      '-p',
-      prompt,
-      '-n',
-      '512',
-      '--temp',
-      '0.7',
-      '--no-display-prompt',
-    ]);
-
-    await for (final chunk in process.stdout.transform(utf8.decoder)) {
-      if (chunk.isNotEmpty) yield chunk;
-    }
-
-    final code = await process.exitCode;
-    if (code != 0) {
-      throw UnknownFailure(
-        fallback: 'توقف محرك التشغيل المحلي بشكل غير متوقع (رمز $code).',
-      );
-    }
-  }
-
-  Future<String?> _findLlamaCli() async {
-    if (!Platform.isLinux && !Platform.isMacOS) return null;
     try {
-      final result = await Process.run('which', ['llama-cli']);
-      if (result.exitCode == 0) {
-        final path = result.stdout.toString().trim();
-        if (path.isNotEmpty) return path;
+      if (_engine == null ||
+          _engine!.isDisposed ||
+          _loadedModelPath != modelPath) {
+        _engine?.dispose();
+        _engine = await LocalLlmEngine.loadModel(
+          modelPath: modelPath,
+          params: const ModelParams(contextSize: 2048),
+        );
+        _loadedModelPath = modelPath;
       }
-    } catch (_) {}
-    return null;
+
+      final session = _engine!.createSession();
+      try {
+        final messages = <ChatMessage>[
+          ChatMessage.system(systemPrompt),
+          for (final m in history.where((m) => !m.isError).take(12))
+            if (m.role == AiRole.user)
+              ChatMessage.user(m.content)
+            else if (m.role == AiRole.assistant)
+              ChatMessage.assistant(m.content),
+        ];
+
+        await for (final token in session.chat(messages)) {
+          if (token.isNotEmpty) yield token;
+        }
+      } finally {
+        session.dispose();
+      }
+    } on LlmException catch (e) {
+      throw UnknownFailure(
+        fallback:
+            'تعذر تشغيل النموذج المحلي على هذا الجهاز. جرّب نموذجاً أخف أو استخدم السحابي.',
+        debugMessage: e.toString(),
+      );
+    } catch (e) {
+      throw AppFailure.from(
+        e,
+        fallback: 'حدث خطأ أثناء التشغيل المحلي للنموذج.',
+      );
+    }
   }
 
-  String _buildChatPrompt(String systemPrompt, List<AiMessage> history) {
-    final buf = StringBuffer()
-      ..writeln('<|system|>')
-      ..writeln(systemPrompt);
-    for (final msg in history.where((m) => !m.isError).take(8)) {
-      final tag = msg.role == AiRole.user ? '<|user|>' : '<|assistant|>';
-      buf
-        ..writeln(tag)
-        ..writeln(msg.content);
-    }
-    buf.writeln('<|assistant|>');
-    return buf.toString();
+  void dispose() {
+    _engine?.dispose();
+    _engine = null;
+    _loadedModelPath = null;
   }
 }

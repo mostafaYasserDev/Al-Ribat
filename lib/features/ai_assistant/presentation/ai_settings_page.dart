@@ -18,6 +18,7 @@ class AiSettingsPage extends ConsumerStatefulWidget {
 
 class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
   late final TextEditingController _keyController;
+  late AiProviderType _permissionTab;
   bool _obscureKey = true;
   bool _savedFeedback = false;
 
@@ -26,6 +27,7 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
     super.initState();
     final config = ref.read(aiConfigProvider);
     _keyController = TextEditingController(text: config.groqApiKey ?? '');
+    _permissionTab = config.type;
   }
 
   @override
@@ -59,7 +61,19 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final config = ref.watch(aiConfigProvider);
-    final perms = ref.watch(aiPermissionsProvider);
+    final perms = _permissionTab == AiProviderType.localLlm
+        ? ref.watch(aiLocalPermissionsProvider)
+        : ref.watch(aiCloudPermissionsProvider);
+    Future<void> savePerms(dynamic next) {
+      return _permissionTab == AiProviderType.localLlm
+          ? ref
+              .read(aiLocalPermissionsProvider.notifier)
+              .updatePermissions(next)
+          : ref
+              .read(aiCloudPermissionsProvider.notifier)
+              .updatePermissions(next);
+    }
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -118,17 +132,24 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                 const SettingsSectionHeader(title: 'صلاحيات الوصول للبيانات'),
                 SettingsGroupCard(
                   children: [
-                    SettingsSwitchTile(
-                      icon: Icons.notifications_active_outlined,
-                      iconColor: const Color(0xFFFF9500),
-                      title: 'التنبيهات الاستباقية الذكية',
-                      subtitle:
-                          'تحليل محلي لتنبيهك عند ازدحام الجدول أو تراجع الالتزام',
-                      value: config.proactiveAlertsEnabled,
-                      onChanged: (v) =>
-                          ref.read(aiConfigProvider.notifier).updateConfig(
-                                config.copyWith(proactiveAlertsEnabled: v),
-                              ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                      child: AnimatedSegmentedControl<AiProviderType>(
+                        options: const [
+                          SegmentOption(
+                            value: AiProviderType.groqCloud,
+                            label: 'صلاحيات السحابي',
+                            icon: Icons.cloud_outlined,
+                          ),
+                          SegmentOption(
+                            value: AiProviderType.localLlm,
+                            label: 'صلاحيات المحلي',
+                            icon: Icons.smartphone_rounded,
+                          ),
+                        ],
+                        selected: _permissionTab,
+                        onChanged: (t) => setState(() => _permissionTab = t),
+                      ),
                     ),
                     SettingsSwitchTile(
                       icon: Icons.notifications_active_outlined,
@@ -148,10 +169,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                       title: 'المهام والأنشطة',
                       subtitle: 'الاطلاع على مهامك وحالة إنجازها اليومي',
                       value: perms.allowActivities,
-                      onChanged: (v) => ref
-                          .read(aiPermissionsProvider.notifier)
-                          .updatePermissions(
-                              perms.copyWith(allowActivities: v)),
+                      onChanged: (v) =>
+                          savePerms(perms.copyWith(allowActivities: v)),
                     ),
                     SettingsSwitchTile(
                       icon: Icons.mosque_rounded,
@@ -160,9 +179,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                       subtitle:
                           'توزيع المهام حول الصلوات واكتشاف الفترات الضيقة',
                       value: perms.allowPrayer,
-                      onChanged: (v) => ref
-                          .read(aiPermissionsProvider.notifier)
-                          .updatePermissions(perms.copyWith(allowPrayer: v)),
+                      onChanged: (v) =>
+                          savePerms(perms.copyWith(allowPrayer: v)),
                     ),
                     SettingsSwitchTile(
                       icon: Icons.folder_rounded,
@@ -170,9 +188,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                       title: 'المشاريع',
                       subtitle: 'مشاركة أسماء المشاريع ونسب إنجازها',
                       value: perms.allowProjects,
-                      onChanged: (v) => ref
-                          .read(aiPermissionsProvider.notifier)
-                          .updatePermissions(perms.copyWith(allowProjects: v)),
+                      onChanged: (v) =>
+                          savePerms(perms.copyWith(allowProjects: v)),
                     ),
                     SettingsSwitchTile(
                       icon: Icons.timer_rounded,
@@ -180,10 +197,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                       title: 'جلسات التركيز',
                       subtitle: 'مشاركة مدد جلسات التركيز الأسبوعية',
                       value: perms.allowWorkSessions,
-                      onChanged: (v) => ref
-                          .read(aiPermissionsProvider.notifier)
-                          .updatePermissions(
-                              perms.copyWith(allowWorkSessions: v)),
+                      onChanged: (v) =>
+                          savePerms(perms.copyWith(allowWorkSessions: v)),
                     ),
                     SettingsSwitchTile(
                       icon: Icons.menu_book_rounded,
@@ -191,10 +206,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                       title: 'التأملات الكاملة (نص حرفي)',
                       subtitle: 'حساسة — مشاركة نصوص خواطرك مباشرة',
                       value: perms.allowReflections,
-                      onChanged: (v) => ref
-                          .read(aiPermissionsProvider.notifier)
-                          .updatePermissions(
-                              perms.copyWith(allowReflections: v)),
+                      onChanged: (v) =>
+                          savePerms(perms.copyWith(allowReflections: v)),
                     ),
                     AnimatedSize(
                       duration: const Duration(milliseconds: 220),
@@ -212,10 +225,8 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                                     .read(aiReflectionSummaryApprovedProvider
                                         .notifier)
                                     .state = false;
-                                ref
-                                    .read(aiPermissionsProvider.notifier)
-                                    .updatePermissions(perms.copyWith(
-                                        allowReflectionSummary: v));
+                                savePerms(
+                                    perms.copyWith(allowReflectionSummary: v));
                               },
                             ),
                     ),

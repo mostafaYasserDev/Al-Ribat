@@ -7,6 +7,7 @@ import '../../projects/presentation/widgets/anchored_popover.dart';
 import '../../reflections/presentation/widgets/apple_morph_route.dart';
 import '../../settings/presentation/widgets/settings_ui_components.dart';
 import '../application/ai_providers.dart';
+import '../domain/ai_local_model_spec.dart';
 import '../domain/ai_message.dart';
 import '../domain/ai_provider_config.dart';
 import '../domain/ai_tool_call.dart';
@@ -111,6 +112,107 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
     _scrollToBottom();
   }
 
+  String _activeModelSubtitle(AiProviderConfig config) {
+    if (config.type == AiProviderType.groqCloud) {
+      return config.groqModel == AiProviderConfig.fastGroqModel
+          ? 'سحابي · GPT-OSS 20B'
+          : 'سحابي · Qwen 3.8 27B';
+    }
+    final spec = LocalModelSpec.catalog
+        .where((m) => m.id == config.localModelId)
+        .firstOrNull;
+    return spec != null ? 'محلي · ${spec.displayName}' : 'محلي · غير محدد';
+  }
+
+  void _openModelSwitcher(BuildContext anchorContext) {
+    HapticFeedback.selectionClick();
+    final config = ref.read(aiConfigProvider);
+    final downloaded =
+        ref.read(downloadedModelsProvider).valueOrNull ?? const {};
+    final hasCloudKey =
+        config.groqApiKey != null && config.groqApiKey!.trim().isNotEmpty;
+
+    showAnchoredPopover<void>(
+      anchorContext,
+      width: 265,
+      preferAbove: false,
+      builder: (popCtx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasCloudKey) ...[
+            PopoverActionRow(
+              icon: config.type == AiProviderType.groqCloud &&
+                      config.groqModel == AiProviderConfig.defaultGroqModel
+                  ? Icons.check_circle_rounded
+                  : Icons.cloud_outlined,
+              color: const Color(0xFF007AFF),
+              label: 'سحابي · Qwen 3.8 27B',
+              onTap: () {
+                Navigator.of(popCtx).pop();
+                ref.read(aiConfigProvider.notifier).updateConfig(
+                      config.copyWith(
+                        type: AiProviderType.groqCloud,
+                        groqModel: AiProviderConfig.defaultGroqModel,
+                      ),
+                    );
+              },
+            ),
+            PopoverActionRow(
+              icon: config.type == AiProviderType.groqCloud &&
+                      config.groqModel == AiProviderConfig.fastGroqModel
+                  ? Icons.check_circle_rounded
+                  : Icons.cloud_outlined,
+              color: const Color(0xFF007AFF),
+              label: 'سحابي · GPT-OSS 20B',
+              onTap: () {
+                Navigator.of(popCtx).pop();
+                ref.read(aiConfigProvider.notifier).updateConfig(
+                      config.copyWith(
+                        type: AiProviderType.groqCloud,
+                        groqModel: AiProviderConfig.fastGroqModel,
+                      ),
+                    );
+              },
+            ),
+          ],
+          for (final spec in LocalModelSpec.catalog)
+            if (downloaded.containsKey(spec.id))
+              PopoverActionRow(
+                icon: config.type == AiProviderType.localLlm &&
+                        config.localModelId == spec.id
+                    ? Icons.check_circle_rounded
+                    : Icons.smartphone_rounded,
+                color: const Color(0xFF5856D6),
+                label: 'محلي · ${spec.displayName}',
+                onTap: () {
+                  Navigator.of(popCtx).pop();
+                  ref.read(aiConfigProvider.notifier).updateConfig(
+                        config.copyWith(
+                          type: AiProviderType.localLlm,
+                          localModelId: spec.id,
+                          localModelPath: downloaded[spec.id],
+                        ),
+                      );
+                },
+              ),
+          PopoverActionRow(
+            icon: Icons.tune_rounded,
+            color: const Color(0xFF34C759),
+            label: 'إدارة النماذج والإعدادات',
+            onTap: () {
+              Navigator.of(popCtx).pop();
+              Navigator.of(context).push(
+                CupertinoPageRoute<void>(
+                  builder: (_) => const AiSettingsPage(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   void _openMenu(BuildContext anchorContext) {
     HapticFeedback.selectionClick();
     showAnchoredPopover<void>(
@@ -177,35 +279,52 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         titleSpacing: 0,
-        title: Row(
-          children: [
-            const SettingsIconBadge(
-              icon: Icons.auto_awesome_rounded,
-              color: Color(0xFF5856D6),
-              size: 32,
-              iconSize: 18,
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        title: Builder(
+          builder: (titleCtx) => PressableScale(
+            onTap: () => _openModelSwitcher(titleCtx),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'RibatAI',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                const SettingsIconBadge(
+                  icon: Icons.auto_awesome_rounded,
+                  color: Color(0xFF5856D6),
+                  size: 32,
+                  iconSize: 18,
                 ),
-                Text(
-                  config.type == AiProviderType.groqCloud
-                      ? 'سحابي · Groq'
-                      : 'محلي (قريباً)',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RibatAI',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _activeModelSubtitle(config),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color:
+                                colorScheme.onSurface.withValues(alpha: 0.65),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 14,
+                          color: colorScheme.onSurface.withValues(alpha: 0.55),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
         actions: [
           Builder(

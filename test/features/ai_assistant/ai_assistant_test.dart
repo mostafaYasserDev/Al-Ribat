@@ -7,6 +7,7 @@ import 'package:al_ribat/domain/entities/prayer_time.dart';
 import 'package:al_ribat/domain/entities/reflection_entry.dart';
 import 'package:al_ribat/domain/entities/work_session_item.dart';
 import 'package:al_ribat/features/ai_assistant/application/ai_proactive_engine.dart';
+import 'package:al_ribat/features/ai_assistant/application/ai_providers.dart';
 import 'package:al_ribat/features/ai_assistant/data/ai_conversation_hive_repo.dart';
 import 'package:al_ribat/features/ai_assistant/data/ai_settings_hive_repo.dart';
 import 'package:al_ribat/features/ai_assistant/data/ai_tool_parser.dart';
@@ -192,7 +193,12 @@ void main() {
       ),
     );
     await settingsRepo.savePermissions(
-      const AiPermissions(allowReflections: true, allowProjects: false),
+      const AiPermissions(allowReflections: false, allowProjects: false),
+      AiProviderType.groqCloud,
+    );
+    await settingsRepo.savePermissions(
+      const AiPermissions(allowReflections: true, allowProjects: true),
+      AiProviderType.localLlm,
     );
     await chatRepo.saveAll([
       AiMessage(
@@ -205,8 +211,22 @@ void main() {
 
     expect(settingsRepo.loadConfig().groqApiKey, 'gsk_test_123');
     expect(settingsRepo.loadConfig().isConfigured, isTrue);
-    expect(settingsRepo.loadPermissions().allowReflections, isTrue);
-    expect(settingsRepo.loadPermissions().allowProjects, isFalse);
+    expect(
+      settingsRepo.loadPermissions(AiProviderType.groqCloud).allowReflections,
+      isFalse,
+    );
+    expect(
+      settingsRepo.loadPermissions(AiProviderType.groqCloud).allowProjects,
+      isFalse,
+    );
+    expect(
+      settingsRepo.loadPermissions(AiProviderType.localLlm).allowReflections,
+      isTrue,
+    );
+    expect(
+      settingsRepo.loadPermissions(AiProviderType.localLlm).allowProjects,
+      isTrue,
+    );
     expect(chatRepo.loadAll().length, 1);
     expect(chatRepo.loadAll().first.content, 'مرحبا');
   });
@@ -239,8 +259,13 @@ void main() {
   testWidgets('AiChatScreen shows 4-step onboarding and opens AiSettingsPage',
       (tester) async {
     await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(
+      ProviderScope(
+        overrides: [
+          downloadedModelsProvider.overrideWith(
+            (ref) async => {'gemma3-1b-int4': '/tmp/gemma.gguf'},
+          ),
+        ],
+        child: const MaterialApp(
           home: Directionality(
             textDirection: TextDirection.rtl,
             child: AiChatScreen(),
@@ -266,7 +291,7 @@ void main() {
     await tester.tap(find.text('التالي'));
     await tester.pumpAndSettle();
 
-    expect(find.text('حدّد ما يطلع عليه RibatAI'), findsOneWidget);
+    expect(find.text('حدّد صلاحيات النموذج السحابي'), findsOneWidget);
     await tester.tap(find.text('كافة الصلاحيات والإعدادات'));
     await tester.pumpAndSettle();
 
@@ -344,7 +369,7 @@ void main() {
 
   test('LocalLlmClient throws clear ValidationFailure when model is missing',
       () async {
-    const client = LocalLlmClient();
+    final client = LocalLlmClient();
     await expectLater(
       client.streamChat(
         modelPath: '/nonexistent/model.gguf',
@@ -353,5 +378,46 @@ void main() {
       ).toList(),
       throwsException,
     );
+  });
+
+  testWidgets('AiChatScreen shows active local model name and switcher popover',
+      (tester) async {
+    final box = Hive.box<String>('meta_box');
+    await tester.runAsync(
+      () => AiSettingsHiveRepo(box).saveConfig(
+        const AiProviderConfig(
+          type: AiProviderType.localLlm,
+          localModelId: 'gemma3-1b-int4',
+          localModelPath: '/tmp/gemma.gguf',
+          hasCompletedOnboarding: true,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          downloadedModelsProvider.overrideWith(
+            (ref) async => {'gemma3-1b-int4': '/tmp/gemma.gguf'},
+          ),
+        ],
+        child: const MaterialApp(
+          home: Directionality(
+            textDirection: TextDirection.rtl,
+            child: AiChatScreen(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text('محلي · Gemma 3 1B (Q4)'), findsOneWidget);
+    expect(find.text('محلي (قريباً)'), findsNothing);
+
+    await tester.tap(find.text('محلي · Gemma 3 1B (Q4)'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('إدارة النماذج والإعدادات'), findsOneWidget);
   });
 }

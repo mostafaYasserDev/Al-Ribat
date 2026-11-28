@@ -29,8 +29,11 @@ final aiConversationRepoProvider = Provider<AiConversationHiveRepo>((ref) {
 
 final groqClientProvider = Provider<GroqClient>((ref) => GroqClient());
 
-final localLlmClientProvider =
-    Provider<LocalLlmClient>((ref) => const LocalLlmClient());
+final localLlmClientProvider = Provider<LocalLlmClient>((ref) {
+  final client = LocalLlmClient();
+  ref.onDispose(client.dispose);
+  return client;
+});
 
 final modelDownloadManagerProvider =
     Provider<ModelDownloadManager>((ref) => ModelDownloadManager());
@@ -63,22 +66,55 @@ class AiConfigNotifier extends Notifier<AiProviderConfig> {
   }
 }
 
-final aiPermissionsProvider =
-    NotifierProvider<AiPermissionsNotifier, AiPermissions>(
-  AiPermissionsNotifier.new,
+final aiCloudPermissionsProvider =
+    NotifierProvider<AiCloudPermissionsNotifier, AiPermissions>(
+  AiCloudPermissionsNotifier.new,
 );
 
-class AiPermissionsNotifier extends Notifier<AiPermissions> {
+class AiCloudPermissionsNotifier extends Notifier<AiPermissions> {
   @override
   AiPermissions build() {
-    return ref.read(aiSettingsRepoProvider).loadPermissions();
+    return ref
+        .read(aiSettingsRepoProvider)
+        .loadPermissions(AiProviderType.groqCloud);
   }
 
   Future<void> updatePermissions(AiPermissions next) async {
     state = next;
-    await ref.read(aiSettingsRepoProvider).savePermissions(next);
+    await ref
+        .read(aiSettingsRepoProvider)
+        .savePermissions(next, AiProviderType.groqCloud);
   }
 }
+
+final aiLocalPermissionsProvider =
+    NotifierProvider<AiLocalPermissionsNotifier, AiPermissions>(
+  AiLocalPermissionsNotifier.new,
+);
+
+class AiLocalPermissionsNotifier extends Notifier<AiPermissions> {
+  @override
+  AiPermissions build() {
+    return ref
+        .read(aiSettingsRepoProvider)
+        .loadPermissions(AiProviderType.localLlm);
+  }
+
+  Future<void> updatePermissions(AiPermissions next) async {
+    state = next;
+    await ref
+        .read(aiSettingsRepoProvider)
+        .savePermissions(next, AiProviderType.localLlm);
+  }
+}
+
+/// Active permissions matching the currently selected provider.
+final aiPermissionsProvider = Provider<AiPermissions>((ref) {
+  final type = ref.watch(aiConfigProvider.select((c) => c.type));
+  return type == AiProviderType.localLlm
+      ? ref.watch(aiLocalPermissionsProvider)
+      : ref.watch(aiCloudPermissionsProvider);
+});
 
 final aiReflectionSummaryApprovedProvider = StateProvider<bool>((ref) => false);
 
