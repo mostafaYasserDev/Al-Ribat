@@ -10,7 +10,9 @@ import '../../data/model_download_manager.dart';
 import 'ai_model_download_sheet.dart';
 
 class AiDownloadFloatingPill extends ConsumerWidget {
-  const AiDownloadFloatingPill({super.key});
+  const AiDownloadFloatingPill({super.key, this.navigatorKey});
+
+  final GlobalKey<NavigatorState>? navigatorKey;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -40,7 +42,9 @@ class AiDownloadFloatingPill extends ConsumerWidget {
                       child: PressableScale(
                         onTap: () {
                           HapticFeedback.selectionClick();
-                          showModelDownloadSheet(context, spec);
+                          final navCtx =
+                              navigatorKey?.currentContext ?? context;
+                          showModelDownloadSheet(navCtx, spec);
                         },
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(20),
@@ -157,16 +161,16 @@ class _PillBody extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                onPressed: onCancel,
-                tooltip: isDone ? 'إغلاق' : 'إلغاء التنزيل',
-                icon: Icon(
-                  Icons.close_rounded,
-                  size: 17,
-                  color: colorScheme.onSurface.withValues(alpha: 0.55),
+              InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: onCancel,
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 17,
+                    color: colorScheme.onSurface.withValues(alpha: 0.55),
+                  ),
                 ),
               ),
             ],

@@ -12,6 +12,9 @@ import '../presentation/widgets/app_lock_wrapper.dart';
 class AlRibatApp extends ConsumerWidget {
   const AlRibatApp({super.key});
 
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings =
@@ -23,6 +26,7 @@ class AlRibatApp extends ConsumerWidget {
     };
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'الرباط',
       locale: const Locale('ar'),
@@ -34,11 +38,11 @@ class AlRibatApp extends ConsumerWidget {
         child: Stack(
           children: [
             if (child != null) child,
-            const Positioned(
+            Positioned(
               top: 0,
               left: 0,
               right: 0,
-              child: AiDownloadFloatingPill(),
+              child: AiDownloadFloatingPill(navigatorKey: navigatorKey),
             ),
           ],
         ),
