@@ -66,6 +66,11 @@ class GroqClient {
           'تم تجاوز حد الطلبات المؤقت على Groq. انتظر قليلاً ثم أعد المحاولة.',
         );
       }
+      if (res.statusCode == 404) {
+        throw const ValidationFailure(
+          'النموذج المختار غير متاح حالياً على Groq (404). جرّب نموذجاً آخر من الإعدادات.',
+        );
+      }
       if (res.statusCode < 200 || res.statusCode >= 300) {
         throw UnknownFailure(
           fallback: 'تعذر الاتصال بخدمة Groq (رمز ${res.statusCode}).',

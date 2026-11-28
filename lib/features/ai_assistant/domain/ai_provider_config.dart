@@ -10,8 +10,8 @@ class AiProviderConfig {
     this.hasCompletedOnboarding = false,
   });
 
-  static const String defaultGroqModel = 'llama-3.3-70b-versatile';
-  static const String fastGroqModel = 'llama-3.1-8b-instant';
+  static const String defaultGroqModel = 'qwen/qwen3.8-27b';
+  static const String fastGroqModel = 'openai/gpt-oss-20b';
 
   final AiProviderType type;
   final String? groqApiKey;
@@ -61,10 +61,16 @@ class AiProviderConfig {
     final type =
         AiProviderType.values.where((e) => e.name == typeName).firstOrNull ??
             AiProviderType.groqCloud;
+    final rawModel = json['groqModel'] as String?;
+    final resolvedModel = switch (rawModel) {
+      null || '' || 'llama-3.3-70b-versatile' => defaultGroqModel,
+      'llama-3.1-8b-instant' => fastGroqModel,
+      _ => rawModel,
+    };
     return AiProviderConfig(
       type: type,
       groqApiKey: json['groqApiKey'] as String?,
-      groqModel: json['groqModel'] as String? ?? defaultGroqModel,
+      groqModel: resolvedModel,
       localModelId: json['localModelId'] as String?,
       localModelPath: json['localModelPath'] as String?,
       hasCompletedOnboarding: json['hasCompletedOnboarding'] as bool? ?? false,

@@ -347,14 +347,16 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                     options: const [
                       SegmentOption(
                         value: AiProviderConfig.defaultGroqModel,
-                        label: 'Llama 3.3 70B (أذكى)',
+                        label: 'Qwen 3.8 27B (ممتاز)',
                       ),
                       SegmentOption(
                         value: AiProviderConfig.fastGroqModel,
-                        label: 'Llama 3.1 8B (أسرع)',
+                        label: 'GPT-OSS 20B (أسرع)',
                       ),
                     ],
-                    selected: config.groqModel,
+                    selected: config.groqModel == AiProviderConfig.fastGroqModel
+                        ? AiProviderConfig.fastGroqModel
+                        : AiProviderConfig.defaultGroqModel,
                     onChanged: (m) => ref
                         .read(aiConfigProvider.notifier)
                         .updateConfig(config.copyWith(groqModel: m)),
