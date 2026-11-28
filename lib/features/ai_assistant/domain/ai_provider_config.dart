@@ -8,6 +8,7 @@ class AiProviderConfig {
     this.localModelId,
     this.localModelPath,
     this.hasCompletedOnboarding = false,
+    this.proactiveAlertsEnabled = true,
   });
 
   static const String defaultGroqModel = 'qwen/qwen3.8-27b';
@@ -19,6 +20,7 @@ class AiProviderConfig {
   final String? localModelId;
   final String? localModelPath;
   final bool hasCompletedOnboarding;
+  final bool proactiveAlertsEnabled;
 
   bool get isConfigured => switch (type) {
         AiProviderType.groqCloud =>
@@ -35,6 +37,7 @@ class AiProviderConfig {
     String? localModelId,
     String? localModelPath,
     bool? hasCompletedOnboarding,
+    bool? proactiveAlertsEnabled,
   }) {
     return AiProviderConfig(
       type: type ?? this.type,
@@ -44,6 +47,8 @@ class AiProviderConfig {
       localModelPath: localModelPath ?? this.localModelPath,
       hasCompletedOnboarding:
           hasCompletedOnboarding ?? this.hasCompletedOnboarding,
+      proactiveAlertsEnabled:
+          proactiveAlertsEnabled ?? this.proactiveAlertsEnabled,
     );
   }
 
@@ -54,6 +59,7 @@ class AiProviderConfig {
         'localModelId': localModelId,
         'localModelPath': localModelPath,
         'hasCompletedOnboarding': hasCompletedOnboarding,
+        'proactiveAlertsEnabled': proactiveAlertsEnabled,
       };
 
   factory AiProviderConfig.fromJson(Map<String, dynamic> json) {
@@ -74,6 +80,7 @@ class AiProviderConfig {
       localModelId: json['localModelId'] as String?,
       localModelPath: json['localModelPath'] as String?,
       hasCompletedOnboarding: json['hasCompletedOnboarding'] as bool? ?? false,
+      proactiveAlertsEnabled: json['proactiveAlertsEnabled'] as bool? ?? true,
     );
   }
 }

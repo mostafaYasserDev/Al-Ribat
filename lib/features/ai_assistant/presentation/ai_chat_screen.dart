@@ -14,13 +14,16 @@ import 'ai_settings_page.dart';
 import 'widgets/ai_setup_and_review.dart';
 
 class AiChatScreen extends ConsumerStatefulWidget {
-  const AiChatScreen({super.key});
+  const AiChatScreen({super.key, this.initialPrompt});
+
+  final String? initialPrompt;
 
   static Future<void> open(
     BuildContext context, {
     BuildContext? sourceContext,
     Color? sourceColor,
     double sourceRadius = 12,
+    String? initialPrompt,
   }) {
     final sourceRect = captureWidgetRect(sourceContext);
     return Navigator.of(context).push<void>(
@@ -28,7 +31,7 @@ class AiChatScreen extends ConsumerStatefulWidget {
         sourceRect: sourceRect,
         sourceColor: sourceColor,
         sourceRadius: sourceRadius,
-        builder: (_) => const AiChatScreen(),
+        builder: (_) => AiChatScreen(initialPrompt: initialPrompt),
       ),
     );
   }
@@ -41,6 +44,21 @@ class _AiChatScreenState extends ConsumerState<AiChatScreen> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   final _menuKey = GlobalKey();
+  bool _sentInitialPrompt = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final prompt = widget.initialPrompt?.trim();
+    if (prompt != null && prompt.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _sentInitialPrompt) return;
+        if (!ref.read(aiConfigProvider).isConfigured) return;
+        _sentInitialPrompt = true;
+        _handleSend(prompt);
+      });
+    }
+  }
 
   static const _starterPrompts = [
     'قيّم توزيع مهامي بين الصلوات اليوم',

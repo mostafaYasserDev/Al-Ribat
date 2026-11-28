@@ -6,18 +6,22 @@ import 'package:al_ribat/domain/entities/prayer_schedule.dart';
 import 'package:al_ribat/domain/entities/prayer_time.dart';
 import 'package:al_ribat/domain/entities/reflection_entry.dart';
 import 'package:al_ribat/domain/entities/work_session_item.dart';
+import 'package:al_ribat/features/ai_assistant/application/ai_proactive_engine.dart';
 import 'package:al_ribat/features/ai_assistant/data/ai_conversation_hive_repo.dart';
 import 'package:al_ribat/features/ai_assistant/data/ai_settings_hive_repo.dart';
 import 'package:al_ribat/features/ai_assistant/data/ai_tool_parser.dart';
 import 'package:al_ribat/features/ai_assistant/data/local_context_builder.dart';
 import 'package:al_ribat/features/ai_assistant/data/local_reflection_summarizer.dart';
+import 'package:al_ribat/features/ai_assistant/domain/ai_context_snapshot.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_local_model_spec.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_message.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_permissions.dart';
+import 'package:al_ribat/features/ai_assistant/domain/ai_proactive_alert.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_provider_config.dart';
 import 'package:al_ribat/features/ai_assistant/domain/ai_tool_call.dart';
 import 'package:al_ribat/features/ai_assistant/presentation/ai_chat_screen.dart';
 import 'package:al_ribat/features/ai_assistant/presentation/ai_settings_page.dart';
+import 'package:al_ribat/features/ai_assistant/presentation/widgets/ai_proactive_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -267,5 +271,56 @@ void main() {
     expect(find.text('المساعد الذكي (RibatAI)'), findsOneWidget);
     expect(find.text('صلاحيات الوصول للبيانات'), findsOneWidget);
     expect(find.byType(AiSettingsPage), findsOneWidget);
+  });
+
+  test('AiProactiveEngine detects tight prayer slot scheduling conflict', () {
+    const engine = AiProactiveEngine();
+    const snapshot = AiContextSnapshot(
+      dueToday: 3,
+      completedToday: 0,
+      prayerSlots: [
+        PrayerSlotInfo(
+          label: 'بين المغرب والعشاء',
+          durationMinutes: 80,
+          taskCount: 3,
+          taskTitles: ['ورد', 'قراءة', 'مراجعة'],
+        ),
+      ],
+    );
+    final alert = engine.evaluate(snapshot, const AiPermissions());
+    expect(alert, isNotNull);
+    expect(alert!.type, ProactiveAlertType.schedulingConflict);
+    expect(alert.title, contains('بين المغرب والعشاء'));
+  });
+
+  testWidgets('AiProactiveBanner renders alert and dismisses for today',
+      (tester) async {
+    const testAlert = AiProactiveAlert(
+      id: 'test_slot',
+      type: ProactiveAlertType.schedulingConflict,
+      title: 'جدولة مزدحمة بين المغرب والعشاء',
+      body: 'لديك 3 مهام في 80 دقيقة.',
+      suggestedPrompt: 'أعد توزيع مهامي',
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          aiProactiveAlertProvider.overrideWith((ref) => testAlert),
+        ],
+        child: const MaterialApp(
+          home: Scaffold(
+            body: Directionality(
+              textDirection: TextDirection.rtl,
+              child: AiProactiveBanner(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('جدولة مزدحمة بين المغرب والعشاء'), findsOneWidget);
+    expect(find.text('ناقش المساعد لحلها'), findsOneWidget);
   });
 }

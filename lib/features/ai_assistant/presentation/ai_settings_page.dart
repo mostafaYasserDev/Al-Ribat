@@ -118,6 +118,30 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
                 SettingsGroupCard(
                   children: [
                     SettingsSwitchTile(
+                      icon: Icons.notifications_active_outlined,
+                      iconColor: const Color(0xFFFF9500),
+                      title: 'التنبيهات الاستباقية الذكية',
+                      subtitle:
+                          'تحليل محلي لتنبيهك عند ازدحام الجدول أو تراجع الالتزام',
+                      value: config.proactiveAlertsEnabled,
+                      onChanged: (v) =>
+                          ref.read(aiConfigProvider.notifier).updateConfig(
+                                config.copyWith(proactiveAlertsEnabled: v),
+                              ),
+                    ),
+                    SettingsSwitchTile(
+                      icon: Icons.notifications_active_outlined,
+                      iconColor: const Color(0xFFFF9500),
+                      title: 'التنبيهات الاستباقية الذكية',
+                      subtitle: 'تحليل محلي لتنبيهك عند ازدحام الجدول أو تراجع الالتزام',
+                      value: config.proactiveAlertsEnabled,
+                      onChanged: (v) => ref
+                          .read(aiConfigProvider.notifier)
+                          .updateConfig(
+                            config.copyWith(proactiveAlertsEnabled: v),
+                          ),
+                    ),
+                    SettingsSwitchTile(
                       icon: Icons.task_alt_rounded,
                       iconColor: const Color(0xFF34C759),
                       title: 'المهام والأنشطة',

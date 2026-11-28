@@ -16,6 +16,7 @@ import '../../../domain/entities/prayer_schedule.dart';
 import '../../../domain/entities/prayer_time.dart';
 import '../../../presentation/stats/stats_screen.dart';
 import '../../ai_assistant/presentation/ai_chat_screen.dart';
+import '../../ai_assistant/presentation/widgets/ai_proactive_banner.dart';
 import '../../../presentation/widgets/add_activity_sheet.dart';
 import '../../../services/motivation_quotes.dart';
 import 'widgets/home_activities_sections.dart';
@@ -369,6 +370,7 @@ class HomeScreenState extends ConsumerState<HomeScreen>
                             );
                           },
                         ),
+                        const AiProactiveBanner(),
                         const SizedBox(height: 12),
                         HomePrayerHeroCard(
                           schedule: schedule,
